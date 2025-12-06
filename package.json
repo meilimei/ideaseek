@@ -6,11 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ingest:reddit": "tsx scripts/ingest-reddit.ts",
+    "ingest:trends": "tsx scripts/ingest-trends.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
-    "next": "16.0.5",
+    "google-trends-api": "^4.9.2",
+    "next": "^16.0.7",
     "openai": "^6.9.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
@@ -20,9 +23,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

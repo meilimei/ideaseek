@@ -19,6 +19,7 @@ type Idea = {
   difficulty: number | null;
   market_size: string | null;
   source_type: string | null;
+  source_url: string | null;
   demand_strength: string | null;
   pain_points: string[] | null;
   target_users: string | null;
@@ -47,9 +48,15 @@ export default function IdeaDetailPage({ params }: Props) {
           throw new Error('Failed to fetch idea');
         }
         const json = await res.json();
-        setIdea(json.item);
-      } catch (err: any) {
-        setError(err.message ?? 'Unknown error');
+        const item = json.item as Idea;
+        setIdea({
+          ...item,
+          source_url: item?.source_url ?? null,
+        });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -144,11 +151,36 @@ export default function IdeaDetailPage({ params }: Props) {
             </span>
           )}
           {idea.source_type && (
-            <span className="px-3 py-1 rounded-full bg-gray-100 text-xs">
-              Source: {idea.source_type}
-            </span>
+            <>
+              {idea.source_url ? (
+                <a
+                  href={idea.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1 rounded-full bg-gray-100 text-xs underline hover:text-indigo-700"
+                >
+                  Source: {idea.source_type}
+                </a>
+              ) : (
+                <span className="px-3 py-1 rounded-full bg-gray-100 text-xs">
+                  Source: {idea.source_type}
+                </span>
+              )}
+            </>
           )}
         </div>
+        {idea.source_type === 'reddit' && idea.source_url && (
+          <div className="text-sm">
+            <a
+              href={idea.source_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 underline hover:text-indigo-800"
+            >
+              View original Reddit thread
+            </a>
+          </div>
+        )}
       </section>
 
       {/* Idea narrative */}

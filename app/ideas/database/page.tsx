@@ -19,6 +19,7 @@ type Idea = {
   difficulty: number | null;
   market_size: string | null;
   demand_strength?: string | null;
+  source_url: string | null;
 };
 
 export default function IdeasDatabasePage() {

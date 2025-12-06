@@ -25,6 +25,7 @@ export async function GET(_request: Request, { params }: Params) {
         'difficulty',
         'market_size',
         'source_type',
+        'source_url',
         'demand_strength',
         'pain_points',
         'target_users',
