@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "ingest:reddit": "tsx scripts/ingest-reddit.ts",
-    "ingest:trends": "tsx scripts/ingest-trends.ts"
+    "ingest:trends": "tsx scripts/ingest-trends.ts",
+    "ingest:trends:searchapi": "tsx scripts/ingest-trends-searchapi.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
