@@ -6,6 +6,16 @@ type TrendCard = {
   slug: string;
   title: string;
   source_primary: string;
+  keyword?: string;
+  summary?: string | null;
+  geo?: string | null;
+  timeframe?: string | null;
+  latest_value?: number | null;
+  peak_value?: number | null;
+  avg_value?: number | null;
+  growth_pct?: number | null;
+  sparkline?: number[] | null;
+  updated_at?: string | null;
   volume_display: string | null;
   growth_display: string | null;
   growth_label: string | null;
@@ -27,7 +37,7 @@ export async function GET(request: Request) {
   let query = supabaseService
     .from('trends')
     .select(
-      'id, slug, title, source_primary, volume_display, growth_display, growth_label, categories, overall_score, last_seen, growth_rate, volume_score',
+      'id, slug, title, keyword, summary, geo, timeframe, latest_value, peak_value, avg_value, growth_pct, sparkline, updated_at, source_primary, volume_display, growth_display, growth_label, categories, overall_score, last_seen, growth_rate, volume_score',
       { count: 'exact' },
     )
     .eq('is_public', true);
@@ -58,6 +68,8 @@ export async function GET(request: Request) {
       .order('overall_score', { ascending: false, nullsFirst: false });
   }
 
+  query = query.order('updated_at', { ascending: false, nullsFirst: false });
+
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   query = query.range(from, to);
@@ -78,6 +90,16 @@ export async function GET(request: Request) {
       slug: t.slug as string,
       title: t.title as string,
       source_primary: t.source_primary as string,
+      keyword: t.keyword as string | undefined,
+      summary: (t.summary as string | null) ?? null,
+      geo: (t.geo as string | null) ?? null,
+      timeframe: (t.timeframe as string | null) ?? null,
+      latest_value: (t.latest_value as number | null) ?? null,
+      peak_value: (t.peak_value as number | null) ?? null,
+      avg_value: (t.avg_value as number | null) ?? null,
+      growth_pct: (t.growth_pct as number | null) ?? null,
+      sparkline: (t.sparkline as number[] | null) ?? null,
+      updated_at: (t.updated_at as string | null) ?? null,
       volume_display: (t.volume_display as string | null) ?? null,
       growth_display: (t.growth_display as string | null) ?? null,
       growth_label: (t.growth_label as string | null) ?? null,
