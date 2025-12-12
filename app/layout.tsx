@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import AuthHeader from "./_components/AuthHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {children}
+        <div className="border-b bg-white/70 backdrop-blur">
+          <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
+            <span className="font-semibold text-gray-800">IdeaSeek</span>
+            <AuthHeader />
+          </div>
+        </div>
+        <main>{children}</main>
       </body>
     </html>
   );

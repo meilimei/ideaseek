@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabaseBrowserClient';
 
 type Idea = {
   id: string;
@@ -22,6 +23,7 @@ type Idea = {
   source_type: string | null;
   source_url: string | null;
   created_at: string | null;
+  created_by: string | null;
 };
 
 export default function IdeasDatabasePage() {
@@ -36,12 +38,15 @@ export default function IdeasDatabasePage() {
   const [difficultyFilter, setDifficultyFilter] = useState<
     'all' | 'easy' | 'medium' | 'hard'
   >('all');
+  const [viewMode, setViewMode] = useState<'all' | 'mine'>('all');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const isDefaultState =
     !searchQuery &&
     sourceFilter === 'all' &&
     difficultyFilter === 'all' &&
-    sortBy === 'newest';
+    sortBy === 'newest' &&
+    viewMode === 'all';
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 10;
   const handleResetFilters = () => {
@@ -49,6 +54,7 @@ export default function IdeasDatabasePage() {
     setSourceFilter('all');
     setDifficultyFilter('all');
     setSortBy('newest');
+    setViewMode('all');
   };
   const scrollToListTop = useCallback(() => {
     if (listTopRef.current) {
@@ -83,6 +89,13 @@ export default function IdeasDatabasePage() {
       }
     }
     fetchIdeas();
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null);
+    });
   }, []);
 
   // Pick the first idea as "Idea of the Day".
@@ -123,6 +136,12 @@ export default function IdeasDatabasePage() {
         return true;
       });
     }
+    // View mode filter
+    filtered = filtered.filter((idea) => {
+      if (viewMode === 'all') return true;
+      if (!currentUserId) return false;
+      return idea.created_by === currentUserId;
+    });
     // Sort.
     if (sortBy === 'newest') {
       return filtered;
@@ -136,6 +155,8 @@ export default function IdeasDatabasePage() {
     ideaOfTheDay,
     sourceFilter,
     difficultyFilter,
+    viewMode,
+    currentUserId,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredIdeas.length / PAGE_SIZE));
@@ -160,7 +181,15 @@ export default function IdeasDatabasePage() {
 
   useEffect(() => {
     handlePageChange(1);
-  }, [searchQuery, sourceFilter, difficultyFilter, sortBy, handlePageChange]);
+  }, [
+    searchQuery,
+    sourceFilter,
+    difficultyFilter,
+    sortBy,
+    viewMode,
+    currentUserId,
+    handlePageChange,
+  ]);
 
   if (loading) {
     return <div className="p-6">Loading ideas...</div>;
@@ -208,30 +237,56 @@ export default function IdeasDatabasePage() {
             </label>
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search ideas..."
-              className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            />
-            <button
-              type="button"
-              onClick={(e) => e.preventDefault()}
-              className="px-4 py-2 rounded-lg border bg-gray-100 text-sm hover:bg-gray-200"
-            >
-              Search
-            </button>
-            {!isDefaultState && (
+          <div className="flex flex-col w-full md:w-auto gap-2">
+            <div className="flex gap-2 w-full md:w-auto">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search ideas..."
+                className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              />
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="px-4 py-2 rounded-lg border bg-gray-50 text-sm hover:bg-gray-100"
+                onClick={(e) => e.preventDefault()}
+                className="px-4 py-2 rounded-lg border bg-gray-100 text-sm hover:bg-gray-200"
               >
-                Clear
+                Search
               </button>
-            )}
+              {!isDefaultState && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 rounded-lg border bg-gray-50 text-sm hover:bg-gray-100"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="inline-flex rounded-full border text-xs overflow-hidden self-start md:self-end">
+              <button
+                type="button"
+                onClick={() => setViewMode('all')}
+                className={`px-3 py-1 ${
+                  viewMode === 'all'
+                    ? 'bg-black text-white'
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                All ideas
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('mine')}
+                className={`px-3 py-1 ${
+                  viewMode === 'mine'
+                    ? 'bg-black text-white'
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                My saved
+              </button>
+            </div>
           </div>
         </div>
 
