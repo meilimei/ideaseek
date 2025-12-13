@@ -10,7 +10,8 @@
     "ingest:reddit": "tsx scripts/ingest-reddit.ts",
     "ingest:trends": "tsx scripts/ingest-trends.ts",
     "ingest:trends:searchapi": "tsx scripts/ingest-trends-searchapi.ts",
-    "ingest:youtube": "tsx scripts/ingest-youtube.ts"
+    "ingest:youtube": "tsx scripts/ingest-youtube.ts",
+    "enrich:trends": "tsx scripts/enrich-trends.ts"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.15.0",
