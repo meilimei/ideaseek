@@ -7,7 +7,15 @@ type TrendCard = {
   id: string;
   slug: string;
   title: string;
+  keyword?: string | null;
+  geo?: string | null;
+  timeframe?: string | null;
+  latest_value?: number | null;
+  peak_value?: number | null;
+  avg_value?: number | null;
+  growth_pct?: number | null;
   source_primary: string;
+  sparkline?: number[] | null;
   volume_display: string | null;
   growth_display: string | null;
   growth_label: string | null;

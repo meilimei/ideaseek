@@ -8,6 +8,13 @@ type TrendCard = {
   id: string;
   slug: string;
   title: string;
+  keyword?: string | null;
+  geo?: string | null;
+  timeframe?: string | null;
+  latest_value?: number | null;
+  peak_value?: number | null;
+  avg_value?: number | null;
+  growth_pct?: number | null;
   source_primary: string;
   sparkline?: number[] | null;
   volume_display: string | null;
@@ -16,8 +23,6 @@ type TrendCard = {
   categories: string[];
   overall_score: number | null;
 };
-
-type SparkPoint = { date: string; value: number };
 
 type TrendCardItemProps = {
   trend: TrendCard;
@@ -30,13 +35,28 @@ export default function TrendCardItem({
   bookmarked,
   onBookmarkChange,
 }: TrendCardItemProps) {
-  const points: SparkPoint[] =
-    Array.isArray(trend.sparkline) && trend.sparkline.length > 0
-      ? trend.sparkline.map((value, idx) => ({
-          date: `${idx}`,
-          value,
-        }))
-      : [];
+  const isGoogle = trend.source_primary === 'google_trends';
+  const displayTitle = trend.title || trend.keyword || trend.slug;
+
+  const sparkValues = Array.isArray(trend.sparkline) ? trend.sparkline : [];
+
+  const interestValue =
+    trend.latest_value ??
+    trend.peak_value ??
+    trend.avg_value ??
+    null;
+
+  const formatInterest = (value: number | null) => {
+    if (value == null) return '—';
+    return `${Math.round(value)}`;
+  };
+
+  const formatGrowth = (growth: number | null) => {
+    if (growth == null) return '—';
+    const pct = Math.round(growth * 100);
+    const sign = pct > 0 ? '+' : '';
+    return `${sign}${pct}%`;
+  };
 
   return (
     <div className="flex flex-col justify-between rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
@@ -47,7 +67,7 @@ export default function TrendCardItem({
               href={`/trends/${trend.slug}`}
               className="text-lg font-semibold hover:underline"
             >
-              {trend.title}
+              {displayTitle}
             </Link>
             <TrendBookmarkButton
               slug={trend.slug}
@@ -56,28 +76,40 @@ export default function TrendCardItem({
               onChange={onBookmarkChange}
             />
           </div>
-          <div className="flex items-center gap-3 text-sm text-gray-700">
-            {trend.volume_display && (
-              <span className="text-blue-600">{trend.volume_display}</span>
-            )}
-            {trend.growth_display && (
-              <span className="text-green-600">{trend.growth_display}</span>
-            )}
-          </div>
-          {trend.growth_label && (
-            <span className="inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700 border border-green-100">
-              {trend.growth_label}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-700">
+            <span className="text-blue-600">
+              {isGoogle
+                ? `Interest: ${formatInterest(interestValue)}`
+                : `Volume: ${trend.volume_display ?? '—'}`}
             </span>
-          )}
-        </div>
-        {points.length > 0 && (
-          <div className="md:w-40 md:flex-shrink-0 md:pl-3">
-            <TrendSparkline
-              points={points}
-              className="h-16 w-full mt-2 md:mt-0"
-            />
+            <span className="text-green-600">
+              Growth: {formatGrowth(trend.growth_pct)}
+            </span>
+            {trend.growth_label && (
+              <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700 border border-green-100">
+                {trend.growth_label}
+              </span>
+            )}
           </div>
-        )}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <span className="rounded-full border px-2 py-0.5">
+              {trend.source_primary === 'google_trends'
+                ? 'Google Trends'
+                : trend.source_primary}
+            </span>
+            {(trend.geo || trend.timeframe) && (
+              <span className="rounded-full border px-2 py-0.5">
+                {[trend.geo, trend.timeframe].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="md:w-40 md:flex-shrink-0 md:pl-3">
+          <TrendSparkline
+            values={sparkValues}
+            className="h-16 w-full mt-2 md:mt-0"
+          />
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-700">
         {trend.categories.map((cat) => (
