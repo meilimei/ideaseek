@@ -3,7 +3,6 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import {
   createAdminJob,
   listAdminJobs,
-  runAdminJob,
   type AdminJobType,
 } from '@/lib/server/adminJobs';
 
@@ -46,12 +45,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing job_type' }, { status: 400 });
     }
 
-    const jobId = await createAdminJob(jobType, payload);
-    try {
-      await runAdminJob(jobId, jobType);
-    } catch (err) {
-      console.error(`[admin job ${jobId}] failed:`, err);
-    }
+    const jobId = await createAdminJob(jobType, payload, auth.user.id);
 
     return NextResponse.json({ ok: true, jobId });
   } catch (err) {

@@ -31,7 +31,7 @@ export default function AdminJobActions() {
       if (!res.ok) {
         throw new Error(json.error || 'Failed to create job');
       }
-      setMessage(`Created job ${json.jobId}. Navigating...`);
+      setMessage(`Queued job ${json.jobId}. Runner will pick it up soon.`);
       router.push(`/admin/jobs/${json.jobId}`);
       router.refresh();
     } catch (err) {
@@ -61,6 +61,9 @@ export default function AdminJobActions() {
       </div>
       {message && <div className="text-xs text-gray-600">{message}</div>}
       {error && <div className="text-xs text-red-600">{error}</div>}
+      <div className="text-[11px] text-gray-500">
+        Dev hint: run runner locally via <code>npx tsx scripts/job-runner.ts --max=3</code>
+      </div>
     </div>
   );
 }

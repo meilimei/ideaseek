@@ -1,28 +1,34 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { supabaseServiceClient as supabase } from '../supabaseServiceClient';
-
-const execAsync = promisify(exec);
 
 export type AdminJobType = 'reddit-ingest' | 'youtube-ingest' | 'trends-ingest';
 
-const JOB_COMMANDS: Record<AdminJobType, string> = {
-  'reddit-ingest': 'npm run ingest:reddit',
-  'youtube-ingest': 'npm run ingest:youtube',
-  'trends-ingest': 'npm run ingest:trends',
+export type AdminJobRow = {
+  id: string;
+  job_type: AdminJobType;
+  status: string;
+  payload: Record<string, unknown>;
+  attempts?: number | null;
+  max_attempts?: number | null;
+  next_run_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  log?: string | null;
+  error?: string | null;
 };
 
 export async function createAdminJob(
   jobType: AdminJobType,
   payload: Record<string, unknown> | null,
+  createdBy?: string,
 ) {
   const { data, error } = await supabase
     .from('admin_jobs')
     .insert({
       job_type: jobType,
       payload: payload ?? {},
-      status: 'running',
-      started_at: new Date().toISOString(),
+      status: 'queued',
+      next_run_at: new Date().toISOString(),
+      created_by: createdBy ?? null,
     })
     .select('id')
     .single();
@@ -31,45 +37,13 @@ export async function createAdminJob(
   return data?.id as string;
 }
 
-export async function runAdminJob(jobId: string, jobType: AdminJobType) {
-  const command = JOB_COMMANDS[jobType];
-  if (!command) {
-    throw new Error(`Unknown job type: ${jobType}`);
-  }
-
-  let log = '';
-  try {
-    const { stdout, stderr } = await execAsync(command, { env: process.env });
-    log = `${stdout ?? ''}${stderr ?? ''}`;
-    await supabase
-      .from('admin_jobs')
-      .update({
-        status: 'success',
-        finished_at: new Date().toISOString(),
-        log,
-      })
-      .eq('id', jobId);
-    return { ok: true, log };
-  } catch (err) {
-    log += `\nError: ${err instanceof Error ? err.message : String(err)}`;
-    await supabase
-      .from('admin_jobs')
-      .update({
-        status: 'failed',
-        finished_at: new Date().toISOString(),
-        error: err instanceof Error ? err.message : String(err),
-        log,
-      })
-      .eq('id', jobId);
-    throw err;
-  }
-}
-
 export async function listAdminJobs(limit = 50) {
   const { data, error } = await supabase
     .from('admin_jobs')
-    .select('id, job_type, status, payload, error, log, created_at, started_at, finished_at')
-    .order('created_at', { ascending: false })
+    .select(
+      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at',
+    )
+    .order('id', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
@@ -79,7 +53,9 @@ export async function listAdminJobs(limit = 50) {
 export async function getAdminJob(id: string) {
   const { data, error } = await supabase
     .from('admin_jobs')
-    .select('id, job_type, status, payload, error, log, created_at, started_at, finished_at')
+    .select(
+      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at',
+    )
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
