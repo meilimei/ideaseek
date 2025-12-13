@@ -14,6 +14,15 @@ export async function GET(
         id,
         slug,
         title,
+        keyword,
+        summary,
+        geo,
+        timeframe,
+        latest_value,
+        peak_value,
+        avg_value,
+        growth_pct,
+        updated_at,
         source_primary,
         volume_score,
         volume_display,
@@ -23,7 +32,6 @@ export async function GET(
         time_window,
         first_seen,
         last_seen,
-        summary,
         description,
         categories,
         target_users,
@@ -41,11 +49,11 @@ export async function GET(
     return NextResponse.json({ error: 'Trend not found' }, { status: 404 });
   }
 
-  const { data: timeseries, error: tsError } = await supabaseService
-    .from('trend_timeseries')
-    .select('date, value')
+  const { data: timeseriesRows, error: tsError } = await supabaseService
+    .from('trend_points')
+    .select('point_date, value')
     .eq('trend_id', trend.id)
-    .order('date', { ascending: true });
+    .order('point_date', { ascending: true });
 
   if (tsError) {
     console.error('Failed to load trend timeseries:', tsError);
@@ -81,7 +89,11 @@ export async function GET(
       ...trend,
       categories: trend.categories ?? [],
     },
-    timeseries: timeseries ?? [],
+    timeseries:
+      timeseriesRows?.map((row) => ({
+        date: row.point_date as string,
+        value: row.value as number,
+      })) ?? [],
     analysis: analysis
       ? {
           summary: analysis.summary,
