@@ -1,16 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import AuthHeader from "./_components/AuthHeader";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -24,10 +14,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className="antialiased">
+        <div className="border-b bg-white/70 backdrop-blur">
+          <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
+            <span className="font-semibold text-gray-800">IdeaSeek</span>
+            <AuthHeader />
+          </div>
+        </div>
+        <main>{children}</main>
       </body>
     </html>
   );

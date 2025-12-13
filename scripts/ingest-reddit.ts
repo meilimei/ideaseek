@@ -2,7 +2,7 @@
 import path from 'node:path';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
-import { insertIdeas, type IdeaForInsert } from './shared/ideas';
+import { insertIdeas, type IdeaForInsert } from './ingest-utils';
 
 // 1. 加载 .env.local（注意路径）
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });

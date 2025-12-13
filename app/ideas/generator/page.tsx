@@ -1,251 +1,251 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import { useState } from 'react';
 
 type GeneratedIdea = {
+  localId: string;
+  savedIdeaId?: string;
   title: string;
-  one_liner: string;
+  one_liner?: string;
+  description?: string;
   tags?: string[];
   difficulty?: number;
   market_size?: string;
-  description?: string;
   demand_strength?: string;
-  pain_points?: string[];
-  target_users?: string;
-  market_stage?: string;
-  competition?: string;
-  monetization?: string[];
-  key_risks?: string[];
-  next_steps?: string;
+};
+
+const initialForm = {
+  background: '',
+  interests: '',
+  skills: '',
+  constraints: '',
 };
 
 export default function IdeaGeneratorPage() {
-  const [userProfile, setUserProfile] = useState('');
-  const [preferences, setPreferences] = useState('');
+  const [form, setForm] = useState(initialForm);
   const [ideas, setIdeas] = useState<GeneratedIdea[]>([]);
   const [loading, setLoading] = useState(false);
-  const [savingIndex, setSavingIndex] = useState<number | null>(null);
-  const [savedIds, setSavedIds] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  void savingId;
+  void setSavingId;
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  const handleChange = (
+    field: keyof typeof initialForm,
+    value: string,
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleGenerate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setError(null);
     setIdeas([]);
-    setSavedIds({});
-    setSavingIndex(null);
     setLoading(true);
-
     try {
       const res = await fetch('/api/ideas/generator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userProfile,
-          preferences,
-          count: 5,
-        }),
+        body: JSON.stringify(form),
       });
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        throw new Error(json?.error || 'Failed to generate ideas');
-      }
-
       const json = await res.json();
-      setIdeas(json.ideas ?? []);
-    } catch (err: any) {
-      setError(err.message ?? 'Unknown error');
+      if (!res.ok) {
+        throw new Error(json.error ?? 'Failed to generate ideas');
+      }
+      const ideasWithIds: GeneratedIdea[] = (Array.isArray(json.ideas)
+        ? json.ideas
+        : []
+      ).map((idea, index: number) => ({
+        ...idea,
+        localId:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `idea-${Date.now()}-${index}`,
+        savedIdeaId: undefined,
+      }));
+      setIdeas(ideasWithIds);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate ideas';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleSave(index: number, idea: GeneratedIdea) {
-    setError(null);
-    setSavingIndex(index);
+  const handleSave = async (idea: GeneratedIdea) => {
     try {
-      const res = await fetch('/api/ideas', {
+      setError(null);
+      setSavingId(idea.localId);
+
+      const res = await fetch('/api/ideas/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...idea,
-          source_type: 'generated',
-        }),
+        body: JSON.stringify({ idea, userId: 'local-dev' }),
       });
 
-      if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        throw new Error(json?.error || 'Failed to save idea');
-      }
-
       const json = await res.json();
-      if (!json?.id) {
-        throw new Error('Failed to save idea');
+
+      if (!res.ok) {
+        setError(json.error || 'Failed to save idea');
+        return;
       }
 
-      setSavedIds((prev) => ({ ...prev, [index]: json.id }));
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to save idea');
+      setIdeas((prev) =>
+        prev.map((it) =>
+          it.localId === idea.localId ? { ...it, savedIdeaId: json.id } : it,
+        ),
+      );
+    } catch (err) {
+      console.error(err);
+      setError('Failed to save idea');
     } finally {
-      setSavingIndex(null);
+      setSavingId(null);
     }
-  }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <Link
-          href="/ideas/database"
-          className="text-sm text-indigo-600 underline"
-        >
-          ← Back to database
-        </Link>
-        <h1 className="text-2xl font-semibold">Idea Generator</h1>
+    <div className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Idea Generator</h1>
+        <p className="text-gray-600">
+          Get startup ideas tailored to your background and interests.
+        </p>
       </div>
 
-      {/* 表单 */}
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-4 border rounded-xl p-4 bg-white/60"
-      >
+      <form className="space-y-4" onSubmit={handleGenerate}>
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Your profile（必填）
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Your background &amp; experience
           </label>
           <textarea
-            value={userProfile}
-            onChange={(e) => setUserProfile(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm min-h-[120px] focus:outline-none focus:ring focus:ring-indigo-100"
-            placeholder="例如：5 年前端开发经验，会 Next.js / React，对 SaaS、开发者工具、出海有兴趣，希望 1–2 人就能做起来……"
+            required
+            value={form.background}
+            onChange={(e) => handleChange('background', e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 min-h-[90px]"
+            placeholder="Summarize your work history, domains, and roles..."
           />
         </div>
-
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Preferences（可选）
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Industries / problems you&apos;re interested in (optional)
           </label>
           <textarea
-            value={preferences}
-            onChange={(e) => setPreferences(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring focus:ring-indigo-100"
-            placeholder="例如：偏 B2B / 偏订阅制 / 不做监管太重行业 / 希望先做英文出海……"
+            value={form.interests}
+            onChange={(e) => handleChange('interests', e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 min-h-[80px]"
+            placeholder="e.g., fintech, SMB tools, climate, education"
           />
         </div>
-
-        {error && (
-          <div className="text-sm text-red-500">
-            Error: {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading || !userProfile.trim()}
-          className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {loading ? 'Generating…' : 'Generate ideas'}
-        </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Your core skills (e.g., coding, design, marketing) (optional)
+          </label>
+          <textarea
+            value={form.skills}
+            onChange={(e) => handleChange('skills', e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 min-h-[80px]"
+            placeholder="List relevant skills, tools, or strengths..."
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Constraints (time, budget, geography, etc.) (optional)
+          </label>
+          <textarea
+            value={form.constraints}
+            onChange={(e) => handleChange('constraints', e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 min-h-[80px]"
+            placeholder="Any limits to consider (e.g., 5 hrs/wk, $1k/mo, remote-only)"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Generating...' : 'Generate ideas'}
+          </button>
+          {error && (
+            <span className="text-sm text-red-500 self-center">
+              {error}
+            </span>
+          )}
+        </div>
       </form>
 
-      {/* 结果列表 */}
-      {ideas.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">
-            Generated opportunities ({ideas.length})
-          </h2>
+      {loading && !ideas.length && (
+        <div className="text-sm text-gray-600">Generating...</div>
+      )}
 
+      {ideas.length > 0 && (
+        <div className="space-y-3">
           {ideas.map((idea, idx) => (
             <div
-              key={idx}
-              className="border rounded-xl p-4 bg-white/60 space-y-2"
+              key={`${idea.title}-${idx}`}
+              className="border rounded-lg p-4 shadow-sm bg-white"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-xl font-medium mb-1">
-                    {idea.title}
-                  </h3>
-                  <p className="text-gray-700">{idea.one_liner}</p>
-                </div>
-                <div className="text-xs text-gray-600 space-y-1 text-right">
-                  {idea.difficulty != null && (
-                    <div>Difficulty: {idea.difficulty}/5</div>
-                  )}
-                  {idea.market_size && (
-                    <div>Market: {idea.market_size}</div>
-                  )}
-                  {idea.demand_strength && (
-                    <div>Demand: {idea.demand_strength}</div>
-                  )}
-                </div>
+              <div className="flex justify-between items-start gap-2">
+                <h3 className="text-lg font-semibold">{idea.title}</h3>
               </div>
-
-              {idea.tags && idea.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                  {idea.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 rounded-full border"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+              {idea.one_liner && (
+                <p className="text-gray-700 mt-1">{idea.one_liner}</p>
               )}
-
               {idea.description && (
-                <p className="text-gray-800">
+                <p className="text-gray-700 mt-2 line-clamp-4">
                   {idea.description}
                 </p>
               )}
-
-              {idea.pain_points && idea.pain_points.length > 0 && (
-                <div className="text-sm text-gray-800">
-                  <div className="font-medium">Pain points:</div>
-                  <ul className="list-disc list-inside space-y-1">
-                    {idea.pain_points.map((p, i) => (
-                      <li key={i}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {idea.monetization && idea.monetization.length > 0 && (
-                <div className="text-sm text-gray-800">
-                  <div className="font-medium">Monetization:</div>
-                  <ul className="list-disc list-inside space-y-1">
-                    {idea.monetization.map((m, i) => (
-                      <li key={i}>{m}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {idea.next_steps && (
-                <div className="text-sm text-gray-800">
-                  <div className="font-medium">Next steps:</div>
-                  <p>{idea.next_steps}</p>
-                </div>
-              )}
-
-              <div className="flex justify-end">
-                {!savedIds[idx] ? (
+              <div className="flex flex-wrap gap-2 mt-3 text-xs text-gray-600">
+                {idea.tags?.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 rounded-full border text-xs"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {(idea.difficulty != null ||
+                  idea.market_size ||
+                  idea.demand_strength) && (
+                  <span className="px-2 py-0.5 rounded-full bg-gray-100 text-xs">
+                    {idea.difficulty != null
+                      ? `Difficulty: ${idea.difficulty}`
+                      : null}
+                    {idea.market_size ? ` · Market: ${idea.market_size}` : ''}
+                    {idea.demand_strength
+                      ? ` · Demand: ${idea.demand_strength}`
+                      : ''}
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 flex items-center gap-2 flex-wrap">
+                {idea.savedIdeaId ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled
+                      className="px-3 py-1 rounded-lg border text-xs bg-gray-100 text-gray-600 cursor-default"
+                    >
+                      Saved
+                    </button>
+                    <Link
+                      href={`/ideas/${idea.savedIdeaId}`}
+                      className="px-3 py-1 rounded-lg border text-xs text-gray-700 hover:bg-gray-100"
+                    >
+                      View full report
+                    </Link>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => handleSave(idx, idea)}
-                    disabled={savingIndex === idx}
-                    className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                    onClick={() => handleSave(idea)}
+                    disabled={savingId === idea.localId}
+                    className="px-4 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-60"
                   >
-                    {savingIndex === idx ? 'Saving…' : 'Save to database'}
+                    {savingId === idea.localId ? 'Saving...' : 'Save to library'}
                   </button>
-                ) : (
-                  <Link
-                    href={`/ideas/${savedIds[idx]}`}
-                    className="text-sm text-indigo-600 underline"
-                  >
-                    View full report →
-                  </Link>
                 )}
               </div>
             </div>
