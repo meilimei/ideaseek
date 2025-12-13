@@ -1,10 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseBrowserClient';
+import type { User } from '@supabase/supabase-js';
 
 export default function AuthHeader() {
-  const [user, setUser] = useState<unknown | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -12,7 +15,19 @@ export default function AuthHeader() {
     supabase.auth
       .getUser()
       .then(({ data }) => {
-        setUser(data.user ?? null);
+        const nextUser = data.user ?? null;
+        setUser(nextUser);
+        if (nextUser) {
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('user_id', nextUser.id)
+            .maybeSingle()
+            .then(({ data: profile }) => {
+              if (profile?.role === 'admin') setIsAdmin(true);
+            })
+            .catch(() => {});
+        }
       })
       .catch((err) => {
         console.error('Failed to load user', err);
@@ -57,6 +72,14 @@ export default function AuthHeader() {
           <span className="text-gray-800">
             {user.user_metadata?.full_name || user.email || 'Signed in'}
           </span>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="rounded-md border px-3 py-1 text-xs text-gray-700 hover:bg-gray-100"
+            >
+              Admin
+            </Link>
+          )}
           {process.env.NODE_ENV !== 'production' && user.id && (
             <span className="rounded-full border px-2 py-0.5 text-[11px] text-gray-600 bg-gray-50">
               id: {user.id}

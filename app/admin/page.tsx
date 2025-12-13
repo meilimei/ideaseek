@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { redirect } from 'next/navigation';
 
 const cards = [
   { href: '/admin/jobs', title: 'Jobs', description: 'Manage background jobs and ingestion runs.' },
@@ -9,7 +10,11 @@ const cards = [
 ];
 
 export default async function AdminHomePage() {
-  await requireAdmin();
+  const auth = await requireAdmin();
+  if (auth.status === 'unauthenticated') return redirect('/');
+  if (auth.status === 'forbidden') {
+    return <div className="text-sm text-gray-700">403 — Admin access required.</div>;
+  }
 
   return (
     <div className="space-y-6">
