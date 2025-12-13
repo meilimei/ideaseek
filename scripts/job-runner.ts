@@ -54,28 +54,33 @@ async function runCommand(jobId: string, jobType: AdminJobType): Promise<string>
 async function printQueuedSummary() {
   const { data, error } = await supabase
     .from('admin_jobs')
-    .select('id')
+    .select('id, attempts, max_attempts, next_run_at')
     .eq('status', 'queued')
     .or('next_run_at.is.null,next_run_at.lte.now()')
-    .lt('attempts', supabase.rpc('coalesce', { args: ['max_attempts', 3] }) as any)
     .order('id', { ascending: false })
-    .limit(5);
+    .limit(20);
 
   if (error) {
     console.error('Failed to count queued jobs:', error);
     return;
   }
 
-  const queuedIds = (data ?? []).map((row: any) => row.id);
+  const ready = (data ?? []).filter((row: any) => {
+    const attempts = row.attempts ?? 0;
+    const maxAttempts = row.max_attempts ?? 3;
+    return attempts < maxAttempts;
+  });
+
+  const queuedIds = ready.slice(0, 5).map((row: any) => row.id);
   console.log(
-    `Queued jobs: ${(data ?? []).length}${queuedIds.length ? ` (top ids: ${queuedIds.join(', ')})` : ''
+    `Queued jobs: ${ready.length}${queuedIds.length ? ` (top ids: ${queuedIds.join(', ')})` : ''
     }`,
   );
 }
 
 async function markJob(
   jobId: string,
-  status: 'success' | 'failed',
+  status: 'success' | 'failed' | 'queued',
   log: string,
   errorMessage?: string,
   nextRunAt?: string | null,
@@ -108,7 +113,8 @@ async function processJob(job: AdminJobRow) {
     const nextRunAt = shouldRetry
       ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
       : null;
-    await markJob(jobId, 'failed', log, message, nextRunAt);
+    const status: 'queued' | 'failed' = shouldRetry ? 'queued' : 'failed';
+    await markJob(jobId, status, log, message, nextRunAt);
   }
 }
 

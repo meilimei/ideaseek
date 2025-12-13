@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 
-export default function ReRunJobButton({ jobType }: { jobType: string }) {
+type Props = {
+  jobType: string;
+  payload: Record<string, unknown> | null;
+};
+
+export default function ReRunJobButton({ jobType, payload }: Props) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -13,7 +18,7 @@ export default function ReRunJobButton({ jobType }: { jobType: string }) {
       const res = await fetch('/api/admin/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_type: jobType }),
+        body: JSON.stringify({ job_type: jobType, payload: payload ?? {} }),
       });
       const json = await res.json();
       if (!res.ok) {

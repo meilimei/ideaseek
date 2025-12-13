@@ -43,6 +43,7 @@ export default async function AdminLayout({
     { href: '/admin/jobs', label: 'Jobs' },
     { href: '/admin/ideas', label: 'Ideas' },
     { href: '/admin/trends', label: 'Trends' },
+    { href: '/admin/data/reddit-posts', label: 'Reddit Posts' },
     { href: '/admin/raw', label: 'Raw Data' },
   ];
 

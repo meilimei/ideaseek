@@ -41,7 +41,7 @@ export async function listAdminJobs(limit = 50) {
   const { data, error } = await supabase
     .from('admin_jobs')
     .select(
-      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at',
+      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at, attempts, max_attempts',
     )
     .order('id', { ascending: false })
     .limit(limit);
@@ -54,7 +54,7 @@ export async function getAdminJob(id: string) {
   const { data, error } = await supabase
     .from('admin_jobs')
     .select(
-      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at',
+      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at, attempts, max_attempts',
     )
     .eq('id', id)
     .maybeSingle();

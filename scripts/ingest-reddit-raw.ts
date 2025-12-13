@@ -238,6 +238,7 @@ async function upsertRawRedditPosts(
     source_post_id: post.id,
     subreddit: post.subreddit,
     title: post.title,
+    selftext: post.selftext ?? null,
     url: post.url ?? null,
     author: post.author ?? null,
     score: post.score ?? null,

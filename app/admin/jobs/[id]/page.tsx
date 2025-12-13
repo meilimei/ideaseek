@@ -53,7 +53,7 @@ export default async function AdminJobDetailPage({
           <Link href="/admin/jobs" className="text-sm text-indigo-600 hover:underline">
             Back
           </Link>
-          <ReRunJobButton jobType={job.job_type} />
+          <ReRunJobButton jobType={job.job_type} payload={job.payload} />
         </div>
       </div>
 

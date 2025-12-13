@@ -11,6 +11,8 @@ type AdminJob = {
   created_at: string | null;
   started_at: string | null;
   finished_at: string | null;
+  attempts?: number | null;
+  max_attempts?: number | null;
 };
 
 async function fetchJobs(): Promise<{ jobs: AdminJob[] }> {
@@ -80,6 +82,7 @@ export default function AdminJobsClient() {
               <th className="px-4 py-2">ID</th>
               <th className="px-4 py-2">Type</th>
               <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2">Attempts</th>
               <th className="px-4 py-2">Created</th>
               <th className="px-4 py-2">Started</th>
               <th className="px-4 py-2">Finished</th>
@@ -92,6 +95,9 @@ export default function AdminJobsClient() {
                 <td className="px-4 py-2 font-mono text-xs text-gray-600">{job.id}</td>
                 <td className="px-4 py-2">{job.job_type}</td>
                 <td className="px-4 py-2 capitalize">{job.status}</td>
+                <td className="px-4 py-2">
+                  {job.attempts ?? 0} / {job.max_attempts ?? 3}
+                </td>
                 <td className="px-4 py-2">{job.created_at ?? '—'}</td>
                 <td className="px-4 py-2">{job.started_at ?? '—'}</td>
                 <td className="px-4 py-2">{job.finished_at ?? '—'}</td>
