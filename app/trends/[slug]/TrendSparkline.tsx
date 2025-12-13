@@ -3,7 +3,8 @@
 type SparkPoint = { date: string; value: number };
 
 type TrendSparklineProps = {
-  points: SparkPoint[];
+  values?: number[];
+  points?: SparkPoint[];
   className?: string;
 };
 
@@ -12,10 +13,23 @@ function cn(...classes: Array<string | undefined | null | false>) {
 }
 
 export default function TrendSparkline({
+  values,
   points,
   className,
 }: TrendSparklineProps) {
-  if (!points || points.length === 0) {
+  const valueData =
+    Array.isArray(values) && values.length > 0
+      ? values.map((v) => ({ value: v }))
+      : null;
+
+  const pointData =
+    !valueData && Array.isArray(points) && points.length > 0
+      ? points.map((p) => ({ value: p.value }))
+      : null;
+
+  const data = valueData ?? pointData ?? [];
+
+  if (data.length === 0) {
     return (
       <div
         className={cn(
@@ -26,15 +40,15 @@ export default function TrendSparkline({
     );
   }
 
-  const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const valuesOnly = data.map((p) => p.value);
+  const min = Math.min(...valuesOnly);
+  const max = Math.max(...valuesOnly);
   const range = max - min || 1;
-  const normalized = points.map((p) => (p.value - min) / range);
+  const normalized = data.map((p) => (p.value - min) / range);
 
   const width = 200;
   const height = 96;
-  const step = points.length > 1 ? width / (points.length - 1) : width;
+  const step = data.length > 1 ? width / (data.length - 1) : width;
 
   const coords = normalized.map((v, idx) => ({
     x: idx * step,
