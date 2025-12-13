@@ -57,6 +57,11 @@ export default function AuthHeader() {
           <span className="text-gray-800">
             {user.user_metadata?.full_name || user.email || 'Signed in'}
           </span>
+          {process.env.NODE_ENV !== 'production' && user.id && (
+            <span className="rounded-full border px-2 py-0.5 text-[11px] text-gray-600 bg-gray-50">
+              id: {user.id}
+            </span>
+          )}
           <button
             type="button"
             onClick={handleSignOut}

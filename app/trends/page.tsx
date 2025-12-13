@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import TrendCardItem from './TrendCardItem';
+import { createClient } from '@/lib/supabaseBrowserClient';
 
 type TrendCard = {
   id: string;
@@ -25,6 +26,7 @@ type TrendCard = {
 
 export default function TrendsPage() {
   const [trends, setTrends] = useState<TrendCard[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
@@ -93,6 +95,23 @@ export default function TrendsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV === 'production' &&
+      process.env.NEXT_PUBLIC_DEBUG !== '1'
+    ) {
+      return;
+    }
+    const supabase = createClient();
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (data.user) setUserId(data.user.id);
+      })
+      .catch(() => {})
+      .finally(() => {});
+  }, []);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
       <header className="space-y-2">
@@ -100,6 +119,15 @@ export default function TrendsPage() {
         <p className="text-gray-600">
           Discover emerging trends and opportunities.
         </p>
+        {(process.env.NODE_ENV !== 'production' ||
+          process.env.NEXT_PUBLIC_DEBUG === '1') && (
+          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-gray-700 bg-gray-50">
+            Debug User:{' '}
+            <span className="font-semibold">
+              {userId ?? 'not logged in'}
+            </span>
+          </div>
+        )}
       </header>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

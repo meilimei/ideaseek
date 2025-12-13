@@ -16,6 +16,10 @@ type TrendCard = {
   growth_pct?: number | null;
   sparkline?: number[] | null;
   updated_at?: string | null;
+  tags?: string[] | null;
+  score?: number | null;
+  status?: string | null;
+  enriched_at?: string | null;
   volume_display: string | null;
   growth_display: string | null;
   growth_label: string | null;
@@ -37,7 +41,7 @@ export async function GET(request: Request) {
   let query = supabaseService
     .from('trends')
     .select(
-      'id, slug, title, keyword, summary, geo, timeframe, latest_value, peak_value, avg_value, growth_pct, sparkline, updated_at, source_primary, volume_display, growth_display, growth_label, categories, overall_score, last_seen, growth_rate, volume_score',
+      'id, slug, title, keyword, summary, geo, timeframe, latest_value, peak_value, avg_value, growth_pct, sparkline, updated_at, tags, score, status, enriched_at, source_primary, volume_display, growth_display, growth_label, categories, overall_score, last_seen, growth_rate, volume_score',
       { count: 'exact' },
     )
     .eq('is_public', true);
@@ -100,6 +104,10 @@ export async function GET(request: Request) {
       growth_pct: (t.growth_pct as number | null) ?? null,
       sparkline: (t.sparkline as number[] | null) ?? null,
       updated_at: (t.updated_at as string | null) ?? null,
+      tags: (t.tags as string[] | null) ?? null,
+      score: (t.score as number | null) ?? null,
+      status: (t.status as string | null) ?? null,
+      enriched_at: (t.enriched_at as string | null) ?? null,
       volume_display: (t.volume_display as string | null) ?? null,
       growth_display: (t.growth_display as string | null) ?? null,
       growth_label: (t.growth_label as string | null) ?? null,

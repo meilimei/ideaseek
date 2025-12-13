@@ -15,6 +15,11 @@ type TrendCard = {
   peak_value?: number | null;
   avg_value?: number | null;
   growth_pct?: number | null;
+  tags?: string[] | null;
+  score?: number | null;
+  status?: string | null;
+  summary?: string | null;
+  enriched_at?: string | null;
   source_primary: string;
   sparkline?: number[] | null;
   volume_display: string | null;
@@ -112,6 +117,16 @@ export default function TrendCardItem({
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-700">
+        {trend.status && (
+          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 border border-blue-100">
+            {trend.status}
+          </span>
+        )}
+        {trend.score != null && (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+            Score: {trend.score.toFixed(1)} / 5
+          </span>
+        )}
         {trend.categories.map((cat) => (
           <span
             key={cat}
@@ -125,6 +140,15 @@ export default function TrendCardItem({
             Score: {trend.overall_score} / 5
           </span>
         )}
+        {trend.tags &&
+          trend.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border px-2 py-0.5"
+            >
+              {tag}
+            </span>
+          ))}
       </div>
     </div>
   );
