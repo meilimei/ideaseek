@@ -4,12 +4,13 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { supabaseServiceClient as supabase } from '../lib/supabaseServiceClient';
 import { type AdminJobType, type AdminJobRow } from '../lib/server/adminJobs';
+import { processSingleTrendsSnapshot } from '../lib/server/processTrendsSnapshot';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const execAsync = promisify(exec);
 
-const JOB_COMMANDS: Record<AdminJobType, string> = {
+const JOB_COMMANDS: Partial<Record<AdminJobType, string>> = {
   'reddit-ingest': 'npm run ingest:reddit',
   'youtube-ingest': 'npm run ingest:youtube',
   'trends-ingest': 'npm run ingest:trends',
@@ -102,7 +103,16 @@ async function processJob(job: AdminJobRow) {
   const jobType = job.job_type;
   let log = '';
   try {
-    log = await runCommand(jobId, jobType);
+    if (jobType === 'process-trends-snapshot') {
+      const snapshotId = (job.payload as any)?.snapshot_id;
+      if (!snapshotId) {
+        throw new Error('Missing snapshot_id in payload');
+      }
+      await processSingleTrendsSnapshot(Number(snapshotId));
+      log = `Processed trends snapshot ${snapshotId}`;
+    } else {
+      log = await runCommand(jobId, jobType);
+    }
     await markJob(jobId, 'success', log);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

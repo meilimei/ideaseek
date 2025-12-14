@@ -1,6 +1,10 @@
 import { supabaseServiceClient as supabase } from '../supabaseServiceClient';
 
-export type AdminJobType = 'reddit-ingest' | 'youtube-ingest' | 'trends-ingest';
+export type AdminJobType =
+  | 'reddit-ingest'
+  | 'youtube-ingest'
+  | 'trends-ingest'
+  | 'process-trends-snapshot';
 
 export type AdminJobRow = {
   id: string;

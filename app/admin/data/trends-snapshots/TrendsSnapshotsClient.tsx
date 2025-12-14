@@ -39,6 +39,7 @@ export default function TrendsSnapshotsClient() {
 
   const [modalData, setModalData] = useState<unknown | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -109,6 +110,7 @@ export default function TrendsSnapshotsClient() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Delete failed');
       setItems((prev) => prev.filter((r) => r.id !== id));
+      setToast(`Deleted snapshot ${id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -123,6 +125,20 @@ export default function TrendsSnapshotsClient() {
       if (!res.ok) throw new Error(json.error || 'Load failed');
       setModalData(json.raw_payload ?? json);
       setModalOpen(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function reprocess(id: number) {
+    try {
+      const res = await fetch(`/api/admin/trends-snapshots/${id}/reprocess`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to enqueue');
+      setToast(`Reprocess job ${json.jobId} enqueued`);
+      void fetchList(page);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -206,6 +222,7 @@ export default function TrendsSnapshotsClient() {
           Page {page} of {totalPages} ({total} rows)
         </div>
         {error && <div className="text-red-600">{error}</div>}
+        {toast && <div className="text-green-700">{toast}</div>}
       </div>
 
       <div className="overflow-x-auto rounded-2xl border bg-white">
@@ -269,6 +286,13 @@ export default function TrendsSnapshotsClient() {
                     className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
                   >
                     Mark unprocessed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => reprocess(row.id)}
+                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
+                  >
+                    Reprocess
                   </button>
                   <button
                     type="button"
