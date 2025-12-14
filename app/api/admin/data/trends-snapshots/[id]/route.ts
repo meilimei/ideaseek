@@ -15,6 +15,8 @@ type SnapshotRow = {
   last_error: string | null;
   created_at: string | null;
   raw_payload?: unknown;
+  is_deleted?: boolean | null;
+  deleted_at?: string | null;
 };
 
 export async function GET(
@@ -34,7 +36,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('raw_trends_snapshots')
     .select(
-      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at, raw_payload',
+      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at, raw_payload, is_deleted, deleted_at',
     )
     .eq('id', id)
     .maybeSingle();
@@ -74,6 +76,10 @@ export async function PATCH(
   if (body.reset_error === true || body.processed === true) {
     updates.last_error = null;
   }
+  if (typeof body.is_deleted === 'boolean') {
+    updates.is_deleted = body.is_deleted;
+    updates.deleted_at = body.is_deleted ? new Date().toISOString() : null;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
@@ -84,7 +90,7 @@ export async function PATCH(
     .update(updates)
     .eq('id', id)
     .select(
-      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at',
+      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at, is_deleted, deleted_at',
     )
     .single();
 
@@ -110,12 +116,22 @@ export async function DELETE(
 
   const { id } = await context.params;
 
-  const { error } = await supabase.from('raw_trends_snapshots').delete().eq('id', id);
+  const { data, error } = await supabase
+    .from('raw_trends_snapshots')
+    .update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select(
+      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at, is_deleted, deleted_at',
+    )
+    .single();
 
   if (error) {
     console.error('Failed to delete trends snapshot:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(data as SnapshotRow);
 }

@@ -14,6 +14,8 @@ type SnapshotRow = {
   processed_at: string | null;
   last_error: string | null;
   created_at: string | null;
+  is_deleted?: boolean | null;
+  deleted_at?: string | null;
 };
 
 export async function GET(request: Request) {
@@ -36,14 +38,18 @@ export async function GET(request: Request) {
   const processed = url.searchParams.get('processed') || undefined;
   const startDate = url.searchParams.get('startDate') || undefined;
   const endDate = url.searchParams.get('endDate') || undefined;
+  const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
 
   let query = supabase
     .from('raw_trends_snapshots')
     .select(
-      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at',
+      'id, snapshot_key, strategy_name, keyword, geo, timeframe, source, processed, processed_at, last_error, created_at, is_deleted, deleted_at',
       { count: 'exact' },
     );
 
+  if (!includeDeleted) {
+    query = query.eq('is_deleted', false);
+  }
   if (strategy) {
     query = query.ilike('strategy_name', `%${strategy}%`);
   }

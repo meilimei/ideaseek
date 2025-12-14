@@ -14,6 +14,8 @@ type SnapshotRow = {
   processed_at: string | null;
   last_error: string | null;
   created_at: string | null;
+  is_deleted?: boolean | null;
+  deleted_at?: string | null;
 };
 
 type ListResponse = {
@@ -36,6 +38,7 @@ export default function TrendsSnapshotsClient() {
   const [processed, setProcessed] = useState<'all' | 'processed' | 'unprocessed'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [includeDeleted, setIncludeDeleted] = useState(false);
 
   const [modalData, setModalData] = useState<unknown | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -58,6 +61,7 @@ export default function TrendsSnapshotsClient() {
       if (processed !== 'all') params.set('processed', processed);
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
+      if (includeDeleted) params.set('includeDeleted', 'true');
 
       const res = await fetch(`/api/admin/data/trends-snapshots?${params.toString()}`, {
         cache: 'no-store',
@@ -109,8 +113,24 @@ export default function TrendsSnapshotsClient() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Delete failed');
-      setItems((prev) => prev.filter((r) => r.id !== id));
+      setItems((prev) => prev.map((r) => (r.id === id ? { ...r, ...json } : r)));
       setToast(`Deleted snapshot ${id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function restoreRow(id: number) {
+    try {
+      const res = await fetch(`/api/admin/data/trends-snapshots/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_deleted: false }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Restore failed');
+      setItems((prev) => prev.map((r) => (r.id === id ? { ...r, ...json } : r)));
+      setToast(`Restored snapshot ${id}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -199,6 +219,14 @@ export default function TrendsSnapshotsClient() {
               onChange={(e) => setEndDate(e.target.value)}
             />
           </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={includeDeleted}
+              onChange={(e) => setIncludeDeleted(e.target.checked)}
+            />
+            Include deleted
+          </label>
           <button
             type="button"
             onClick={() => void fetchList(1)}
@@ -235,6 +263,7 @@ export default function TrendsSnapshotsClient() {
               <th className="px-3 py-2">Keyword</th>
               <th className="px-3 py-2">Snapshot Key</th>
               <th className="px-3 py-2">Processed</th>
+              <th className="px-3 py-2">Deleted</th>
               <th className="px-3 py-2">Error</th>
               <th className="px-3 py-2 text-right">Actions</th>
             </tr>
@@ -260,6 +289,18 @@ export default function TrendsSnapshotsClient() {
                   <div>{row.processed ? 'Yes' : 'No'}</div>
                   {row.processed_at && (
                     <div className="text-gray-500">{row.processed_at}</div>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-xs text-gray-600">
+                  {row.is_deleted ? (
+                    <div>
+                      Deleted
+                      {row.deleted_at && (
+                        <div className="text-gray-500">{row.deleted_at}</div>
+                      )}
+                    </div>
+                  ) : (
+                    '—'
                   )}
                 </td>
                 <td className="px-3 py-2 text-xs text-red-600">
@@ -297,13 +338,23 @@ export default function TrendsSnapshotsClient() {
                   >
                     Reprocess
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteRow(row.id)}
-                    className="rounded-md border px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                  >
-                    Delete
-                  </button>
+                  {row.is_deleted ? (
+                    <button
+                      type="button"
+                      onClick={() => restoreRow(row.id)}
+                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      Restore
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => deleteRow(row.id)}
+                      className="rounded-md border px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
