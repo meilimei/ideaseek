@@ -90,7 +90,7 @@ export default function TrendsSnapshotsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           processed: processedValue,
-          reset_error: !processedValue,
+          reset_error: processedValue,
         }),
       });
       const json = await res.json();
@@ -273,20 +273,23 @@ export default function TrendsSnapshotsClient() {
                   >
                     View JSON
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => updateProcessed(row.id, true)}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    Mark processed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateProcessed(row.id, false)}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    Mark unprocessed
-                  </button>
+                  {row.processed ? (
+                    <button
+                      type="button"
+                      onClick={() => updateProcessed(row.id, false)}
+                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      Mark unprocessed
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => updateProcessed(row.id, true)}
+                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
+                    >
+                      Mark processed
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => reprocess(row.id)}

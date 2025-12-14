@@ -71,7 +71,7 @@ export async function PATCH(
     updates.processed = body.processed;
     updates.processed_at = body.processed ? new Date().toISOString() : null;
   }
-  if (body.reset_error === true) {
+  if (body.reset_error === true || body.processed === true) {
     updates.last_error = null;
   }
 
