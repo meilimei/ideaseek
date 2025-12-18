@@ -27,7 +27,42 @@ type Idea = {
   source_url: string | null;
   created_at: string | null;
   created_by: string | null;
+  published?: boolean | null;
+  pinned?: boolean | null;
+  featured?: boolean | null;
 };
+
+type IdeaStats = {
+  totalIdeas: number;
+  publishedIdeas: number;
+  newLast7d: number;
+  sourceCounts: Record<string, number>;
+  mySavedIdeas?: number;
+};
+
+function StatCard({
+  label,
+  value,
+  accent,
+  subtext,
+}: {
+  label: string;
+  value: number | string;
+  accent: string;
+  subtext?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="text-sm font-semibold text-gray-900">{label}</div>
+      <div
+        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-gray-900`}
+      >
+        {value}
+      </div>
+      {subtext && <div className="mt-2 text-sm text-gray-600">{subtext}</div>}
+    </div>
+  );
+}
 
 export default function IdeasDatabasePage() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -37,48 +72,48 @@ export default function IdeasDatabasePage() {
   const router = useRouter();
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>(
-    (searchParams.get('sort') as 'newest' | 'oldest') ?? 'newest',
-  );
-  const [sourceFilter, setSourceFilter] = useState<
-    'all' | 'reddit' | 'trends' | 'youtube' | 'generated' | 'curated'
-  >(
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [stats, setStats] = useState<IdeaStats | null>(null);
+  const listTopRef = useRef<HTMLDivElement | null>(null);
+  const currentSort =
+    (searchParams.get('sort') as
+      | 'newest'
+      | 'oldest'
+      | 'published'
+      | 'pinned'
+      | 'featured') ?? 'newest';
+  const currentSource =
     (searchParams.get('source') as
       | 'all'
       | 'reddit'
       | 'trends'
       | 'youtube'
       | 'generated'
-      | 'curated') ?? 'all',
-  );
-  const [difficultyFilter, setDifficultyFilter] = useState<
-    'all' | 'easy' | 'medium' | 'hard'
-  >(
-    (searchParams.get('difficulty') as 'all' | 'easy' | 'medium' | 'hard') ?? 'all',
-  );
-  const [viewMode, setViewMode] = useState<'all' | 'mine'>(
-    (searchParams.get('view') as 'all' | 'mine') ?? 'all',
-  );
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const listTopRef = useRef<HTMLDivElement | null>(null);
+      | 'curated') ?? 'all';
+  const currentDifficulty =
+    (searchParams.get('difficulty') as 'all' | 'easy' | 'medium' | 'hard') ?? 'all';
+  const currentView = (searchParams.get('view') as 'all' | 'mine') ?? 'all';
+  const currentPage = Number(searchParams.get('page') ?? '1') || 1;
   const isDefaultState =
     !searchQuery &&
-    sourceFilter === 'all' &&
-    difficultyFilter === 'all' &&
-    sortBy === 'newest' &&
-    viewMode === 'all';
-  const [currentPage, setCurrentPage] = useState(
-    Number(searchParams.get('page') ?? 1) || 1,
-  );
+    currentSource === 'all' &&
+    currentDifficulty === 'all' &&
+    currentSort === 'newest' &&
+    currentView === 'all';
   const PAGE_SIZE = 10;
   const handleResetFilters = () => {
     setSearchQuery('');
-    setSourceFilter('all');
-    setDifficultyFilter('all');
-    setSortBy('newest');
-    setViewMode('all');
-    setCurrentPage(1);
-    router.replace(pathname);
+    updateQuery(
+      {
+        q: null,
+        source: null,
+        difficulty: null,
+        sort: null,
+        view: null,
+        page: null,
+      },
+      { resetPage: true },
+    );
   };
   const scrollToListTop = useCallback(() => {
     if (listTopRef.current) {
@@ -88,16 +123,38 @@ export default function IdeasDatabasePage() {
       });
     }
   }, []);
+  const updateQuery = useCallback(
+    (
+      patch: Record<string, string | null>,
+      options: { resetPage?: boolean } = {},
+    ) => {
+      const params = new URLSearchParams(searchParams.toString());
+      Object.entries(patch).forEach(([key, value]) => {
+        if (value === null || value === '') {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
+      if (options.resetPage) {
+        params.set('page', '1');
+      }
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
+
   const handlePageChange = useCallback(
     (page: number) => {
-      setCurrentPage(page);
       const params = new URLSearchParams(searchParams.toString());
       if (page > 1) {
         params.set('page', String(page));
       } else {
         params.delete('page');
       }
-      router.replace(`${pathname}?${params.toString()}`);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: true });
       scrollToListTop();
     },
     [pathname, router, scrollToListTop, searchParams],
@@ -106,7 +163,9 @@ export default function IdeasDatabasePage() {
   useEffect(() => {
     async function fetchIdeas() {
       try {
-        const res = await fetch('/api/ideas');
+        const params = new URLSearchParams();
+        if (currentSort) params.set('sort', currentSort);
+        const res = await fetch(`/api/ideas?${params.toString()}`);
         if (!res.ok) {
           throw new Error('Failed to fetch ideas');
         }
@@ -120,13 +179,31 @@ export default function IdeasDatabasePage() {
       }
     }
     fetchIdeas();
-  }, []);
+  }, [currentSort]);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id ?? null);
     });
+  }, []);
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get('q') ?? '');
+  }, [searchParams]);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/ideas/stats', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as IdeaStats;
+        setStats(json);
+      } catch {
+        // ignore
+      }
+    }
+    fetchStats();
   }, []);
 
   // Pick the first idea as "Idea of the Day".
@@ -150,43 +227,68 @@ export default function IdeasDatabasePage() {
       });
     }
     // Source filter
-    if (sourceFilter !== 'all') {
+    if (currentSource !== 'all') {
       filtered = filtered.filter((idea) => {
         const src = idea.source_type ?? 'curated';
-        return src === sourceFilter;
+        return src === currentSource;
       });
     }
     // Difficulty filter
-    if (difficultyFilter !== 'all') {
+    if (currentDifficulty !== 'all') {
       filtered = filtered.filter((idea) => {
         const d = idea.difficulty ?? null;
         if (d == null) return false;
-        if (difficultyFilter === 'easy') return d >= 1 && d <= 2;
-        if (difficultyFilter === 'medium') return d === 3;
-        if (difficultyFilter === 'hard') return d >= 4;
+        if (currentDifficulty === 'easy') return d >= 1 && d <= 2;
+        if (currentDifficulty === 'medium') return d === 3;
+        if (currentDifficulty === 'hard') return d >= 4;
         return true;
       });
     }
     // View mode filter
     filtered = filtered.filter((idea) => {
-      if (viewMode === 'all') return true;
+      if (currentView === 'all') return true;
       if (!currentUserId) return false;
       return idea.created_by === currentUserId;
     });
-    // Sort.
-    if (sortBy === 'newest') {
-      return filtered;
-    } else {
-      return filtered.slice().reverse();
-    }
+    const sorted = filtered.slice().sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      switch (currentSort) {
+        case 'oldest':
+          return dateA - dateB;
+        case 'published': {
+          const pa = a.published ? 1 : 0;
+          const pb = b.published ? 1 : 0;
+          if (pb !== pa) return pb - pa;
+          return dateB - dateA;
+        }
+        case 'pinned': {
+          const pa = a.pinned ? 1 : 0;
+          const pb = b.pinned ? 1 : 0;
+          if (pb !== pa) return pb - pa;
+          return dateB - dateA;
+        }
+        case 'featured': {
+          const pa = a.featured ? 1 : 0;
+          const pb = b.featured ? 1 : 0;
+          if (pb !== pa) return pb - pa;
+          return dateB - dateA;
+        }
+        case 'newest':
+        default:
+          return dateB - dateA;
+      }
+    });
+
+    return sorted;
   }, [
     ideas,
     searchQuery,
-    sortBy,
+    currentSort,
     ideaOfTheDay,
-    sourceFilter,
-    difficultyFilter,
-    viewMode,
+    currentSource,
+    currentDifficulty,
+    currentView,
     currentUserId,
   ]);
 
@@ -210,30 +312,6 @@ export default function IdeasDatabasePage() {
     }
   };
 
-  useEffect(() => {
-    handlePageChange(1);
-  }, [
-    searchQuery,
-    sourceFilter,
-    difficultyFilter,
-    sortBy,
-    viewMode,
-    currentUserId,
-    handlePageChange,
-  ]);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (sourceFilter !== 'all') params.set('source', sourceFilter);
-    if (difficultyFilter !== 'all') params.set('difficulty', difficultyFilter);
-    if (sortBy !== 'newest') params.set('sort', sortBy);
-    if (viewMode !== 'all') params.set('view', viewMode);
-    if (currentPage > 1) params.set('page', String(currentPage));
-    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, sourceFilter, difficultyFilter, sortBy, viewMode, currentPage]);
-
   if (loading) {
     return <div className="p-6">Loading ideas...</div>;
   }
@@ -250,51 +328,156 @@ export default function IdeasDatabasePage() {
       title="Find Your Next Startup Idea"
       description="Browse validated opportunities with research, market analysis, execution plans, and more."
     >
-      <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2, 3].map((card) => (
-          <div
-            key={card}
-            className="rounded-2xl border border-amber-100/70 bg-white/70 p-4 shadow-sm backdrop-blur"
-          >
-            <div className="h-4 w-16 rounded-full bg-amber-100" />
-            <div className="mt-3 h-3 w-24 rounded-full bg-gray-100" />
-            <div className="mt-2 h-16 rounded-xl bg-gradient-to-br from-amber-50 via-white to-indigo-50" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total ideas"
+          value={stats?.totalIdeas ?? 0}
+          accent="from-amber-50 via-white to-indigo-50"
+        />
+        <StatCard
+          label="Published"
+          value={stats?.publishedIdeas ?? 0}
+          accent="from-green-50 via-white to-emerald-50"
+        />
+        <StatCard
+          label="New (7d)"
+          value={stats?.newLast7d ?? 0}
+          accent="from-blue-50 via-white to-indigo-50"
+        />
+        {typeof stats?.mySavedIdeas === 'number' && (
+          <StatCard
+            label="My saved"
+            value={stats.mySavedIdeas}
+            accent="from-purple-50 via-white to-indigo-50"
+            subtext="Ideas you've bookmarked"
+          />
+        )}
+        <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+          <div className="text-sm font-semibold text-gray-900">Sources</div>
+          <div className="mt-3 space-y-2 text-sm text-gray-700">
+            {stats?.sourceCounts
+              ? Object.entries(stats.sourceCounts).map(([src, count]) => (
+                  <div key={src} className="flex items-center justify-between">
+                    <span className="capitalize">{src || 'unknown'}</span>
+                    <span className="text-gray-900 font-semibold">{count}</span>
+                  </div>
+                ))
+              : [1, 2, 3].map((k) => (
+                  <div
+                    key={k}
+                    className="flex items-center justify-between text-gray-400"
+                  >
+                    <span className="h-3 w-20 rounded-full bg-gray-100" />
+                    <span className="h-3 w-6 rounded-full bg-gray-100" />
+                  </div>
+                ))}
           </div>
-        ))}
+        </div>
       </div>
 
       <FilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onSearchSubmit={() => handlePageChange(1)}
-        sourceFilter={sourceFilter}
+        onSearchSubmit={() => {
+          updateQuery({ q: searchQuery || null }, { resetPage: true });
+          scrollToListTop();
+        }}
+        sourceFilter={currentSource}
         onSourceChange={(v) => {
-          setSourceFilter(v);
-          handlePageChange(1);
+          updateQuery({ source: v }, { resetPage: true });
+          scrollToListTop();
         }}
-        sortBy={sortBy}
+        sortBy={currentSort}
         onSortChange={(v) => {
-          setSortBy(v);
-          handlePageChange(1);
+          if (v === currentSort) return;
+          updateQuery({ sort: v }, { resetPage: true });
+          scrollToListTop();
         }}
-        viewMode={viewMode}
+        viewMode={currentView}
         onViewModeChange={(v) => {
-          setViewMode(v);
-          handlePageChange(1);
+          updateQuery({ view: v }, { resetPage: true });
+          scrollToListTop();
         }}
-        difficultyFilter={difficultyFilter}
+        difficultyFilter={currentDifficulty}
         onDifficultyChange={(v) => {
-          setDifficultyFilter(v);
-          handlePageChange(1);
+          updateQuery({ difficulty: v }, { resetPage: true });
+          scrollToListTop();
         }}
         onReset={handleResetFilters}
         isDefaultState={isDefaultState}
         totalCount={filteredIdeas.length}
+        activeChips={[
+          ...(searchQuery
+            ? [
+                {
+                  label: `Search: ${searchQuery}`,
+                  key: 'search',
+                  onRemove: () => {
+                    setSearchQuery('');
+                    updateQuery({ q: null }, { resetPage: true });
+                    scrollToListTop();
+                  },
+                },
+              ]
+            : []),
+          ...(currentSource !== 'all'
+            ? [
+                {
+                  label: `Source: ${sourceLabel(currentSource)}`,
+                  key: 'source',
+                  onRemove: () => {
+                    updateQuery({ source: null }, { resetPage: true });
+                    scrollToListTop();
+                  },
+                },
+              ]
+            : []),
+          ...(currentDifficulty !== 'all'
+            ? [
+                {
+                  label: `Difficulty: ${currentDifficulty}`,
+                  key: 'difficulty',
+                  onRemove: () => {
+                    updateQuery({ difficulty: null }, { resetPage: true });
+                    scrollToListTop();
+                  },
+                },
+              ]
+            : []),
+          ...(currentSort !== 'newest'
+            ? [
+                {
+                  label: `Sort: ${currentSort}`,
+                  key: 'sort',
+                  onRemove: () => {
+                    updateQuery({ sort: null }, { resetPage: true });
+                    scrollToListTop();
+                  },
+                },
+              ]
+            : []),
+          ...(currentView !== 'all'
+            ? [
+                {
+                  label: `View: ${currentView}`,
+                  key: 'view',
+                  onRemove: () => {
+                    updateQuery({ view: null }, { resetPage: true });
+                    scrollToListTop();
+                  },
+                },
+              ]
+            : []),
+        ]}
+        onClearAll={() => {
+          handleResetFilters();
+        }}
       />
 
       {/* Idea of the Day spotlight */}
       {ideaOfTheDay && (
         <div ref={listTopRef}>
+          <div id="ideas-top" />
           <section className="rounded-2xl border border-indigo-100 bg-white/80 p-6 shadow-sm backdrop-blur">
             <h2 className="mb-2 text-xl font-semibold">
               Idea of the Day

@@ -2,14 +2,48 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 
+type SortParam = 'newest' | 'oldest' | 'published' | 'pinned' | 'featured';
+
+function applySort(query: ReturnType<typeof supabase.from>, sort?: SortParam) {
+  switch (sort) {
+    case 'oldest':
+      return query.order('created_at', { ascending: true });
+    case 'published':
+      return query
+        .order('published', { ascending: false, nullsLast: true })
+        .order('created_at', { ascending: false });
+    case 'pinned':
+      return query
+        .order('pinned', { ascending: false, nullsLast: true })
+        .order('created_at', { ascending: false });
+    case 'featured':
+      return query
+        .order('featured', { ascending: false, nullsLast: true })
+        .order('created_at', { ascending: false });
+    case 'newest':
+    default:
+      return query.order('created_at', { ascending: false });
+  }
+}
+
 // 列表：GET /api/ideas
-export async function GET() {
-  const { data, error } = await supabase
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const sort = (url.searchParams.get('sort') as SortParam) ?? 'newest';
+
+  let query = supabase
     .from('ideas')
     .select(
-      'id, title, one_liner, tags, difficulty, market_size, demand_strength, source_type, source_url, created_at, created_by'
-    )
-    .order('created_at', { ascending: false });
+      'id, title, one_liner, tags, difficulty, market_size, demand_strength, source_type, source_url, created_at, created_by, published, pinned, featured'
+    );
+
+  try {
+    query = applySort(query, sort);
+  } catch {
+    query = applySort(query, 'newest');
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('[API] Error fetching ideas:', error);

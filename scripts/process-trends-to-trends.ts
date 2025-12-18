@@ -6,6 +6,7 @@ import {
   type IngestionSource,
   type IngestionStatus,
 } from '../lib/ingestion/types';
+import { computeTrendSignals } from '../lib/server/trendsSignals';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -150,6 +151,16 @@ async function upsertTrendRow(
 
   const summary = `Search interest over time (${geoLabel}/${timeframeLabel}).`;
 
+  const signals = computeTrendSignals({
+    keyword: snapshot.keyword,
+    title: snapshot.keyword,
+    growth_pct: metrics.growth_pct,
+    latest_value: metrics.latest_value,
+    sparkline: metrics.sparkline,
+    peak_value: metrics.peak_value,
+    avg_value: metrics.avg_value,
+  });
+
   const row = {
     trend_key,
     slug,
@@ -165,6 +176,10 @@ async function upsertTrendRow(
     avg_value: metrics.avg_value,
     growth_pct: metrics.growth_pct,
     sparkline: metrics.sparkline,
+    tags: signals.tags,
+    score: signals.score,
+    status: signals.status,
+    status_reason: signals.status_reason,
     raw_latest_payload: snapshot.raw_payload,
     updated_at: new Date().toISOString(),
   };

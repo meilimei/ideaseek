@@ -10,8 +10,10 @@ type FilterBarProps = {
   onSourceChange: (
     value: 'all' | 'reddit' | 'trends' | 'youtube' | 'generated' | 'curated',
   ) => void;
-  sortBy: 'newest' | 'oldest';
-  onSortChange: (value: 'newest' | 'oldest') => void;
+  sortBy: 'newest' | 'oldest' | 'published' | 'pinned' | 'featured';
+  onSortChange: (
+    value: 'newest' | 'oldest' | 'published' | 'pinned' | 'featured',
+  ) => void;
   viewMode: 'all' | 'mine';
   onViewModeChange: (value: 'all' | 'mine') => void;
   difficultyFilter: 'all' | 'easy' | 'medium' | 'hard';
@@ -19,6 +21,12 @@ type FilterBarProps = {
   onReset: () => void;
   isDefaultState: boolean;
   totalCount: number;
+  activeChips: Array<{
+    label: string;
+    key: string;
+    onRemove: () => void;
+  }>;
+  onClearAll: () => void;
 };
 
 export default function FilterBar({
@@ -36,6 +44,8 @@ export default function FilterBar({
   onReset,
   isDefaultState,
   totalCount,
+  activeChips,
+  onClearAll,
 }: FilterBarProps) {
   const handleSearch = (e: ChangeEvent<HTMLInputElement>) => {
     onSearchChange(e.target.value);
@@ -67,11 +77,23 @@ export default function FilterBar({
           <span>Sort by:</span>
           <select
             value={sortBy}
-            onChange={(e) => onSortChange(e.target.value as 'newest' | 'oldest')}
+            onChange={(e) =>
+              onSortChange(
+                e.target.value as
+                  | 'newest'
+                  | 'oldest'
+                  | 'published'
+                  | 'pinned'
+                  | 'featured',
+              )
+            }
             className="rounded-lg border px-2 py-1 text-sm"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
+            <option value="published">Published</option>
+            <option value="pinned">Pinned</option>
+            <option value="featured">Featured</option>
           </select>
         </div>
 
@@ -172,6 +194,29 @@ export default function FilterBar({
           </span>
         )}
       </div>
+
+      {activeChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeChips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.onRemove}
+              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+            >
+              <span>{chip.label}</span>
+              <span className="text-gray-400">×</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="text-xs font-semibold text-gray-700 hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
     </div>
   );
 }
