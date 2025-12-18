@@ -61,21 +61,6 @@ export default function SiteHeader() {
   const inactiveClasses =
     'text-gray-600 hover:text-gray-900 transition-colors';
 
-  const navLinks = useMemo(
-    () =>
-      navItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={`text-sm ${isActive(item.href) ? activeClasses : inactiveClasses}`}
-          onClick={() => setMenuOpen(false)}
-        >
-          {item.label}
-        </Link>
-      )),
-    [pathname],
-  );
-
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
@@ -91,7 +76,18 @@ export default function SiteHeader() {
           <Link href="/" className="text-lg font-semibold text-gray-900">
             IdeaSignal
           </Link>
-          <div className="hidden items-center gap-4 md:flex">{navLinks}</div>
+          <div className="hidden items-center gap-4 md:flex">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`text-sm ${isActive(item.href) ? activeClasses : inactiveClasses}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -136,7 +132,18 @@ export default function SiteHeader() {
 
       {menuOpen && (
         <div className="border-t border-gray-200 bg-white px-4 py-3 md:hidden">
-          <div className="flex flex-col gap-3">{navLinks}</div>
+          <div className="flex flex-col gap-3">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`text-sm ${isActive(item.href) ? activeClasses : inactiveClasses}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
           <div className="mt-3 flex flex-col gap-2">
             <Link
               href="/ideas/generator"
