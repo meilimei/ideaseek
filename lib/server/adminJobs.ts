@@ -18,21 +18,42 @@ export type AdminJobRow = {
   finished_at?: string | null;
   log?: string | null;
   error?: string | null;
+  strategy_id?: string | null;
+  source?: string | null;
 };
 
 export async function createAdminJob(
-  jobType: AdminJobType,
-  payload: Record<string, unknown> | null,
-  createdBy?: string,
+  type: AdminJobType,
+  options?: {
+    payload?: unknown;
+    strategyId?: string | null;
+    source?: string | null;
+    createdBy?: string | null;
+  },
 ) {
+  const payloadObj =
+    (options?.payload && typeof options.payload === 'object'
+      ? (options.payload as Record<string, unknown>)
+      : options?.payload ?? {}) ?? {};
+
+  const inferredSource =
+    options?.source ??
+    (typeof options?.payload === 'object' &&
+    options?.payload &&
+    'source' in (options.payload as Record<string, unknown>)
+      ? String((options.payload as Record<string, unknown>).source)
+      : null);
+
   const { data, error } = await supabase
     .from('admin_jobs')
     .insert({
-      job_type: jobType,
-      payload: payload ?? {},
+      job_type: type,
+      payload: payloadObj,
       status: 'queued',
       next_run_at: new Date().toISOString(),
-      created_by: createdBy ?? null,
+      created_by: options?.createdBy ?? null,
+      strategy_id: options?.strategyId ?? null,
+      source: inferredSource,
     })
     .select('id')
     .single();

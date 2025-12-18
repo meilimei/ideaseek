@@ -10,19 +10,42 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const execAsync = promisify(exec);
 
-const JOB_COMMANDS: Partial<Record<AdminJobType, string>> = {
-  'reddit-ingest': 'npm run ingest:reddit',
-  'youtube-ingest': 'npm run ingest:youtube',
-  'trends-ingest': 'npm run ingest:trends',
+type StrategyRow = {
+  id: string;
+  source: string;
+  config: any;
+  is_active?: boolean | null;
+  name?: string | null;
 };
 
-async function claimJob(worker: string): Promise<AdminJobRow | null> {
+type JobWithStrategy = AdminJobRow & {
+  strategy_id?: string | null;
+  source?: string | null;
+};
+
+async function claimJob(worker: string): Promise<JobWithStrategy | null> {
   const { data, error } = await supabase.rpc('claim_admin_job', { worker });
   if (error) {
     console.error('claim_admin_job failed:', error);
     return null;
   }
-  return data as AdminJobRow | null;
+  if (!data) return null;
+
+  // Ensure we have full fields (strategy_id/source) by reloading the row.
+  const { data: fullRow, error: fetchError } = await supabase
+    .from('admin_jobs')
+    .select(
+      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at, attempts, max_attempts, strategy_id, source',
+    )
+    .eq('id', (data as any).id)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error('Failed to hydrate claimed job:', fetchError);
+    return data as JobWithStrategy;
+  }
+
+  return (fullRow ?? data) as JobWithStrategy;
 }
 
 async function appendLog(jobId: string, message: string) {
@@ -41,12 +64,39 @@ async function appendLog(jobId: string, message: string) {
     .eq('id', jobId);
 }
 
-async function runCommand(jobId: string, jobType: AdminJobType): Promise<string> {
-  const command = JOB_COMMANDS[jobType];
-  if (!command) {
-    throw new Error(`Unknown job type: ${jobType}`);
+async function runCommand(
+  jobId: string,
+  jobType: AdminJobType | string,
+  strategy?: StrategyRow | null,
+): Promise<string> {
+  let command: string;
+  const normalizedType = typeof jobType === 'string' ? jobType.replace(/_/g, '-') : jobType;
+  switch (normalizedType) {
+    case 'reddit-ingest':
+      command = 'npm run ingest:reddit';
+      break;
+    case 'youtube-ingest':
+      command = 'npm run ingest:youtube';
+      break;
+    case 'trends-ingest':
+      command = 'npm run ingest:trends';
+      break;
+    default:
+      throw new Error(`Unknown job type: ${jobType}`);
   }
-  const { stdout, stderr } = await execAsync(command, { env: process.env });
+
+  const env = { ...process.env };
+  if (strategy) {
+    env.INGEST_STRATEGY_ID = strategy.id;
+    env.INGEST_STRATEGY_SOURCE = strategy.source;
+    try {
+      env.INGEST_STRATEGY_CONFIG = JSON.stringify(strategy.config ?? {});
+    } catch {
+      // ignore serialization issues
+    }
+  }
+
+  const { stdout, stderr } = await execAsync(command, { env });
   const combined = `${stdout ?? ''}${stderr ?? ''}`;
   await appendLog(jobId, combined);
   return combined;
@@ -98,7 +148,20 @@ async function markJob(
   await supabase.from('admin_jobs').update(payload).eq('id', jobId);
 }
 
-async function processJob(job: AdminJobRow) {
+async function loadStrategy(id: string): Promise<StrategyRow | null> {
+  const { data, error } = await supabase
+    .from('ingest_strategies')
+    .select('id, source, config, is_active, name')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    console.error('Failed to load strategy', id, error);
+    return null;
+  }
+  return data as StrategyRow | null;
+}
+
+async function processJob(job: JobWithStrategy) {
   const jobId = job.id;
   const jobType = job.job_type;
   let log = '';
@@ -111,7 +174,27 @@ async function processJob(job: AdminJobRow) {
       await processSingleTrendsSnapshot(Number(snapshotId));
       log = `Processed trends snapshot ${snapshotId}`;
     } else {
-      log = await runCommand(jobId, jobType);
+      let strategy: StrategyRow | null = null;
+      if (job.strategy_id) {
+        strategy = await loadStrategy(job.strategy_id);
+        if (!strategy || strategy.is_active === false) {
+          throw new Error('Strategy not found or inactive');
+        }
+      }
+
+      if (strategy && strategy.source === 'reddit') {
+        log = await runCommand(jobId, 'reddit-ingest', strategy);
+      } else if (strategy && strategy.source === 'youtube') {
+        log = await runCommand(jobId, 'youtube-ingest', strategy);
+      } else if (strategy && strategy.source === 'google_trends') {
+        log = await runCommand(jobId, 'trends-ingest', strategy);
+      } else {
+        log = await runCommand(jobId, jobType, strategy);
+      }
+
+      if (strategy) {
+        log = `Using strategy ${strategy.id} (${strategy.name ?? ''})\n${log}`;
+      }
     }
     await markJob(jobId, 'success', log);
   } catch (err) {

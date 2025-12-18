@@ -2,15 +2,15 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
-  REDDIT_STRATEGIES,
-  type RedditStrategyConfig,
-} from '../config/sources';
-import {
   type IngestionRunContext,
   type IngestionSource,
   type IngestionStatus,
   type RawRedditPostPayload,
 } from '../lib/ingestion/types';
+import {
+  getEnabledStrategiesOrDefault,
+  type StrategyWithConfig,
+} from '../lib/server/ingestStrategies';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -30,6 +30,46 @@ ensureEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
+
+type RedditConfig = {
+  subreddits: string[];
+  minScore?: number;
+  keywords?: string[];
+};
+
+const DEFAULT_REDDIT_PIPELINES: Array<{
+  strategyKey: string;
+  name: string;
+  config: RedditConfig;
+}> = [
+  {
+    strategyKey: 'indie-saas-painpoints',
+    name: 'indie-saas-painpoints',
+    config: {
+      subreddits: ['Entrepreneur', 'IndieHackers', 'SaaS'],
+      minScore: 5,
+      keywords: ['any idea how to', 'how do I', 'struggle with'],
+    },
+  },
+  {
+    strategyKey: 'ai-tools-for-creators',
+    name: 'ai-tools-for-creators',
+    config: {
+      subreddits: ['ArtificialIntelligence', 'ContentCreators', 'YouTube'],
+      minScore: 3,
+      keywords: ['recommend tool', 'ai tool', 'workflow', 'automation'],
+    },
+  },
+];
+
+type RedditIngestStrategy = {
+  id: string | null;
+  strategyKey: string;
+  name: string;
+  subreddits: string[];
+  minScore: number;
+  keywords: string[];
+};
 
 type RedditListingChild = {
   data: {
@@ -141,14 +181,14 @@ async function fetchJsonWithRetry<T = unknown>(
 }
 
 async function fetchRedditPostsForStrategy(
-  strategy: RedditStrategyConfig,
+  strategy: RedditIngestStrategy,
   perSubreddit = 25,
 ): Promise<RawRedditPostPayload[]> {
   const collected: RawRedditPostPayload[] = [];
 
   for (const sub of strategy.subreddits) {
     const redditUrl = `https://www.reddit.com/r/${sub}/top.json?limit=${perSubreddit}&t=day&raw_json=1`;
-    console.log(`[${strategy.name}] Fetching ${redditUrl}`);
+    console.log(`[${strategy.strategyKey}] Fetching ${redditUrl}`);
 
     try {
       const json = await fetchJsonWithRetry<RedditListingResponse>(redditUrl);
@@ -171,7 +211,7 @@ async function fetchRedditPostsForStrategy(
       continue;
     } catch (err) {
       console.warn(
-        `[${strategy.name}] Primary fetch failed for r/${sub}, trying fallback:`,
+        `[${strategy.strategyKey}] Primary fetch failed for r/${sub}, trying fallback:`,
         err instanceof Error ? err.message : err,
       );
     }
@@ -198,7 +238,7 @@ async function fetchRedditPostsForStrategy(
       }
     } catch (fallbackErr) {
       console.error(
-        `[${strategy.name}] Fallback fetch failed for r/${sub}:`,
+        `[${strategy.strategyKey}] Fallback fetch failed for r/${sub}:`,
         fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
       );
     }
@@ -209,7 +249,7 @@ async function fetchRedditPostsForStrategy(
 
 function filterPostsForStrategy(
   posts: RawRedditPostPayload[],
-  strategy: RedditStrategyConfig,
+  strategy: RedditIngestStrategy,
 ): RawRedditPostPayload[] {
   const minScore = strategy.minScore ?? 0;
   const keywords = (strategy.keywords ?? []).map((kw) =>
@@ -229,7 +269,7 @@ function filterPostsForStrategy(
 }
 
 async function upsertRawRedditPosts(
-  strategy: RedditStrategyConfig,
+  strategy: RedditIngestStrategy,
   posts: RawRedditPostPayload[],
 ): Promise<number> {
   if (posts.length === 0) return 0;
@@ -247,6 +287,7 @@ async function upsertRawRedditPosts(
       ? new Date(post.created_utc * 1000).toISOString()
       : null,
     strategy_name: strategy.name,
+    ingest_strategy_id: strategy.id ?? null,
     raw_payload: post,
   }));
 
@@ -324,27 +365,43 @@ async function finishIngestionRun(
 async function main() {
   console.log('--- Ingest Reddit raw → Supabase.raw_reddit_posts ---');
 
-  for (const strategy of REDDIT_STRATEGIES) {
+  const strategies: StrategyWithConfig<RedditConfig>[] =
+    await getEnabledStrategiesOrDefault<RedditConfig>(
+      'reddit',
+      DEFAULT_REDDIT_PIPELINES,
+    );
+
+  const redditStrategies: RedditIngestStrategy[] = strategies.map((s) => ({
+    id: s.id,
+    strategyKey: s.strategyKey,
+    name: s.name,
+    subreddits: s.config.subreddits ?? [],
+    minScore: s.config.minScore ?? 0,
+    keywords: s.config.keywords ?? [],
+  }));
+
+  for (const strategy of redditStrategies) {
+    console.log(`[${strategy.strategyKey}] starting reddit ingest`);
     const ctx = await startIngestionRun('reddit', strategy.name);
     try {
       const fetched = await fetchRedditPostsForStrategy(strategy);
       console.log(
-        `[${strategy.name}] Fetched ${fetched.length} posts across ${strategy.subreddits.length} subreddits.`,
+        `[${strategy.strategyKey}] Fetched ${fetched.length} posts across ${strategy.subreddits.length} subreddits.`,
       );
 
       const filtered = filterPostsForStrategy(fetched, strategy);
       console.log(
-        `[${strategy.name}] Filtered to ${filtered.length} posts after score/keyword checks.`,
+        `[${strategy.strategyKey}] Filtered to ${filtered.length} posts after score/keyword checks.`,
       );
 
       const rawInserted = await upsertRawRedditPosts(strategy, filtered);
       await finishIngestionRun(ctx, 'success', { raw: rawInserted });
       console.log(
-        `[${strategy.name}] Upserted ${rawInserted} raw posts successfully.`,
+        `[${strategy.strategyKey}] Upserted ${rawInserted} raw posts successfully.`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[${strategy.name}] Error during ingestion:`, message);
+      console.error(`[${strategy.strategyKey}] Error during ingestion:`, message);
       await finishIngestionRun(ctx, 'error', { raw: 0 }, message);
     }
   }

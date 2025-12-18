@@ -13,8 +13,10 @@ type RawRedditPost = {
   selftext: string | null;
   created_utc: string | null;
   is_deleted: boolean;
-  selected_for_idea: boolean;
+  selected_for_idea?: boolean;
+  selected: boolean | null;
   admin_note: string | null;
+  promoted_idea_id: string | null;
 };
 
 export async function GET(request: Request) {
@@ -45,7 +47,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('raw_reddit_posts')
     .select(
-      'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, admin_note',
+      'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, selected, promoted_idea_id, admin_note',
       { count: 'exact' },
     );
 
@@ -62,9 +64,9 @@ export async function GET(request: Request) {
   }
 
   if (selected === 'true') {
-    query = query.eq('selected_for_idea', true);
+    query = query.eq('selected', true);
   } else if (selected === 'false') {
-    query = query.eq('selected_for_idea', false);
+    query = query.eq('selected', false);
   }
 
   if (q && q.trim().length > 0) {
@@ -115,6 +117,11 @@ export async function PATCH(request: Request) {
     const updates: Record<string, unknown> = {};
     if (typeof body.selected_for_idea === 'boolean') {
       updates.selected_for_idea = body.selected_for_idea;
+      updates.selected = body.selected_for_idea;
+    }
+    if (typeof body.selected === 'boolean') {
+      updates.selected = body.selected;
+      updates.selected_for_idea = body.selected;
     }
     if (typeof body.is_deleted === 'boolean') {
       updates.is_deleted = body.is_deleted;
@@ -132,7 +139,7 @@ export async function PATCH(request: Request) {
       .update(updates)
       .eq('id', id)
       .select(
-        'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, admin_note',
+        'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, selected, promoted_idea_id, admin_note',
       )
       .single();
 

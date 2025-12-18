@@ -2,15 +2,15 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import {
-  YOUTUBE_STRATEGIES,
-  type YouTubeStrategyConfig,
-} from '../config/sources';
-import {
   type IngestionRunContext,
   type IngestionSource,
   type IngestionStatus,
   type RawYouTubeVideoPayload,
 } from '../lib/ingestion/types';
+import {
+  getEnabledStrategiesOrDefault,
+  type StrategyWithConfig,
+} from '../lib/server/ingestStrategies';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -36,6 +36,50 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
+type YoutubeConfig = {
+  queries: string[];
+  regionCode?: string;
+  maxResults?: number;
+  minViews?: number;
+};
+
+const DEFAULT_YOUTUBE_PIPELINES: Array<{
+  strategyKey: string;
+  name: string;
+  config: YoutubeConfig;
+}> = [
+  {
+    strategyKey: 'ai-tools-search',
+    name: 'ai-tools-search',
+    config: {
+      queries: ['ai tools for creators'],
+      regionCode: 'US',
+      maxResults: 40,
+      minViews: 1000,
+    },
+  },
+  {
+    strategyKey: 'saas-ideas-search',
+    name: 'saas-ideas-search',
+    config: {
+      queries: ['saas ideas for developers'],
+      regionCode: 'US',
+      maxResults: 40,
+      minViews: 500,
+    },
+  },
+];
+
+type YouTubeIngestStrategy = {
+  id: string | null;
+  strategyKey: string;
+  name: string;
+  queries: string[];
+  regionCode?: string;
+  maxResults: number;
+  minViews: number;
+};
+
 async function fetchJson<T = any>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -59,48 +103,64 @@ type YouTubeVideosResponse = {
 };
 
 async function fetchYouTubeVideosForStrategy(
-  strategy: YouTubeStrategyConfig,
+  strategy: YouTubeIngestStrategy,
 ): Promise<YouTubeVideoItem[]> {
   const apiKey = process.env.YOUTUBE_API_KEY!;
-  const maxResults = Math.min(strategy.maxVideosPerRun, 50);
+  const maxResults = Math.min(strategy.maxResults, 50);
+  const collected: YouTubeVideoItem[] = [];
+  const seen = new Set<string>();
 
-  const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
-  searchUrl.searchParams.set('key', apiKey);
-  searchUrl.searchParams.set('part', 'snippet');
-  searchUrl.searchParams.set('type', 'video');
-  searchUrl.searchParams.set('order', 'viewCount');
-  searchUrl.searchParams.set('q', strategy.query);
-  searchUrl.searchParams.set('maxResults', String(maxResults));
+  for (const query of strategy.queries) {
+    const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+    searchUrl.searchParams.set('key', apiKey);
+    searchUrl.searchParams.set('part', 'snippet');
+    searchUrl.searchParams.set('type', 'video');
+    searchUrl.searchParams.set('order', 'viewCount');
+    searchUrl.searchParams.set('q', query);
+    searchUrl.searchParams.set('maxResults', String(maxResults));
+    if (strategy.regionCode) {
+      searchUrl.searchParams.set('regionCode', strategy.regionCode);
+    }
 
-  console.log(`[${strategy.name}] Searching YouTube for: ${strategy.query}`);
-  const searchJson = await fetchJson<YouTubeSearchResponse>(
-    searchUrl.toString(),
-  );
-  const videoIds = (searchJson.items ?? [])
-    .map((item) => item.id.videoId)
-    .filter((id): id is string => Boolean(id));
+    console.log(`[${strategy.strategyKey}] Searching YouTube for: ${query}`);
+    const searchJson = await fetchJson<YouTubeSearchResponse>(
+      searchUrl.toString(),
+    );
+    const videoIds = (searchJson.items ?? [])
+      .map((item) => item.id.videoId)
+      .filter((id): id is string => Boolean(id));
 
-  if (videoIds.length === 0) {
-    console.log(`[${strategy.name}] No videoIds found from search.`);
-    return [];
+    if (videoIds.length === 0) {
+      console.log(`[${strategy.strategyKey}] No videoIds found from search.`);
+      continue;
+    }
+
+    const videosUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+    videosUrl.searchParams.set('key', apiKey);
+    videosUrl.searchParams.set('part', 'snippet,statistics');
+    videosUrl.searchParams.set('id', videoIds.join(','));
+
+    console.log(
+      `[${strategy.strategyKey}] Fetching details for ${videoIds.length} videos`,
+    );
+    const videosJson = await fetchJson<YouTubeVideosResponse>(
+      videosUrl.toString(),
+    );
+
+    for (const item of videosJson.items ?? []) {
+      if (item.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        collected.push(item);
+      }
+    }
   }
 
-  const videosUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-  videosUrl.searchParams.set('key', apiKey);
-  videosUrl.searchParams.set('part', 'snippet,statistics');
-  videosUrl.searchParams.set('id', videoIds.join(','));
-
-  console.log(`[${strategy.name}] Fetching details for ${videoIds.length} videos`);
-  const videosJson = await fetchJson<YouTubeVideosResponse>(
-    videosUrl.toString(),
-  );
-
-  return videosJson.items ?? [];
+  return collected;
 }
 
 function filterVideosForStrategy(
   videos: YouTubeVideoItem[],
-  strategy: YouTubeStrategyConfig,
+  strategy: YouTubeIngestStrategy,
 ): YouTubeVideoItem[] {
   const minViews = strategy.minViews;
   return videos.filter((video) => {
@@ -114,7 +174,7 @@ function filterVideosForStrategy(
 }
 
 async function upsertRawYouTubeVideos(
-  strategy: YouTubeStrategyConfig,
+  strategy: YouTubeIngestStrategy,
   videos: YouTubeVideoItem[],
 ): Promise<number> {
   if (videos.length === 0) return 0;
@@ -139,6 +199,7 @@ async function upsertRawYouTubeVideos(
       like_count: likes,
       comment_count: comments,
       strategy_name: strategy.name,
+      ingest_strategy_id: strategy.id ?? null,
       raw_payload: video as RawYouTubeVideoPayload,
     };
   });
@@ -217,25 +278,43 @@ async function main() {
     'YOUTUBE_API_KEY',
   ]);
 
-  for (const strategy of YOUTUBE_STRATEGIES) {
+  const strategies: StrategyWithConfig<YoutubeConfig>[] =
+    await getEnabledStrategiesOrDefault<YoutubeConfig>(
+      'youtube',
+      DEFAULT_YOUTUBE_PIPELINES,
+    );
+
+  const youtubeStrategies: YouTubeIngestStrategy[] = strategies.map((s) => ({
+    id: s.id,
+    strategyKey: s.strategyKey,
+    name: s.name,
+    queries: s.config.queries ?? [],
+    regionCode: s.config.regionCode ?? 'US',
+    maxResults: s.config.maxResults ?? 25,
+    minViews: s.config.minViews ?? 0,
+  }));
+
+  for (const strategy of youtubeStrategies) {
     const runCtx = await startIngestionRun('youtube', strategy.name);
 
     try {
       console.log(
-        `[${strategy.name}] Starting ingestion for query "${strategy.query}"`,
+        `[${strategy.strategyKey}] Starting ingestion for ${strategy.queries.length} quer${strategy.queries.length === 1 ? 'y' : 'ies'}`,
       );
 
       const videos = await fetchYouTubeVideosForStrategy(strategy);
-      console.log(`[${strategy.name}] Fetched ${videos.length} videos from API`);
+      console.log(
+        `[${strategy.strategyKey}] Fetched ${videos.length} videos from API`,
+      );
 
       const filtered = filterVideosForStrategy(videos, strategy);
       console.log(
-        `[${strategy.name}] Filtered to ${filtered.length} videos after minViews checks`,
+        `[${strategy.strategyKey}] Filtered to ${filtered.length} videos after minViews checks`,
       );
 
       const inserted = await upsertRawYouTubeVideos(strategy, filtered);
       console.log(
-        `[${strategy.name}] Upserted ${inserted} raw YouTube videos successfully.`,
+        `[${strategy.strategyKey}] Upserted ${inserted} raw YouTube videos successfully.`,
       );
 
       await finishIngestionRun(runCtx, 'success', {

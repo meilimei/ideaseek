@@ -12,9 +12,11 @@ type RawRedditPost = {
   num_comments: number | null;
   selftext: string | null;
   created_utc: string | null;
-  selected_for_idea: boolean;
+  selected_for_idea?: boolean;
+  selected?: boolean | null;
   is_deleted: boolean;
   admin_note: string | null;
+  promoted_idea_id?: string | null;
 };
 
 type ApiResponse = {
@@ -94,6 +96,26 @@ export default function RedditPostsClient() {
         throw new Error(json.error || 'Update failed');
       }
       setItems((prev) => prev.map((row) => (row.id === id ? { ...row, ...json } : row)));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const promote = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/reddit-posts/${id}/promote`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to promote');
+      }
+      alert(
+        json.created
+          ? `Created idea ${json.ideaId}`
+          : `Already promoted, idea ${json.ideaId}`,
+      );
+      void fetchData(page);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -195,6 +217,7 @@ export default function RedditPostsClient() {
           </thead>
           <tbody>
             {items.map((row) => {
+              const isSelected = row.selected ?? row.selected_for_idea ?? false;
               const noteValue = noteEdits[row.id] ?? row.admin_note ?? '';
               return (
                 <tr key={row.id} className="border-t align-top">
@@ -217,12 +240,10 @@ export default function RedditPostsClient() {
                   <td className="px-3 py-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        updateRow(row.id, { selected_for_idea: !row.selected_for_idea })
-                      }
+                      onClick={() => updateRow(row.id, { selected: !isSelected })}
                       className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
                     >
-                      {row.selected_for_idea ? 'Selected' : 'Select'}
+                      {isSelected ? 'Selected' : 'Select'}
                     </button>
                   </td>
                   <td className="px-3 py-2">
@@ -248,6 +269,25 @@ export default function RedditPostsClient() {
                     />
                   </td>
                   <td className="px-3 py-2 text-right">
+                    {row.promoted_idea_id ? (
+                      <a
+                        href={`/ideas/${row.promoted_idea_id}`}
+                        className="rounded-md border px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open idea
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => promote(row.id)}
+                        className="rounded-md border px-2 py-1 text-xs bg-indigo-600 text-white hover:bg-indigo-700"
+                        disabled={loading}
+                      >
+                        Promote to Idea
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => updateRow(row.id, { admin_note: noteValue })}

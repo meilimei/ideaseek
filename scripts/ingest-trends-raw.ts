@@ -2,14 +2,14 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
-  TRENDS_STRATEGIES,
-  type TrendsStrategyConfig,
-} from '../config/sources';
-import {
   type IngestionRunContext,
   type IngestionSource,
   type IngestionStatus,
 } from '../lib/ingestion/types';
+import {
+  getEnabledStrategiesOrDefault,
+  type StrategyWithConfig,
+} from '../lib/server/ingestStrategies';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -35,6 +35,51 @@ ensureEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
+
+type TrendsConfig = {
+  keywords: string[];
+  geo?: string;
+  timeframe?: string;
+  strategyName?: string;
+};
+
+const DEFAULT_TRENDS_PIPELINES: Array<{
+  strategyKey: string;
+  name: string;
+  config: TrendsConfig;
+}> = [
+  {
+    strategyKey: 'creator-economy',
+    name: 'creator-economy',
+    config: {
+      keywords: [
+        'picture management software',
+        'content scheduler',
+        'video editing ai',
+      ],
+      geo: 'US',
+      timeframe: 'today 12-m',
+    },
+  },
+  {
+    strategyKey: 'ai-developer-tools',
+    name: 'ai-developer-tools',
+    config: {
+      keywords: ['code assistant', 'ai code review'],
+      geo: 'GLOBAL',
+      timeframe: 'today 12-m',
+    },
+  },
+];
+
+type TrendsIngestStrategy = {
+  id: string | null;
+  strategyKey: string;
+  name: string;
+  keywords: string[];
+  geo?: string;
+  timeframe?: string;
+};
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -101,7 +146,7 @@ async function fetchInterestOverTime(
 }
 
 async function upsertRawTrendsSnapshot(
-  strategy: TrendsStrategyConfig,
+  strategy: TrendsIngestStrategy,
   keyword: string,
   geo: string | undefined,
   timeframe: string | undefined,
@@ -122,6 +167,7 @@ async function upsertRawTrendsSnapshot(
         timeframe: timeframe ?? null,
         source: 'google_trends',
         strategy_name: strategy.name,
+        ingest_strategy_id: strategy.id ?? null,
         raw_payload: payload,
       },
       { onConflict: 'snapshot_key' },
@@ -198,14 +244,29 @@ async function main() {
     '--- Ingest Google Trends raw → Supabase.raw_trends_snapshots ---',
   );
 
-  for (const strategy of TRENDS_STRATEGIES) {
+  const strategies: StrategyWithConfig<TrendsConfig>[] =
+    await getEnabledStrategiesOrDefault<TrendsConfig>(
+      'trends',
+      DEFAULT_TRENDS_PIPELINES,
+    );
+
+  const trendsStrategies: TrendsIngestStrategy[] = strategies.map((s) => ({
+    id: s.id,
+    strategyKey: s.strategyKey,
+    name: s.name,
+    keywords: s.config.keywords ?? [],
+    geo: s.config.geo ?? 'US',
+    timeframe: s.config.timeframe ?? DEFAULT_TIMEFRAME,
+  }));
+
+  for (const strategy of trendsStrategies) {
     const ctx = await startIngestionRun('trends', strategy.name);
     let rawInserted = 0;
 
     try {
       for (const keyword of strategy.keywords) {
         console.log(
-          `[${strategy.name}] Fetching interest over time for "${keyword}" (${strategy.geo ?? 'GLOBAL'}, ${strategy.timeframe ?? DEFAULT_TIMEFRAME})`,
+          `[${strategy.strategyKey}] Fetching interest over time for "${keyword}" (${strategy.geo ?? 'GLOBAL'}, ${strategy.timeframe ?? DEFAULT_TIMEFRAME})`,
         );
 
         const payload = await fetchInterestOverTime(
@@ -226,12 +287,12 @@ async function main() {
 
       await finishIngestionRun(ctx, 'success', { raw: rawInserted });
       console.log(
-        `[${strategy.name}] Stored ${rawInserted} raw trend snapshot(s).`,
+        `[${strategy.strategyKey}] Stored ${rawInserted} raw trend snapshot(s).`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(
-        `[${strategy.name}] Error during trends ingestion:`,
+        `[${strategy.strategyKey}] Error during trends ingestion:`,
         message,
       );
       await finishIngestionRun(ctx, 'error', { raw: rawInserted }, message);

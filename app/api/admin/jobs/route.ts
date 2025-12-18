@@ -38,14 +38,27 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const jobType = body?.job_type as AdminJobType | undefined;
+    const jobType = (body?.job_type ?? body?.type) as AdminJobType | undefined;
     const payload = (body?.payload as Record<string, unknown>) ?? {};
+    const strategyId = body?.strategyId ?? body?.strategy_id;
+    const source = body?.source ?? null;
 
     if (!jobType) {
       return NextResponse.json({ error: 'Missing job_type' }, { status: 400 });
     }
+    if (strategyId !== undefined && strategyId !== null && typeof strategyId !== 'string') {
+      return NextResponse.json(
+        { error: 'strategyId must be a string if provided' },
+        { status: 400 },
+      );
+    }
 
-    const jobId = await createAdminJob(jobType, payload, auth.user.id);
+    const jobId = await createAdminJob(jobType, {
+      payload,
+      strategyId: strategyId ?? null,
+      source,
+      createdBy: auth.user.id,
+    });
 
     return NextResponse.json({ ok: true, jobId });
   } catch (err) {
