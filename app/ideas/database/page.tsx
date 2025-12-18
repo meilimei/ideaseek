@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabaseBrowserClient';
+import PageShell from '@/components/site/PageShell';
 
 type Idea = {
   id: string;
@@ -203,18 +204,26 @@ export default function IdeasDatabasePage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      {/* Hero section */}
-      <header className="text-center space-y-3">
-        <h1 className="text-4xl font-bold">Find Your Next Startup Idea</h1>
-        <p className="text-gray-600">
-          Browse validated opportunities with research, market analysis, execution plans and more.
-        </p>
-      </header>
+    <PageShell
+      title="Find Your Next Startup Idea"
+      description="Browse validated opportunities with research, market analysis, execution plans, and more."
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        {[1, 2, 3].map((card) => (
+          <div
+            key={card}
+            className="rounded-2xl border border-amber-100/70 bg-white/70 p-4 shadow-sm backdrop-blur"
+          >
+            <div className="h-4 w-16 rounded-full bg-amber-100" />
+            <div className="mt-3 h-3 w-24 rounded-full bg-gray-100" />
+            <div className="mt-2 h-16 rounded-xl bg-gradient-to-br from-amber-50 via-white to-indigo-50" />
+          </div>
+        ))}
+      </div>
 
       {/* Filter & sort bar */}
-      <nav className="space-y-3 border-b pb-3">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <nav className="space-y-3 rounded-2xl border border-gray-200/80 bg-white/80 p-4 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-600">
               {filteredIdeas.length} ideas{' '}
@@ -237,8 +246,8 @@ export default function IdeasDatabasePage() {
             </label>
           </div>
 
-          <div className="flex flex-col w-full md:w-auto gap-2">
-            <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex w-full flex-col gap-2 md:w-auto">
+            <div className="flex w-full gap-2 md:w-auto">
               <input
                 type="text"
                 value={searchQuery}
@@ -249,7 +258,7 @@ export default function IdeasDatabasePage() {
               <button
                 type="button"
                 onClick={(e) => e.preventDefault()}
-                className="px-4 py-2 rounded-lg border bg-gray-100 text-sm hover:bg-gray-200"
+                className="rounded-lg border bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200"
               >
                 Search
               </button>
@@ -257,13 +266,13 @@ export default function IdeasDatabasePage() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="px-4 py-2 rounded-lg border bg-gray-50 text-sm hover:bg-gray-100"
+                  className="rounded-lg border bg-gray-50 px-4 py-2 text-sm hover:bg-gray-100"
                 >
                   Clear
                 </button>
               )}
             </div>
-            <div className="inline-flex rounded-full border text-xs overflow-hidden self-start md:self-end">
+            <div className="inline-flex overflow-hidden self-start rounded-full border text-xs md:self-end">
               <button
                 type="button"
                 onClick={() => setViewMode('all')}
@@ -312,9 +321,9 @@ export default function IdeasDatabasePage() {
                     | 'curated',
                 )
               }
-              className={`px-3 py-1 rounded-full border text-xs cursor-pointer ${
+              className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
                 sourceFilter === opt.value
-                  ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                  ? 'border-indigo-200 bg-indigo-100 text-indigo-700'
                   : 'bg-white text-gray-700'
               }`}
             >
@@ -337,9 +346,9 @@ export default function IdeasDatabasePage() {
                   opt.value as 'all' | 'easy' | 'medium' | 'hard',
                 )
               }
-              className={`px-3 py-1 rounded-full border text-xs cursor-pointer ${
+              className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
                 difficultyFilter === opt.value
-                  ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                  ? 'border-indigo-200 bg-indigo-100 text-indigo-700'
                   : 'bg-white text-gray-700'
               }`}
             >
@@ -352,21 +361,21 @@ export default function IdeasDatabasePage() {
       {/* Idea of the Day spotlight */}
       {ideaOfTheDay && (
         <div ref={listTopRef}>
-          <section className="rounded-xl bg-indigo-50 p-6 border shadow-sm">
-            <h2 className="text-xl font-semibold mb-2">
+          <section className="rounded-2xl border border-indigo-100 bg-white/80 p-6 shadow-sm backdrop-blur">
+            <h2 className="mb-2 text-xl font-semibold">
               Idea of the Day
             </h2>
-            <h3 className="text-2xl font-bold mb-2">
+            <h3 className="mb-2 text-2xl font-bold">
               {ideaOfTheDay.title}
             </h3>
             {ideaOfTheDay.one_liner && (
-              <p className="text-gray-800 mb-2">
+              <p className="mb-2 text-gray-800">
                 {ideaOfTheDay.one_liner}
               </p>
             )}
             {/* Use the description as teaser. Ensure we show truncated content */}
             {ideaOfTheDay.description && (
-              <p className="text-gray-700 mb-4">
+              <p className="mb-4 text-gray-700">
                 {ideaOfTheDay.description.slice(0, 200)}...
               </p>
             )}
@@ -379,15 +388,15 @@ export default function IdeasDatabasePage() {
           </section>
 
           {/* Ideas list */}
-          <section className="space-y-4 mt-4">
+          <section className="mt-4 space-y-4">
             {pagedIdeas.map((idea) => (
               <Link
                 href={`/ideas/${idea.id}`}
                 key={idea.id}
-                className="block border rounded-xl p-4 hover:shadow-sm transition bg-white"
+                className="block rounded-xl border bg-white p-4 transition hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-semibold mb-1">{idea.title}</h3>
+                  <h3 className="mb-1 text-lg font-semibold">{idea.title}</h3>
                   <div className="text-xs text-gray-500">
                     {idea.created_at
                       ? new Date(idea.created_at).toLocaleDateString()
@@ -395,7 +404,7 @@ export default function IdeasDatabasePage() {
                   </div>
                 </div>
                 {idea.one_liner && (
-                  <p className="text-gray-700 mb-2">{idea.one_liner}</p>
+                  <p className="mb-2 text-gray-700">{idea.one_liner}</p>
                 )}
                 <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                   <span className="px-2 py-0.5 rounded-full border text-xs">
@@ -490,6 +499,6 @@ export default function IdeasDatabasePage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import TrendCardItem from './TrendCardItem';
 import { createClient } from '@/lib/supabaseBrowserClient';
+import PageShell from '@/components/site/PageShell';
 
 type TrendCard = {
   id: string;
@@ -113,24 +114,24 @@ export default function TrendsPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Trends</h1>
-        <p className="text-gray-600">
-          Discover emerging trends and opportunities.
-        </p>
-        {(process.env.NODE_ENV !== 'production' ||
-          process.env.NEXT_PUBLIC_DEBUG === '1') && (
-          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-gray-700 bg-gray-50">
-            Debug User:{' '}
-            <span className="font-semibold">
-              {userId ?? 'not logged in'}
-            </span>
+    <PageShell
+      title="Trends"
+      description="Discover emerging signals and opportunities from Google, YouTube, and the community."
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        {[1, 2, 3].map((item) => (
+          <div
+            key={item}
+            className="rounded-2xl border border-indigo-100/70 bg-white/70 p-4 shadow-sm backdrop-blur"
+          >
+            <div className="h-4 w-20 rounded-full bg-indigo-50" />
+            <div className="mt-3 h-3 w-24 rounded-full bg-gray-100" />
+            <div className="mt-2 h-16 rounded-xl bg-gradient-to-br from-indigo-50 via-white to-amber-50" />
           </div>
-        )}
-      </header>
+        ))}
+      </div>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-2xl border border-gray-200/80 bg-white/80 p-4 shadow-sm backdrop-blur">
         <div className="text-sm text-gray-600">{total} trends</div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <div className="flex items-center gap-2">
@@ -142,7 +143,7 @@ export default function TrendsPage() {
                 setPage(1);
               }}
               placeholder="Search trends..."
-              className="w-full md:w-64 rounded-lg border px-3 py-2 text-sm"
+              className="w-full rounded-lg border px-3 py-2 text-sm md:w-64"
             />
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -269,6 +270,6 @@ export default function TrendsPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
