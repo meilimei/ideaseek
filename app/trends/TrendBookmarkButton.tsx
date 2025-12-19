@@ -28,6 +28,7 @@ export default function TrendBookmarkButton({
       });
       if (res.status === 401) {
         alert('Please sign in to save trends.');
+        setLoading(false);
         return;
       }
       const json = await res.json();

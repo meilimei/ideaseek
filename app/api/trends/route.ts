@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { supabaseServiceClient as supabaseService } from '@/lib/supabaseServiceClient';
 
 type TrendCard = {
@@ -32,11 +34,45 @@ export async function GET(request: Request) {
   const q = url.searchParams.get('q') || '';
   const sort = url.searchParams.get('sort') || 'recent';
   const source = url.searchParams.get('source') || 'all';
+  const savedOnly = url.searchParams.get('saved') === '1';
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const pageSize = Math.max(
     1,
     Math.min(50, parseInt(url.searchParams.get('pageSize') || '12', 10)),
   );
+
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name: string, value: string, options?: Record<string, unknown>) {
+          cookieStore.set({ name, value, ...(options ?? {}) });
+        },
+        remove(name: string) {
+          cookieStore.delete(name);
+        },
+      },
+    },
+  );
+
+  const {
+    data: { user },
+  } = await supabaseAuth.auth.getUser();
+  const userId = user?.id ?? null;
+
+  let savedCount: number | undefined;
+  if (userId) {
+    const { count: bookmarksCount } = await supabaseService
+      .from('trend_bookmarks')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    if (typeof bookmarksCount === 'number') savedCount = bookmarksCount;
+  }
 
   let query = supabaseService
     .from('trends')
@@ -52,6 +88,43 @@ export async function GET(request: Request) {
 
   if (source !== 'all') {
     query = query.eq('source_primary', source);
+  }
+
+  if (savedOnly) {
+    if (!userId) {
+      return NextResponse.json({
+        trends: [],
+        total: 0,
+        page,
+        pageSize,
+        bookmarkedIds: [],
+        savedCount: savedCount ?? 0,
+        requireAuth: true,
+      });
+    }
+    const { data: bookmarks, error: bookmarkError } = await supabaseService
+      .from('trend_bookmarks')
+      .select('trend_id')
+      .eq('user_id', userId);
+    if (bookmarkError) {
+      console.error('Failed to load bookmarks:', bookmarkError);
+      return NextResponse.json(
+        { error: 'Failed to load trends' },
+        { status: 500 },
+      );
+    }
+    const ids = (bookmarks ?? []).map((b) => b.trend_id as string);
+    if (ids.length === 0) {
+      return NextResponse.json({
+        trends: [],
+        total: 0,
+        page,
+        pageSize,
+        bookmarkedIds: [],
+        savedCount: savedCount ?? 0,
+      });
+    }
+    query = query.in('id', ids);
   }
 
   if (sort === 'growth') {
@@ -115,10 +188,23 @@ export async function GET(request: Request) {
       overall_score: (t.overall_score as number | null) ?? null,
     })) ?? [];
 
+  let bookmarkedIds: string[] = [];
+  if (userId && trends.length > 0) {
+    const ids = trends.map((t) => t.id);
+    const { data: bookmarks } = await supabaseService
+      .from('trend_bookmarks')
+      .select('trend_id')
+      .eq('user_id', userId)
+      .in('trend_id', ids);
+    bookmarkedIds = (bookmarks ?? []).map((b) => b.trend_id as string);
+  }
+
   return NextResponse.json({
     trends,
     total: count ?? 0,
     page,
     pageSize,
+    bookmarkedIds,
+    savedCount: savedCount ?? 0,
   });
 }
