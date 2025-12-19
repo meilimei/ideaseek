@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabaseBrowserClient';
 import type { User } from '@supabase/supabase-js';
+import CommandPalette from './CommandPalette';
 
 type NavItem = { href: string; label: string };
 
@@ -62,8 +63,9 @@ export default function SiteHeader() {
     'text-gray-600 hover:text-gray-900 transition-colors';
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+    <>
+      <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -91,6 +93,18 @@ export default function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              window.dispatchEvent(new Event('open-command-palette'));
+            }}
+            className="hidden items-center gap-1 rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 md:inline-flex"
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <span className="text-gray-500">🔍</span>
+            <span className="text-gray-600">⌘K</span>
+          </button>
           <Link
             href="/ideas/generator"
             className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
@@ -187,6 +201,8 @@ export default function SiteHeader() {
           </div>
         </div>
       )}
-    </header>
+      </header>
+      <CommandPalette />
+    </>
   );
 }
