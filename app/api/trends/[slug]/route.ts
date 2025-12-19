@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServiceClient as supabaseService } from '@/lib/supabaseServiceClient';
+import { getRelatedIdeasForTrend } from '@/lib/server/relatedIdeas';
 
 export async function GET(
   request: Request,
@@ -38,7 +39,8 @@ export async function GET(
         difficulty,
         competition_level,
         monetization_potential,
-        overall_score
+        overall_score,
+        tags
       `,
     )
     .eq('slug', slug)
@@ -71,18 +73,12 @@ export async function GET(
     console.error('Failed to load trend analysis:', anError);
   }
 
-  const { data: relatedIdeas, error: ideasError } = await supabaseService
-    .from('ideas')
-    .select(
-      'id, title, one_liner, difficulty, demand_strength, score_overall, source_type',
-    )
-    .eq('primary_trend_id', trend.id)
-    .order('score_overall', { ascending: false })
-    .limit(10);
-
-  if (ideasError) {
-    console.error('Failed to load related ideas:', ideasError);
-  }
+  const relatedIdeas = await getRelatedIdeasForTrend({
+    supabase: supabaseService,
+    trendKeyword: (trend.keyword as string) ?? trend.title,
+    trendTags: (trend.tags as string[] | null) ?? null,
+    limit: 6,
+  });
 
   return NextResponse.json({
     trend: {

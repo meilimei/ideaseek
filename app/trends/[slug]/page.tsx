@@ -49,6 +49,11 @@ type RelatedIdea = {
   demand_strength: number | null;
   score_overall: number | null;
   source_type: string | null;
+  tags: string[] | null;
+  slug?: string | null;
+  published?: boolean | null;
+  pinned?: boolean | null;
+  featured?: boolean | null;
 };
 
 async function fetchTrend(slug: string) {
@@ -213,6 +218,12 @@ export default async function TrendDetailPage({
           <h2 className="text-lg font-semibold tracking-tight">
             Related Ideas
           </h2>
+          <Link
+            href={`/ideas/database?q=${encodeURIComponent(trend.title)}`}
+            className="text-sm text-indigo-600 hover:underline"
+          >
+            Search all ideas for &quot;{trend.title}&quot;
+          </Link>
         </div>
 
         {!relatedIdeas || relatedIdeas.length === 0 ? (
@@ -224,7 +235,7 @@ export default async function TrendDetailPage({
             {relatedIdeas.map((idea: RelatedIdea) => (
               <Link
                 key={idea.id}
-                href={`/ideas/${idea.id}`}
+                href={idea.slug ? `/ideas/${idea.slug}` : `/ideas/${idea.id}`}
                 className="block rounded-2xl border bg-white/60 p-3 transition-colors hover:bg-indigo-50"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -254,6 +265,14 @@ export default async function TrendDetailPage({
                       Source: {idea.source_type}
                     </span>
                   )}
+                  {idea.tags?.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border px-2 py-0.5"
+                    >
+                      {tag}
+                    </span>
+                  ))}
                   {idea.difficulty != null && (
                     <span className="rounded-full border px-2 py-0.5">
                       Difficulty: {idea.difficulty}
