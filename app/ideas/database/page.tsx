@@ -20,6 +20,9 @@ type Idea = {
   one_liner: string | null;
   description: string | null;
   tags: string[] | null;
+  score?: number | null;
+  status?: string | null;
+  status_reason?: string | null;
   difficulty: number | null;
   market_size: string | null;
   demand_strength?: string | null;
@@ -523,6 +526,18 @@ export default function IdeasDatabasePage() {
                 {idea.one_liner && (
                   <p className="mb-2 text-gray-700">{idea.one_liner}</p>
                 )}
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                  {idea.status && (
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 border border-indigo-100">
+                      {idea.status}
+                    </span>
+                  )}
+                  {idea.score != null && (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 border border-amber-100">
+                      Score: {idea.score.toFixed(1)} / 5
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                   <span className="px-2 py-0.5 rounded-full border text-xs">
                     Source: {sourceLabel(idea.source_type)}

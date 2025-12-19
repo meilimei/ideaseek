@@ -1,5 +1,6 @@
 import { supabaseServiceClient } from '@/lib/supabaseServiceClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { computeIdeaSignals } from './ideaSignals';
 
 function getAdminSupabaseClient(): SupabaseClient {
   return supabaseServiceClient;
@@ -91,9 +92,32 @@ export async function promoteRedditPostToIdea(options: {
     created_by: options.adminUserId,
   };
 
+  const signals = computeIdeaSignals({
+    title: insertPayload.title,
+    one_liner: insertPayload.one_liner,
+    description: insertPayload.description,
+    tags: insertPayload.tags,
+    source_type: insertPayload.source_type,
+  });
+
+  const mergedTags =
+    insertPayload.tags && insertPayload.tags.length > 0
+      ? Array.from(new Set([...(insertPayload.tags ?? []), ...signals.tags])).slice(
+          0,
+          3,
+        )
+      : signals.tags;
+
   const { data: newIdea, error: ideaError } = await supabase
     .from('ideas')
-    .insert(insertPayload)
+    .insert({
+      ...insertPayload,
+      tags: mergedTags,
+      score: signals.score,
+      status: signals.status,
+      status_reason: signals.status_reason,
+      keywords: signals.keywords,
+    })
     .select('id, title')
     .single();
 

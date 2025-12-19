@@ -1,6 +1,7 @@
 // app/api/ideas/route.ts
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { computeIdeaSignals } from '@/lib/server/ideaSignals';
 
 type SortParam = 'newest' | 'oldest' | 'published' | 'pinned' | 'featured';
 
@@ -62,6 +63,7 @@ type InsertIdeaPayload = {
   one_liner?: string;
   description?: string;
   tags?: string[];
+  keywords?: string[];
   difficulty?: number;
   market_size?: string;
   demand_strength?: string;
@@ -94,11 +96,31 @@ export async function POST(req: Request) {
     );
   }
 
-  const payload = {
+  const signals = computeIdeaSignals({
     title: body.title,
     one_liner: body.one_liner ?? null,
     description: body.description ?? null,
     tags: body.tags ?? null,
+    demand_strength: body.demand_strength ?? null,
+    market_size: body.market_size ?? null,
+    difficulty: body.difficulty ?? null,
+    source_type: body.source_type ?? 'generated',
+  });
+
+  const mergedTags =
+    body.tags && body.tags.length > 0
+      ? Array.from(new Set([...body.tags, ...signals.tags])).slice(0, 3)
+      : signals.tags;
+
+  const payload = {
+    title: body.title,
+    one_liner: body.one_liner ?? null,
+    description: body.description ?? null,
+    tags: mergedTags,
+    keywords: signals.keywords,
+    score: signals.score,
+    status: signals.status,
+    status_reason: signals.status_reason,
     difficulty: body.difficulty ?? null,
     market_size: body.market_size ?? null,
     demand_strength: body.demand_strength ?? null,

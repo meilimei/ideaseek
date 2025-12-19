@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { supabaseServiceClient as supabaseService } from '@/lib/supabaseServiceClient';
+import { computeIdeaSignals } from '@/lib/server/ideaSignals';
 
 export async function POST(request: Request) {
   try {
@@ -44,11 +45,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const insertData = {
+    const signals = computeIdeaSignals({
       title: idea.title,
       one_liner: idea.one_liner ?? null,
       description: idea.description ?? null,
       tags: idea.tags ?? [],
+      demand_strength: idea.demand_strength ?? null,
+      market_size: idea.market_size ?? null,
+      difficulty: idea.difficulty ?? null,
+      source_type: 'generator',
+    });
+
+    const mergedTags =
+      idea.tags && idea.tags.length > 0
+        ? Array.from(new Set([...(idea.tags ?? []), ...signals.tags])).slice(0, 3)
+        : signals.tags;
+
+    const insertData = {
+      title: idea.title,
+      one_liner: idea.one_liner ?? null,
+      description: idea.description ?? null,
+      tags: mergedTags,
+      keywords: signals.keywords,
+      score: signals.score,
+      status: signals.status,
+      status_reason: signals.status_reason,
       difficulty: idea.difficulty ?? null,
       market_size: idea.market_size ?? null,
       demand_strength: idea.demand_strength ?? null,

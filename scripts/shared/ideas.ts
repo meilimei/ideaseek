@@ -1,4 +1,5 @@
 import { supabaseServiceClient } from '../../lib/supabaseServiceClient';
+import { computeIdeaSignals } from '../../lib/server/ideaSignals';
 
 export type IdeaForInsert = {
   title: string;
@@ -17,6 +18,10 @@ export type IdeaForInsert = {
   next_steps?: string | null;
   source_type?: string | null;
   source_url?: string | null;
+  score?: number | null;
+  status?: string | null;
+  status_reason?: string | null;
+  keywords?: string[] | null;
 };
 
 type SkipReason = 'source_url' | 'title';
@@ -90,9 +95,35 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
     return;
   }
 
+  const enrichedIdeas = uniqueIdeas.map((idea) => {
+    const signals = computeIdeaSignals({
+      title: idea.title,
+      one_liner: idea.one_liner,
+      description: idea.description,
+      tags: idea.tags,
+      demand_strength: idea.demand_strength,
+      market_size: idea.market_size,
+      difficulty: idea.difficulty ?? null,
+      source_type: idea.source_type,
+    });
+    const mergedTags =
+      idea.tags && idea.tags.length > 0
+        ? Array.from(new Set([...idea.tags, ...signals.tags])).slice(0, 3)
+        : signals.tags;
+
+    return {
+      ...idea,
+      tags: mergedTags,
+      score: signals.score,
+      status: signals.status,
+      status_reason: signals.status_reason,
+      keywords: signals.keywords,
+    };
+  });
+
   const { data, error } = await supabaseServiceClient
     .from('ideas')
-    .insert(uniqueIdeas)
+    .insert(enrichedIdeas)
     .select('id, title, source_url');
 
   if (error) {
