@@ -140,24 +140,24 @@ export default function TrendsPage() {
         {[1, 2].map((item) => (
           <div
             key={item}
-            className="rounded-2xl border border-indigo-100/70 bg-white/70 p-4 shadow-sm backdrop-blur"
+            className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur"
           >
-            <div className="h-4 w-20 rounded-full bg-indigo-50" />
-            <div className="mt-3 h-3 w-24 rounded-full bg-gray-100" />
-            <div className="mt-2 h-16 rounded-xl bg-gradient-to-br from-indigo-50 via-white to-amber-50" />
+            <div className="h-4 w-20 rounded-full bg-[var(--muted)]" />
+            <div className="mt-3 h-3 w-24 rounded-full bg-[var(--muted)]" />
+            <div className="mt-2 h-16 rounded-xl bg-gradient-to-br from-[rgba(85,175,210,0.18)] via-[var(--card)] to-[rgba(124,58,237,0.16)]" />
           </div>
         ))}
-        <div className="rounded-2xl border border-amber-100/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-          <div className="text-sm font-semibold text-gray-900">Saved trends</div>
-          <div className="mt-3 text-3xl font-bold text-gray-900">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+          <div className="text-sm font-semibold text-slate-200">Saved trends</div>
+          <div className="mt-3 text-3xl font-bold text-white">
             {savedCount ?? 0}
           </div>
-          <div className="mt-2 text-sm text-gray-600">Bookmarked signals</div>
+          <div className="mt-2 text-sm text-slate-400">Bookmarked signals</div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-2xl border border-gray-200/80 bg-white/80 p-4 shadow-sm backdrop-blur">
-        <div className="text-sm text-gray-600">{total} trends</div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+        <div className="text-sm text-slate-300">{total} trends</div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <div className="flex items-center gap-2">
             <input
@@ -168,10 +168,10 @@ export default function TrendsPage() {
                 setPage(1);
               }}
               placeholder="Search trends..."
-              className="w-full rounded-lg border px-3 py-2 text-sm md:w-64"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 md:w-64"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-700">
+          <div className="flex items-center gap-2 text-sm text-slate-200">
             <span>Sort by:</span>
             <select
               value={sort}
@@ -179,7 +179,7 @@ export default function TrendsPage() {
                 setSort(e.target.value as typeof sort);
                 setPage(1);
               }}
-              className="rounded-lg border px-2 py-1 text-sm"
+              className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-2 py-1 text-sm text-slate-100"
             >
               <option value="recent">Most Recent</option>
               <option value="growth">Highest Growth</option>
@@ -198,13 +198,13 @@ export default function TrendsPage() {
                 key={opt.value}
                 type="button"
                 onClick={() => {
-                  setSourceFilter(opt.value);
-                  updateQuery({ source: opt.value, page: '1' });
-                }}
-                className={`rounded-full border px-3 py-1 text-xs ${
+                setSourceFilter(opt.value);
+                updateQuery({ source: opt.value, page: '1' });
+              }}
+                className={`rounded-full border px-3 py-1 text-xs transition ${
                   sourceFilter === opt.value
-                    ? 'bg-black text-white'
-                    : 'bg-white text-gray-700'
+                    ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
+                    : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
                 }`}
               >
                 {opt.label}
@@ -217,8 +217,10 @@ export default function TrendsPage() {
                 setSavedOnly(next);
                 updateQuery({ saved: next ? '1' : null, page: '1' });
               }}
-              className={`rounded-full border px-3 py-1 text-xs ${
-                savedOnly ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'
+              className={`rounded-full border px-3 py-1 text-xs transition ${
+                savedOnly
+                  ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
+                  : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
               }`}
             >
               My saved

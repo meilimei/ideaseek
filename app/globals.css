@@ -1,34 +1,76 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 190 56% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 190 56% 58%;
+  --radius: 16px;
+}
+
+.dark {
+  --background: 216 36% 10%;
+  --foreground: 213 32% 92%;
+  --card: 215 30% 15%;
+  --card-foreground: 213 32% 92%;
+  --popover: 215 30% 15%;
+  --popover-foreground: 213 32% 92%;
+  --primary: 190 56% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 20%;
+  --secondary-foreground: 213 32% 92%;
+  --muted: 215 25% 20%;
+  --muted-foreground: 216 18% 65%;
+  --accent: 215 25% 20%;
+  --accent-foreground: 213 32% 92%;
+  --destructive: 0 63% 45%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 216 22% 28%;
+  --input: 216 22% 28%;
+  --ring: 190 56% 58%;
+  --radius: 16px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-muted: hsl(var(--muted));
+  --color-primary: hsl(var(--primary));
+  --color-border: hsl(var(--border));
   --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+a {
+  color: hsl(var(--foreground));
+}
+
 .prose-heading {
-  @apply font-bold tracking-tight text-gray-900;
+  @apply font-bold tracking-tight text-slate-50;
 }
 
 .prose-subtle {
-  @apply text-base text-gray-600;
+  @apply text-base text-slate-300;
 }

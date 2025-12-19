@@ -52,7 +52,7 @@ export default function FilterBar({
   };
 
   return (
-    <div className="space-y-3 rounded-2xl border border-gray-200/80 bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <form
           className="relative w-full md:max-w-xl"
@@ -69,11 +69,11 @@ export default function FilterBar({
             value={searchQuery}
             onChange={handleSearch}
             placeholder="Search ideas…"
-            className="w-full rounded-lg border px-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--muted)] px-9 py-2 text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50"
           />
         </form>
 
-        <div className="flex items-center gap-2 text-sm text-gray-700">
+        <div className="flex items-center gap-2 text-sm text-slate-200">
           <span>Sort by:</span>
           <select
             value={sortBy}
@@ -87,7 +87,7 @@ export default function FilterBar({
                   | 'featured',
               )
             }
-            className="rounded-lg border px-2 py-1 text-sm"
+            className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-2 py-1 text-sm text-slate-100"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
@@ -100,7 +100,7 @@ export default function FilterBar({
         <button
           type="button"
           onClick={onReset}
-          className="self-start rounded-md px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 md:self-auto"
+          className="self-start rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-semibold text-slate-100 hover:border-[var(--primary)] hover:text-[var(--primary)] md:self-auto"
         >
           Reset
         </button>
@@ -128,10 +128,10 @@ export default function FilterBar({
                   | 'curated',
               )
             }
-            className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
+            className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition ${
               sourceFilter === opt.value
-                ? 'border-indigo-200 bg-indigo-100 text-indigo-700'
-                : 'bg-white text-gray-700'
+                ? 'border-[var(--primary)]/60 bg-[rgba(85,175,210,0.15)] text-[var(--primary)]'
+                : 'border-[var(--border)] bg-[var(--muted)] text-slate-100 hover:border-[var(--primary)]/40'
             }`}
           >
             {opt.label}
@@ -151,10 +151,10 @@ export default function FilterBar({
             onClick={() =>
               onDifficultyChange(opt.value as 'all' | 'easy' | 'medium' | 'hard')
             }
-            className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
+            className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition ${
               difficultyFilter === opt.value
-                ? 'border-indigo-200 bg-indigo-100 text-indigo-700'
-                : 'bg-white text-gray-700'
+                ? 'border-[var(--primary)]/60 bg-[rgba(85,175,210,0.15)] text-[var(--primary)]'
+                : 'border-[var(--border)] bg-[var(--muted)] text-slate-100 hover:border-[var(--primary)]/40'
             }`}
           >
             {opt.label}
@@ -163,15 +163,15 @@ export default function FilterBar({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-gray-600">{totalCount} ideas</div>
-        <div className="inline-flex overflow-hidden rounded-full border text-xs">
+        <div className="text-sm text-slate-300">{totalCount} ideas</div>
+        <div className="inline-flex overflow-hidden rounded-full border border-[var(--border)] text-xs">
           <button
             type="button"
             onClick={() => onViewModeChange('all')}
             className={`px-3 py-1 ${
               viewMode === 'all'
-                ? 'bg-black text-white'
-                : 'bg-white text-gray-700'
+                ? 'bg-[var(--primary-strong)] text-white'
+                : 'bg-[var(--muted)] text-slate-100'
             }`}
           >
             All ideas
@@ -181,15 +181,15 @@ export default function FilterBar({
             onClick={() => onViewModeChange('mine')}
             className={`px-3 py-1 ${
               viewMode === 'mine'
-                ? 'bg-black text-white'
-                : 'bg-white text-gray-700'
+                ? 'bg-[var(--primary-strong)] text-white'
+                : 'bg-[var(--muted)] text-slate-100'
             }`}
           >
             My saved
           </button>
         </div>
         {!isDefaultState && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-slate-400">
             Reset clears all filters and search.
           </span>
         )}
@@ -202,16 +202,16 @@ export default function FilterBar({
               key={chip.key}
               type="button"
               onClick={chip.onRemove}
-              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-xs text-slate-100 hover:border-[var(--primary)]/40"
             >
               <span>{chip.label}</span>
-              <span className="text-gray-400">×</span>
+              <span className="text-slate-400">×</span>
             </button>
           ))}
           <button
             type="button"
             onClick={onClearAll}
-            className="text-xs font-semibold text-gray-700 hover:underline"
+            className="text-xs font-semibold text-slate-100 hover:underline"
           >
             Clear all
           </button>
