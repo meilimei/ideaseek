@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { supabaseServiceClient as supabase } from '@/lib/supabaseServiceClient';
+import { ShareButtons } from '@/components/site/ShareButtons';
 
 type Idea = {
   id: string;
@@ -95,8 +96,6 @@ export default async function IdeaSharePage({
   const idea = await fetchIdea(slug);
   if (!idea) return notFound();
 
-  const currentUrl = `${siteUrl()}/idea/${idea.slug}`;
-
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white/80 p-6 shadow-sm backdrop-blur">
@@ -132,32 +131,7 @@ export default async function IdeaSharePage({
               ))}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2 text-xs text-gray-600">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(currentUrl)}
-                className="rounded-md border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Copy link
-              </button>
-              <Link
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(idea.title)}&url=${encodeURIComponent(currentUrl)}`}
-                target="_blank"
-                className="rounded-md border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Share on X
-              </Link>
-              <Link
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentUrl)}`}
-                target="_blank"
-                className="rounded-md border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Share on LinkedIn
-              </Link>
-            </div>
-            <div>Published: {new Date(idea.created_at).toLocaleDateString()}</div>
-          </div>
+          <ShareButtons title={idea.title} />
         </div>
       </div>
 

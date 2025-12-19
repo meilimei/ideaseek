@@ -106,7 +106,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Idea not found or missing title' }, { status: 404 });
     }
 
-    let baseSlug = idea.slug || slugify(idea.title);
+    const baseSlug = idea.slug || slugify(idea.title);
     let finalSlug = baseSlug;
     // ensure unique
     const { data: existing } = await supabase

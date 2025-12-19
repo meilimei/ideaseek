@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import TrendSparkline from './TrendSparkline';
 import TrendAnalysisSection from './TrendAnalysisSection';
 import TrendBookmarkButton from '../TrendBookmarkButton';
+import { ShareButtons } from '@/components/site/ShareButtons';
 
 type Trend = {
   id: string;
@@ -53,7 +54,8 @@ type RelatedIdea = {
   one_liner: string | null;
   difficulty: number | null;
   demand_strength: number | null;
-  score_overall: number | null;
+  score: number | null;
+  status: string | null;
   source_type: string | null;
 };
 
@@ -168,29 +170,7 @@ export default async function TrendDetailPage({
             Trend
           </p>
           <h1 className="text-3xl font-bold tracking-tight">{trend.title}</h1>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText(`${siteUrl()}/trends/${trend.slug}`)}
-              className="rounded-md border px-2 py-1 hover:bg-gray-50"
-            >
-              Copy link
-            </button>
-            <Link
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(trend.title)}&url=${encodeURIComponent(`${siteUrl()}/trends/${trend.slug}`)}`}
-              target="_blank"
-              className="rounded-md border px-2 py-1 hover:bg-gray-50"
-            >
-              Share on X
-            </Link>
-            <Link
-              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${siteUrl()}/trends/${trend.slug}`)}`}
-              target="_blank"
-              className="rounded-md border px-2 py-1 hover:bg-gray-50"
-            >
-              Share on LinkedIn
-            </Link>
-          </div>
+          <ShareButtons title={trend.title} />
           {trend.summary && (
             <p className="text-gray-700 text-sm md:text-base">
               {trend.summary}
@@ -318,11 +298,11 @@ export default async function TrendDetailPage({
                       </p>
                     )}
                   </div>
-                  {idea.score_overall != null && (
+                  {idea.score != null && (
                     <div className="text-right text-xs text-amber-700">
                       Score
                       <div className="font-semibold">
-                        {idea.score_overall.toFixed(1)} / 5
+                        {idea.score.toFixed(1)} / 5
                       </div>
                     </div>
                   )}
