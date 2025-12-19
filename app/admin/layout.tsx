@@ -51,14 +51,14 @@ export default async function AdminLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--background)] text-slate-100">
       <div className="mx-auto flex max-w-6xl gap-6 px-4 py-8">
-        <aside className="w-48 flex-shrink-0 space-y-2">
-          <div className="text-lg font-semibold text-gray-900">Admin</div>
-          <nav className="flex flex-col gap-1 text-sm text-gray-700">
+        <aside className="w-52 flex-shrink-0 space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm">
+          <div className="text-lg font-semibold text-white">Admin</div>
+          <nav className="flex flex-col gap-1 text-sm text-slate-200">
             <Link
               href="/admin"
-              className="rounded-md px-3 py-2 hover:bg-gray-100"
+              className="rounded-md px-3 py-2 transition hover:border hover:border-[var(--primary)]/50 hover:text-[var(--primary)]"
             >
               Dashboard
             </Link>
@@ -66,14 +66,16 @@ export default async function AdminLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="rounded-md px-3 py-2 hover:bg-gray-100"
+                className="rounded-md px-3 py-2 transition hover:border hover:border-[var(--primary)]/50 hover:text-[var(--primary)]"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
         </aside>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-6 shadow-sm">
+          {children}
+        </main>
       </div>
     </div>
   );

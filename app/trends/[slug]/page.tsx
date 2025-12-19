@@ -71,11 +71,11 @@ async function fetchTrend(slug: string) {
 }
 
 const metricLabel = (label: string, value: string | number | null) => (
-  <div className="rounded-xl border bg-white p-3 shadow-sm">
-    <div className="text-xs uppercase tracking-wide text-gray-500">
+  <div className="rounded-xl border border-[var(--border)] bg-[var(--card)]/90 p-3 shadow-sm">
+    <div className="text-xs uppercase tracking-wide text-slate-400">
       {label}
     </div>
-    <div className="text-base font-semibold text-gray-900 mt-1">
+    <div className="mt-1 text-base font-semibold text-white">
       {value ?? '—'}
     </div>
   </div>
@@ -163,16 +163,18 @@ export default async function TrendDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 space-y-8">
+    <div className="mx-auto max-w-6xl px-4 py-10 space-y-8 text-slate-100">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.14em] text-indigo-600">
+          <p className="text-xs uppercase tracking-[0.14em] text-[var(--primary)]">
             Trend
           </p>
-          <h1 className="text-3xl font-bold tracking-tight">{trend.title}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            {trend.title}
+          </h1>
           <ShareButtons title={trend.title} />
           {trend.summary && (
-            <p className="text-gray-700 text-sm md:text-base">
+            <p className="text-slate-300 text-sm md:text-base">
               {trend.summary}
             </p>
           )}
@@ -188,7 +190,7 @@ export default async function TrendDetailPage({
         <div className="space-y-4">
           <TrendSparkline points={timeseries as SparkPoint[]} className="h-32" />
           {trend.description && (
-            <div className="rounded-2xl border bg-white/60 p-4 text-sm text-gray-700">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 text-sm text-slate-200">
               {trend.description}
             </div>
           )}
@@ -224,13 +226,13 @@ export default async function TrendDetailPage({
               trend.overall_score != null ? `${trend.overall_score} / 5` : '—',
             )}
           </div>
-          <div className="text-xs text-gray-600 space-y-1">
+          <div className="text-xs text-slate-400 space-y-1">
             {trend.categories?.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {trend.categories.map((cat) => (
                   <span
                     key={cat}
-                    className="rounded-full border px-2 py-0.5 text-xs"
+                    className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-2 py-0.5 text-xs text-slate-200"
                   >
                     {cat}
                   </span>
@@ -270,13 +272,13 @@ export default async function TrendDetailPage({
 
       <section className="mt-10 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">
+          <h2 className="text-lg font-semibold tracking-tight text-white">
             Related Ideas
           </h2>
         </div>
 
         {!relatedIdeas || relatedIdeas.length === 0 ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-400">
             No related ideas yet. Generate ideas from this trend or link existing ideas to it.
           </p>
         ) : (
@@ -285,21 +287,21 @@ export default async function TrendDetailPage({
               <Link
                 key={idea.id}
                 href={`/ideas/${idea.id}`}
-                className="block rounded-2xl border bg-white/60 p-3 transition-colors hover:bg-indigo-50"
+                className="block rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-3 transition-transform hover:-translate-y-[1px] hover:border-[var(--primary)]/50"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900">
+                    <h3 className="text-sm font-medium text-white">
                       {idea.title}
                     </h3>
                     {idea.one_liner && (
-                      <p className="mt-1 text-xs text-gray-600">
+                      <p className="mt-1 text-xs text-slate-300">
                         {idea.one_liner}
                       </p>
                     )}
                   </div>
                   {idea.score != null && (
-                    <div className="text-right text-xs text-amber-700">
+                    <div className="text-right text-xs text-amber-200">
                       Score
                       <div className="font-semibold">
                         {idea.score.toFixed(1)} / 5
@@ -308,19 +310,19 @@ export default async function TrendDetailPage({
                   )}
                 </div>
 
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-gray-500">
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-400">
                   {idea.source_type && (
-                    <span className="rounded-full border px-2 py-0.5">
+                    <span className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-2 py-0.5 text-slate-200">
                       Source: {idea.source_type}
                     </span>
                   )}
                   {idea.difficulty != null && (
-                    <span className="rounded-full border px-2 py-0.5">
+                    <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
                       Difficulty: {idea.difficulty}
                     </span>
                   )}
                   {idea.demand_strength != null && (
-                    <span className="rounded-full border px-2 py-0.5">
+                    <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
                       Demand: {idea.demand_strength}
                     </span>
                   )}
