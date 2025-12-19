@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { supabaseServiceClient as supabase } from '@/lib/supabaseServiceClient';
+import { slugify } from '@/lib/utils/slugify';
 
 const allowedFields = [
   'title',
@@ -23,6 +24,7 @@ const allowedFields = [
   'pinned',
   'featured',
   'deleted_at',
+  'published',
 ] as const;
 
 export async function GET(
@@ -91,6 +93,46 @@ export async function PATCH(
   }
 
   updates.updated_at = new Date().toISOString();
+
+  // Publish workflow
+  if (body.published === true) {
+    const { data: idea } = await supabase
+      .from('ideas')
+      .select('id, title, one_liner, description, slug')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!idea?.title) {
+      return NextResponse.json({ error: 'Idea not found or missing title' }, { status: 404 });
+    }
+
+    let baseSlug = idea.slug || slugify(idea.title);
+    let finalSlug = baseSlug;
+    // ensure unique
+    const { data: existing } = await supabase
+      .from('ideas')
+      .select('id')
+      .eq('slug', finalSlug)
+      .neq('id', id)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      const shortId = id.slice(-6);
+      finalSlug = `${baseSlug}-${shortId}`;
+    }
+
+    const seoTitle = `${idea.title} — IdeaSignal`;
+    const seoDescription =
+      idea.one_liner ??
+      (idea.description ? `${idea.description.slice(0, 150)}${idea.description.length > 150 ? '...' : ''}` : null);
+
+    updates.slug = finalSlug;
+    updates.seo_title = seoTitle;
+    updates.seo_description = seoDescription;
+    updates.published = true;
+    updates.published_at = new Date().toISOString();
+  } else if (body.published === false) {
+    updates.published = false;
+  }
 
   const { data, error } = await supabase
     .from('ideas')

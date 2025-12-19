@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import TrendSparkline from './TrendSparkline';
 import TrendAnalysisSection from './TrendAnalysisSection';
 import TrendBookmarkButton from '../TrendBookmarkButton';
@@ -25,6 +26,11 @@ type Trend = {
   competition_level: number | null;
   monetization_potential: number | null;
   overall_score: number | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  tags?: string[] | null;
+  score?: number | null;
+  status?: string | null;
 };
 
 type SparkPoint = { date: string; value: number };
@@ -81,6 +87,57 @@ const difficultyLabel = (d: number | null) => {
   return 'Very hard';
 };
 
+function siteUrl() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return 'http://localhost:3000';
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const base = siteUrl();
+  const data = await fetchTrend(slug);
+  if (!data || !data.trend) {
+    return {
+      title: 'Trend not found',
+      description: 'This trend could not be found.',
+    };
+  }
+  const trend = data.trend as Trend;
+  const title = trend.seo_title ?? `${trend.keyword ?? trend.title} trend`;
+  const desc =
+    trend.seo_description ??
+    trend.summary ??
+    (trend.status
+      ? `${trend.status}${trend.score != null ? ` · score ${trend.score.toFixed(1)}/5` : ''}`
+      : 'Trend overview and stats');
+  const url = `${base}/trends/${slug}`;
+
+  return {
+    title,
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description: desc,
+      url,
+      siteName: 'IdeaSignal',
+      type: 'article',
+      images: [`${url.replace(`/trends/${slug}`, '')}/api/og/trend?slug=${slug}`],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description: desc,
+      images: [`${url.replace(`/trends/${slug}`, '')}/api/og/trend?slug=${slug}`],
+    },
+  };
+}
+
 export default async function TrendDetailPage({
   params,
 }: {
@@ -111,6 +168,29 @@ export default async function TrendDetailPage({
             Trend
           </p>
           <h1 className="text-3xl font-bold tracking-tight">{trend.title}</h1>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(`${siteUrl()}/trends/${trend.slug}`)}
+              className="rounded-md border px-2 py-1 hover:bg-gray-50"
+            >
+              Copy link
+            </button>
+            <Link
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(trend.title)}&url=${encodeURIComponent(`${siteUrl()}/trends/${trend.slug}`)}`}
+              target="_blank"
+              className="rounded-md border px-2 py-1 hover:bg-gray-50"
+            >
+              Share on X
+            </Link>
+            <Link
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${siteUrl()}/trends/${trend.slug}`)}`}
+              target="_blank"
+              className="rounded-md border px-2 py-1 hover:bg-gray-50"
+            >
+              Share on LinkedIn
+            </Link>
+          </div>
           {trend.summary && (
             <p className="text-gray-700 text-sm md:text-base">
               {trend.summary}
