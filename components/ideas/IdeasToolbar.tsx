@@ -80,6 +80,11 @@ export default function IdeasToolbar({
         >
           Filters
         </Button>
+        <span className="hidden text-[11px] text-muted-foreground sm:inline-flex items-center gap-1">
+          <kbd className="rounded border border-border/60 bg-secondary/20 px-1.5 py-0.5 text-[10px]">/</kbd>
+          <span className="text-[11px]">or</span>
+          <kbd className="rounded border border-border/60 bg-secondary/20 px-1.5 py-0.5 text-[10px]">Ctrl/Cmd K</kbd>
+        </span>
       </div>
     </div>
   );

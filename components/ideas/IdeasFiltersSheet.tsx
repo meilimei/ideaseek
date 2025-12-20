@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +80,8 @@ export default function IdeasFiltersSheet({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onOpenChange]);
 
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
   if (!open) return null;
 
   return (
@@ -90,7 +92,11 @@ export default function IdeasFiltersSheet({
         aria-label="Close filters"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-border/60 bg-background/90 p-5 shadow-glow">
+      <div
+        className="relative z-10 flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-border/60 bg-background/90 p-5 shadow-glow"
+        onAnimationEnd={() => searchRef.current?.focus()}
+        onTransitionEnd={() => searchRef.current?.focus()}
+      >
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-semibold text-foreground">Filters</div>
@@ -118,6 +124,7 @@ export default function IdeasFiltersSheet({
             🔍
           </span>
           <Input
+            ref={searchRef}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search ideas…"

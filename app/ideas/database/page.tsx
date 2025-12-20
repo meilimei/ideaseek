@@ -323,6 +323,35 @@ export default function IdeasDatabasePage() {
   const displayedCount = filteredIdeas.length + (ideaOfTheDay ? 1 : 0);
   const isEmpty = !loading && filteredIdeas.length === 0;
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tagName = target.tagName.toLowerCase();
+        const isInputLike =
+          tagName === 'input' ||
+          tagName === 'textarea' ||
+          tagName === 'select' ||
+          target.isContentEditable;
+        if (isInputLike) return;
+      }
+
+      if (event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        setFiltersOpen(true);
+        return;
+      }
+      if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setFiltersOpen(true);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <PageShell
       title="Find Your Next Startup Idea"
