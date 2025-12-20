@@ -52,7 +52,7 @@ export default function FilterBar({
   };
 
   return (
-    <div className="card-surface space-y-3 p-4 backdrop-blur">
+    <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <form
           className="relative w-full md:max-w-xl"
@@ -100,7 +100,7 @@ export default function FilterBar({
         <button
           type="button"
           onClick={onReset}
-          className="btn-secondary self-start md:self-auto"
+          className="self-start rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-semibold text-slate-100 hover:border-[var(--primary)] hover:text-[var(--primary)] md:self-auto"
         >
           Reset
         </button>
@@ -128,10 +128,10 @@ export default function FilterBar({
                   | 'curated',
               )
             }
-            className={`cursor-pointer pill transition ${
+            className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition ${
               sourceFilter === opt.value
                 ? 'border-[var(--primary)]/60 bg-[rgba(85,175,210,0.15)] text-[var(--primary)]'
-                : 'hover:border-[var(--primary)]/40'
+                : 'border-[var(--border)] bg-[var(--muted)] text-slate-100 hover:border-[var(--primary)]/40'
             }`}
           >
             {opt.label}
@@ -151,10 +151,10 @@ export default function FilterBar({
             onClick={() =>
               onDifficultyChange(opt.value as 'all' | 'easy' | 'medium' | 'hard')
             }
-            className={`cursor-pointer pill transition ${
+            className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition ${
               difficultyFilter === opt.value
                 ? 'border-[var(--primary)]/60 bg-[rgba(85,175,210,0.15)] text-[var(--primary)]'
-                : 'hover:border-[var(--primary)]/40'
+                : 'border-[var(--border)] bg-[var(--muted)] text-slate-100 hover:border-[var(--primary)]/40'
             }`}
           >
             {opt.label}
