@@ -27,7 +27,7 @@ function SearchButton({ className }: { className?: string }) {
       aria-label="Open search"
     >
       <span className="text-sm">Search</span>
-      <kbd className="rounded-md border border-border/60 bg-secondary/20 px-1.5 text-[11px] font-medium text-foreground/70">
+      <kbd className="ml-2 rounded-md border border-border/60 bg-secondary/20 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70">
         /
       </kbd>
     </button>
@@ -45,58 +45,57 @@ export default function SiteHeader() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/50">
-      <div className="relative">
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-xl" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/85 via-[#0c1a2c]/80 to-[#0f2739]/80 opacity-90" />
-        <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground/80 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
-            >
-              Ideasignal
-            </Link>
-            <nav className="hidden items-center gap-2 lg:flex">
-              {navItems.map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={`rounded-full px-3 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 ${
-                      active
-                        ? 'border border-primary/20 bg-primary/12 text-foreground shadow-soft'
-                        : 'border border-transparent text-foreground/80 hover:bg-secondary/10 hover:text-foreground'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
+    <header className="relative sticky top-0 z-50 h-16 w-full bg-background/60 backdrop-blur-xl">
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/85 via-[#0c1a2c]/80 to-[#0f2739]/80 opacity-90" />
+      <div className="relative mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground/80 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
+          >
+            Ideasignal
+          </Link>
+          <nav className="hidden items-center gap-2 lg:flex">
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`rounded-full px-3 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 ${
+                    active
+                      ? 'border border-primary/25 bg-primary/12 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                      : 'border border-transparent text-foreground/80 hover:bg-secondary/10 hover:text-foreground'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <SearchButton className="hidden md:inline-flex" />
-            <Link
-              href="/login"
-              className="hidden rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 md:inline-flex"
-            >
-              Sign in
-            </Link>
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/60 text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 lg:hidden"
-              aria-label="Open menu"
-            >
-              ☰
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          <SearchButton className="hidden md:inline-flex" />
+          <Link
+            href="/login"
+            className="hidden rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 md:inline-flex"
+          >
+            Sign in
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/60 text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 lg:hidden"
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
         </div>
       </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-b from-white/6 to-transparent opacity-40" />
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex justify-end lg:hidden">
@@ -129,7 +128,7 @@ export default function SiteHeader() {
                     onClick={() => setMobileOpen(false)}
                     className={`rounded-xl px-3 py-2 text-sm transition ${
                       active
-                        ? 'border border-primary/20 bg-primary/12 text-foreground'
+                        ? 'border border-primary/25 bg-primary/12 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                         : 'border border-transparent text-foreground/80 hover:bg-secondary/10 hover:text-foreground'
                     }`}
                   >
