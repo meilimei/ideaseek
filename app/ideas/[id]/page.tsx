@@ -4,9 +4,8 @@ import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import IdeaDetailHeader from "@/components/ideas/detail/IdeaDetailHeader";
 import IdeaSection from "@/components/ideas/detail/IdeaSection";
-import IdeaToc from "@/components/ideas/detail/IdeaToc";
 import ScoreCard from "@/components/ideas/detail/ScoreCard";
-import { Card } from "@/components/ui/card";
+import IdeaRightRail from "@/components/ideas/detail/IdeaRightRail";
 
 type Idea = {
   id: string;
@@ -26,6 +25,7 @@ type Idea = {
   monetization: string[] | null;
   key_risks: string[] | null;
   next_steps: string | null;
+  created_at?: string | null;
 };
 
 type Props = {
@@ -139,6 +139,33 @@ export default function IdeaDetailPage({ params }: Props) {
     ];
   }, [idea]);
 
+  const readingMinutes = useMemo(() => {
+    if (!idea) return 1;
+    const parts = [
+      idea.description ?? "",
+      idea.next_steps ?? "",
+      idea.competition ?? "",
+      (idea.monetization ?? []).join(" "),
+      (idea.pain_points ?? []).join(" "),
+    ];
+    const words = parts.join(" ").split(/\s+/).filter(Boolean).length;
+    return Math.max(1, Math.round(words / 200));
+  }, [idea]);
+
+  const sections = useMemo(() => {
+    const list: { id: string; label: string }[] = [];
+    if (idea?.description) list.push({ id: "summary", label: "Summary" });
+    list.push({ id: "scores", label: "Scores" });
+    list.push({ id: "business-fit", label: "Business Fit" });
+    if (idea?.monetization && idea.monetization.length > 0) list.push({ id: "offer", label: "Offer" });
+    if (idea?.demand_strength) list.push({ id: "why-now", label: "Why Now" });
+    if (idea?.pain_points && idea.pain_points.length > 0) list.push({ id: "proof-signals", label: "Proof & Signals" });
+    if (idea?.target_users) list.push({ id: "market-gap", label: "Market Gap" });
+    if (idea?.next_steps || (idea?.key_risks && idea.key_risks.length > 0)) list.push({ id: "execution", label: "Execution" });
+    list.push({ id: "framework-fit", label: "Framework Fit" });
+    return list;
+  }, [idea]);
+
   if (loading) {
     return <div className="p-6 text-foreground/90">Loading idea...</div>;
   }
@@ -156,7 +183,7 @@ export default function IdeaDetailPage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 lg:flex lg:gap-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
       <div className="flex-1 space-y-6">
         <IdeaDetailHeader
           title={idea.title}
@@ -313,31 +340,19 @@ export default function IdeaDetailPage({ params }: Props) {
         </IdeaSection>
       </div>
 
-      <div className="hidden w-64 flex-none lg:block">
-        <div className="sticky top-20 space-y-4">
-          <IdeaToc />
-          <Card className="rounded-2xl border border-border/60 bg-card/50 p-4 text-sm text-foreground shadow-soft">
-            <div className="font-semibold text-foreground">Quick actions</div>
-            <ul className="mt-2 space-y-2 text-muted-foreground">
-              <li>
-                <Link href="#summary" className="underline-offset-4 hover:underline">
-                  Read summary
-                </Link>
-              </li>
-              <li>
-                <Link href="#execution" className="underline-offset-4 hover:underline">
-                  Jump to execution
-                </Link>
-              </li>
-              <li>
-                <Link href="#framework-fit" className="underline-offset-4 hover:underline">
-                  Framework fit
-                </Link>
-              </li>
-            </ul>
-          </Card>
-        </div>
-      </div>
+      <IdeaRightRail
+        idea={{
+          market_size: idea.market_size,
+          demand_strength: idea.demand_strength,
+          difficulty: idea.difficulty,
+          source_type: idea.source_type,
+          source_url: idea.source_url,
+        }}
+        sections={sections}
+        shareUrl={typeof window !== "undefined" ? window.location.href : undefined}
+        backHref="/ideas/database"
+        readingMinutes={readingMinutes}
+      />
     </div>
   );
 }
