@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils/cn";
 type MetaPill = {
   label: string;
   value: string;
+  tone?: "strong" | "medium" | "weak";
 };
 
 type IdeaDetailHeaderProps = {
@@ -42,7 +43,7 @@ export default function IdeaDetailHeader({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/ideas/database"
-          className="text-xs font-semibold text-muted-foreground transition hover:text-foreground"
+          className="text-xs font-semibold text-primary transition hover:underline underline-offset-4"
         >
           ← Back to database
         </Link>
@@ -76,7 +77,7 @@ export default function IdeaDetailHeader({
           {title}
         </h1>
         {subtitle && (
-          <p className="text-sm text-foreground/85 md:text-base">{subtitle}</p>
+          <p className="text-sm text-foreground/80 md:text-base">{subtitle}</p>
         )}
       </div>
 
@@ -85,10 +86,19 @@ export default function IdeaDetailHeader({
           {meta.map((item) => (
             <span
               key={item.label}
-              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/20 px-3 py-1 text-xs text-foreground"
+              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/20 px-3 py-1 text-xs"
             >
               <span className="text-muted-foreground">{item.label}:</span>
-              <span>{item.value}</span>
+              <span
+                className={cn(
+                  "text-foreground/85",
+                  item.tone === "strong" && "text-emerald-200/80",
+                  item.tone === "medium" && "text-sky-200/80",
+                  item.tone === "weak" && "text-amber-200/80"
+                )}
+              >
+                {item.value}
+              </span>
             </span>
           ))}
         </div>
@@ -97,14 +107,14 @@ export default function IdeaDetailHeader({
       {tags && tags.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {tags.map((tag) => (
-            <Badge
+            <span
               key={tag}
               className={cn(
-                "border border-border/40 bg-secondary/15 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+                "inline-flex items-center rounded-full border border-border/40 bg-secondary/15 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
               )}
             >
               {tag}
-            </Badge>
+            </span>
           ))}
         </div>
       )}

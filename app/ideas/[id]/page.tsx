@@ -93,7 +93,16 @@ export default function IdeaDetailPage({ params }: Props) {
     if (idea?.difficulty != null)
       pills.push({ label: "Difficulty", value: `${idea.difficulty}/10` });
     if (idea?.demand_strength)
-      pills.push({ label: "Demand", value: idea.demand_strength });
+      pills.push({
+        label: "Demand",
+        value: idea.demand_strength,
+        tone:
+          idea.demand_strength === "strong"
+            ? "strong"
+            : idea.demand_strength === "medium"
+            ? "medium"
+            : "weak",
+      });
     if (idea?.source_type) pills.push({ label: "Source", value: idea.source_type });
     return pills;
   }, [idea]);
@@ -173,7 +182,10 @@ export default function IdeaDetailPage({ params }: Props) {
   if (error || !idea) {
     return (
       <div className="mx-auto max-w-5xl space-y-4 px-4 py-8 text-foreground/90">
-        <Link href="/ideas/database" className="text-sm font-semibold text-primary underline">
+        <Link
+          href="/ideas/database"
+          className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+        >
           ← Back to database
         </Link>
         <div className="rounded-2xl border border-border/60 bg-card/50 p-4 text-destructive-foreground shadow-soft">
@@ -229,19 +241,17 @@ export default function IdeaDetailPage({ params }: Props) {
           title="Business Fit"
           description="Market potential, difficulty, and go-to-market notes."
         >
-          <div className="space-y-2 text-foreground/90">
+          <Prose>
             <p><strong>Revenue Potential:</strong> {revenueRange(idea.market_size)}</p>
             {idea.difficulty != null && (
               <p>
                 <strong>Execution Difficulty:</strong> {idea.difficulty}/10 ({difficultyLabel(idea.difficulty)})
               </p>
             )}
-            <Prose>
-              <p>
-                <strong>Go-to-market:</strong> The combination of {idea.demand_strength ?? "moderate demand"} and a {idea.market_size ?? "N/A"} market stage suggests a promising path.
-              </p>
-            </Prose>
-          </div>
+            <p>
+              <strong>Go-to-market:</strong> The combination of {idea.demand_strength ?? "moderate demand"} and a {idea.market_size ?? "N/A"} market stage suggests a promising path.
+            </p>
+          </Prose>
         </IdeaSection>
 
         {idea.monetization && idea.monetization.length > 0 && (

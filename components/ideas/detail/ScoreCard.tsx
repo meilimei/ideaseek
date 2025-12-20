@@ -19,15 +19,15 @@ export default function ScoreCard({
   return (
     <Card
       className={cn(
-        "flex h-full flex-col justify-between rounded-2xl border border-border/60 bg-card/50 p-4 text-foreground shadow-soft",
+        "flex h-full flex-col justify-between rounded-2xl border border-border/60 bg-card/50 p-4 shadow-soft",
         className
       )}
     >
       <div className="space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
           {label}
         </div>
-        <div className="text-3xl font-bold leading-tight">{score}</div>
+        <div className="text-3xl font-bold leading-tight text-primary/90">{score}</div>
         {descriptor && (
           <p className="text-sm text-muted-foreground">{descriptor}</p>
         )}
