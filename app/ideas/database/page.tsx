@@ -324,8 +324,8 @@ export default function IdeasDatabasePage() {
   return (
     <PageShell
       title="Find Your Next Startup Idea"
-      description="Browse validated opportunities with research, market analysis, execution plans, and more."
-    >
+  description="Browse validated opportunities with research, market analysis, execution plans, and more."
+>
       {error && (
         <Card className="border-destructive/60 bg-destructive/10 p-4 text-destructive-foreground shadow-soft">
           <div className="font-semibold">Error loading ideas</div>
@@ -335,115 +335,175 @@ export default function IdeasDatabasePage() {
 
       <SectionTitle
         title="Idea library"
-      description="Search and filter validated opportunities sourced from trends, communities, and curated research."
-      actions={<div className="text-sm text-muted-foreground">{displayedCount} ideas</div>}
-    />
-
-      <IdeasFilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={() => {
-          updateQuery({ q: searchQuery || null }, { resetPage: true });
-          scrollToListTop();
-        }}
-        sourceFilter={currentSource}
-        onSourceChange={(v) => {
-          updateQuery({ source: v }, { resetPage: true });
-          scrollToListTop();
-        }}
-        sortBy={currentSort}
-        onSortChange={(v) => {
-          if (v === currentSort) return;
-          updateQuery({ sort: v }, { resetPage: true });
-          scrollToListTop();
-        }}
-        viewMode={currentView}
-        onViewModeChange={(v) => {
-          updateQuery({ view: v }, { resetPage: true });
-          scrollToListTop();
-        }}
-        difficultyFilter={currentDifficulty}
-        onDifficultyChange={(v) => {
-          updateQuery({ difficulty: v }, { resetPage: true });
-          scrollToListTop();
-        }}
-        onReset={handleResetFilters}
-        isDefaultState={isDefaultState}
-        totalCount={displayedCount}
-        activeChips={[
-          ...(searchQuery
-            ? [
-                {
-                  label: `Search: ${searchQuery}`,
-                  key: 'search',
-                  onRemove: () => {
-                    setSearchQuery('');
-                    updateQuery({ q: null }, { resetPage: true });
-                    scrollToListTop();
-                  },
-                },
-              ]
-            : []),
-          ...(currentSource !== 'all'
-            ? [
-                {
-                  label: `Source: ${sourceLabel(currentSource)}`,
-                  key: 'source',
-                  onRemove: () => {
-                    updateQuery({ source: null }, { resetPage: true });
-                    scrollToListTop();
-                  },
-                },
-              ]
-            : []),
-          ...(currentDifficulty !== 'all'
-            ? [
-                {
-                  label: `Difficulty: ${currentDifficulty}`,
-                  key: 'difficulty',
-                  onRemove: () => {
-                    updateQuery({ difficulty: null }, { resetPage: true });
-                    scrollToListTop();
-                  },
-                },
-              ]
-            : []),
-          ...(currentSort !== 'newest'
-            ? [
-                {
-                  label: `Sort: ${currentSort}`,
-                  key: 'sort',
-                  onRemove: () => {
-                    updateQuery({ sort: null }, { resetPage: true });
-                    scrollToListTop();
-                  },
-                },
-              ]
-            : []),
-          ...(currentView !== 'all'
-            ? [
-                {
-                  label: `View: ${currentView}`,
-                  key: 'view',
-                  onRemove: () => {
-                    updateQuery({ view: null }, { resetPage: true });
-                    scrollToListTop();
-                  },
-                },
-              ]
-            : []),
-        ]}
-        onClearAll={() => {
-          handleResetFilters();
-        }}
+        description="Browse validated opportunities sourced from trends, communities, and curated research."
+        actions={<div className="text-sm text-muted-foreground">{displayedCount} ideas</div>}
       />
 
-      <div ref={listTopRef} className="h-0" />
+      {(() => {
+        const SHOW_FILTERS = false;
+        return SHOW_FILTERS ? (
+          <>
+            <IdeasFilterBar
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onSearchSubmit={() => {
+                updateQuery({ q: searchQuery || null }, { resetPage: true });
+                scrollToListTop();
+              }}
+              sourceFilter={currentSource}
+              onSourceChange={(v) => {
+                updateQuery({ source: v }, { resetPage: true });
+                scrollToListTop();
+              }}
+              sortBy={currentSort}
+              onSortChange={(v) => {
+                if (v === currentSort) return;
+                updateQuery({ sort: v }, { resetPage: true });
+                scrollToListTop();
+              }}
+              viewMode={currentView}
+              onViewModeChange={(v) => {
+                updateQuery({ view: v }, { resetPage: true });
+                scrollToListTop();
+              }}
+              difficultyFilter={currentDifficulty}
+              onDifficultyChange={(v) => {
+                updateQuery({ difficulty: v }, { resetPage: true });
+                scrollToListTop();
+              }}
+              onReset={handleResetFilters}
+              isDefaultState={isDefaultState}
+              totalCount={displayedCount}
+              activeChips={[
+                ...(searchQuery
+                  ? [
+                      {
+                        label: `Search: ${searchQuery}`,
+                        key: 'search',
+                        onRemove: () => {
+                          setSearchQuery('');
+                          updateQuery({ q: null }, { resetPage: true });
+                          scrollToListTop();
+                        },
+                      },
+                    ]
+                  : []),
+                ...(currentSource !== 'all'
+                  ? [
+                      {
+                        label: `Source: ${sourceLabel(currentSource)}`,
+                        key: 'source',
+                        onRemove: () => {
+                          updateQuery({ source: null }, { resetPage: true });
+                          scrollToListTop();
+                        },
+                      },
+                    ]
+                  : []),
+                ...(currentDifficulty !== 'all'
+                  ? [
+                      {
+                        label: `Difficulty: ${currentDifficulty}`,
+                        key: 'difficulty',
+                        onRemove: () => {
+                          updateQuery({ difficulty: null }, { resetPage: true });
+                          scrollToListTop();
+                        },
+                      },
+                    ]
+                  : []),
+                ...(currentSort !== 'newest'
+                  ? [
+                      {
+                        label: `Sort: ${currentSort}`,
+                        key: 'sort',
+                        onRemove: () => {
+                          updateQuery({ sort: null }, { resetPage: true });
+                          scrollToListTop();
+                        },
+                      },
+                    ]
+                  : []),
+                ...(currentView !== 'all'
+                  ? [
+                      {
+                        label: `View: ${currentView}`,
+                        key: 'view',
+                        onRemove: () => {
+                          updateQuery({ view: null }, { resetPage: true });
+                          scrollToListTop();
+                        },
+                      },
+                    ]
+                  : []),
+              ]}
+              onClearAll={() => {
+                handleResetFilters();
+              }}
+            />
+            <div ref={listTopRef} className="h-0" />
+          </>
+        ) : null;
+      })()}
 
-      <SectionTitle
-        title="Library signals"
-        description="How the database is trending this week."
-      />
+      {(() => {
+        const SHOW_SIGNALS = false;
+        return SHOW_SIGNALS ? (
+          <>
+            <SectionTitle
+              title="Library signals"
+              description="How the database is trending this week."
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="Total ideas"
+                value={stats?.totalIdeas ?? 0}
+                accent="from-emerald-500/10 via-cyan-500/10 to-sky-500/10"
+              />
+              <StatCard
+                label="Published"
+                value={stats?.publishedIdeas ?? 0}
+                accent="from-teal-400/10 via-cyan-400/10 to-blue-400/10"
+              />
+              <StatCard
+                label="New (7d)"
+                value={stats?.newLast7d ?? 0}
+                accent="from-amber-400/10 via-orange-400/10 to-pink-400/10"
+              />
+              {typeof stats?.mySavedIdeas === 'number' && (
+                <StatCard
+                  label="My saved"
+                  value={stats.mySavedIdeas}
+                  accent="from-[rgba(86,212,230,0.15)] via-[rgba(0,186,206,0.16)] to-[rgba(4,16,38,0.4)]"
+                  subtext="Ideas you've bookmarked"
+                />
+              )}
+              <Card className="border border-border/60 bg-card/70 p-4 shadow-soft backdrop-blur">
+                <div className="text-sm font-semibold text-foreground/80">Sources</div>
+                <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {stats?.sourceCounts
+                    ? Object.entries(stats.sourceCounts).map(([src, count]) => (
+                        <div key={src} className="flex items-center justify-between">
+                          <span className="capitalize text-foreground">{src || 'unknown'}</span>
+                          <span className="font-semibold text-foreground">{count}</span>
+                        </div>
+                      ))
+                    : [1, 2, 3].map((k) => (
+                        <div
+                          key={k}
+                          className="flex items-center justify-between text-muted-foreground"
+                        >
+                          <span className="h-3 w-20 rounded-full bg-muted/60" />
+                          <span className="h-3 w-6 rounded-full bg-muted/60" />
+                        </div>
+                      ))}
+                </div>
+              </Card>
+            </div>
+          </>
+        ) : null;
+      })()}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
