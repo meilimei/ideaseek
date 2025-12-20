@@ -56,8 +56,8 @@ const config = {
         mono: ["var(--font-mono)", "SFMono-Regular", "Menlo", "monospace"],
       },
       boxShadow: {
-        soft: "0 14px 40px rgba(4, 16, 38, 0.45)",
-        glow: "0 0 0 1px rgba(120, 246, 255, 0.12), 0 16px 50px rgba(0, 186, 206, 0.2), 0 28px 80px rgba(4, 16, 38, 0.55)",
+        soft: "0 12px 26px rgba(4, 16, 38, 0.28), 0 2px 6px rgba(0, 0, 0, 0.18)",
+        glow: "0 0 0 1px rgba(86, 212, 230, 0.08), 0 10px 28px rgba(0, 186, 206, 0.14), 0 20px 50px rgba(4, 16, 38, 0.38)",
       },
     },
   },
