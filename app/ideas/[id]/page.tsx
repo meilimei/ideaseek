@@ -6,6 +6,7 @@ import IdeaDetailHeader from "@/components/ideas/detail/IdeaDetailHeader";
 import IdeaSection from "@/components/ideas/detail/IdeaSection";
 import ScoreCard from "@/components/ideas/detail/ScoreCard";
 import IdeaRightRail from "@/components/ideas/detail/IdeaRightRail";
+import Prose from "@/components/ui/prose";
 
 type Idea = {
   id: string;
@@ -200,9 +201,9 @@ export default function IdeaDetailPage({ params }: Props) {
             title="Idea Summary"
             description="A concise overview of the opportunity."
           >
-            <p className="whitespace-pre-line leading-relaxed text-foreground/90">
-              {idea.description}
-            </p>
+            <Prose>
+              <p className="whitespace-pre-line">{idea.description}</p>
+            </Prose>
           </IdeaSection>
         ) : null}
 
@@ -235,11 +236,11 @@ export default function IdeaDetailPage({ params }: Props) {
                 <strong>Execution Difficulty:</strong> {idea.difficulty}/10 ({difficultyLabel(idea.difficulty)})
               </p>
             )}
-            <p>
-              <strong>Go-to-market:</strong> The combination of {idea.demand_strength ?? "moderate demand"}
-              {" "}
-              and a {idea.market_size ?? "N/A"} market stage suggests a promising path.
-            </p>
+            <Prose>
+              <p>
+                <strong>Go-to-market:</strong> The combination of {idea.demand_strength ?? "moderate demand"} and a {idea.market_size ?? "N/A"} market stage suggests a promising path.
+              </p>
+            </Prose>
           </div>
         </IdeaSection>
 
@@ -249,28 +250,32 @@ export default function IdeaDetailPage({ params }: Props) {
             title="Offer"
             description="Ways to monetize and package the solution."
           >
-            <ul className="list-disc space-y-1 pl-5 text-foreground/90">
-              {idea.monetization.map((m, idx) => (
-                <li key={idx}>{m}</li>
-              ))}
-            </ul>
+            <Prose>
+              <ul>
+                {idea.monetization.map((m, idx) => (
+                  <li key={idx}>{m}</li>
+                ))}
+              </ul>
+            </Prose>
           </IdeaSection>
         )}
 
         {idea.demand_strength && (
           <IdeaSection
             id="why-now"
-            title="Why Now"
-            description="Timing signals and urgency."
-          >
-            <p className="text-foreground/90">
+          title="Why Now"
+          description="Timing signals and urgency."
+        >
+          <Prose>
+            <p>
               {idea.demand_strength === "strong"
                 ? "Explosive growth makes this the perfect time to enter."
                 : idea.demand_strength === "medium"
                 ? "Steady interest could translate into solid demand."
                 : "Opportunities exist but require creative positioning and timing."}
             </p>
-          </IdeaSection>
+          </Prose>
+        </IdeaSection>
         )}
 
         {idea.pain_points && idea.pain_points.length > 0 && (
@@ -279,14 +284,16 @@ export default function IdeaDetailPage({ params }: Props) {
             title="Proof & Signals"
             description="Evidence from users, communities, and market discussions."
           >
-            <p className="text-foreground/90">
-              The following pain points were derived from real discussions and market signals:
-            </p>
-            <ul className="list-disc space-y-1 pl-5 text-foreground/90">
-              {idea.pain_points.map((p, idx) => (
-                <li key={idx}>{p}</li>
-              ))}
-            </ul>
+            <Prose>
+              <p>
+                The following pain points were derived from real discussions and market signals:
+              </p>
+              <ul>
+                {idea.pain_points.map((p, idx) => (
+                  <li key={idx}>{p}</li>
+                ))}
+              </ul>
+            </Prose>
           </IdeaSection>
         )}
 
@@ -296,13 +303,13 @@ export default function IdeaDetailPage({ params }: Props) {
             title="Market Gap"
             description="Who this serves and where incumbents fall short."
           >
-            <div className="space-y-2 text-foreground/90">
+            <Prose>
               <p>
                 This idea targets {idea.target_users}. The current market fails to meet these users’ needs,
                 leaving a gap that this solution can fill.
               </p>
               {idea.competition && <p>{idea.competition}</p>}
-            </div>
+            </Prose>
           </IdeaSection>
         )}
 
@@ -313,15 +320,21 @@ export default function IdeaDetailPage({ params }: Props) {
             description="Practical next steps and considerations."
           >
             <div className="space-y-3 text-foreground/90">
-              {idea.next_steps && <p className="whitespace-pre-line">{idea.next_steps}</p>}
+              {idea.next_steps && (
+                <Prose>
+                  <p className="whitespace-pre-line">{idea.next_steps}</p>
+                </Prose>
+              )}
               {idea.key_risks && idea.key_risks.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-foreground">Key Risks</h3>
-                  <ul className="list-disc space-y-1 pl-5 text-foreground/90">
-                    {idea.key_risks.map((risk, idx) => (
-                      <li key={idx}>{risk}</li>
-                    ))}
-                  </ul>
+                  <Prose>
+                    <ul>
+                      {idea.key_risks.map((risk, idx) => (
+                        <li key={idx}>{risk}</li>
+                      ))}
+                    </ul>
+                  </Prose>
                 </div>
               )}
             </div>
@@ -333,10 +346,12 @@ export default function IdeaDetailPage({ params }: Props) {
           title="Framework Fit"
           description="How this maps to common evaluation frameworks."
         >
-          <p className="text-foreground/90">
-            Evaluate this opportunity using popular frameworks like the Value Equation, Market Matrix, or A.C.P
-            Framework to determine its positioning. This section can expand with charts and deeper analysis over time.
-          </p>
+          <Prose>
+            <p>
+              Evaluate this opportunity using popular frameworks like the Value Equation, Market Matrix, or A.C.P
+              Framework to determine its positioning. This section can expand with charts and deeper analysis over time.
+            </p>
+          </Prose>
         </IdeaSection>
       </div>
 
