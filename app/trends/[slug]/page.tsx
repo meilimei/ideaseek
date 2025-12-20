@@ -5,6 +5,7 @@ import TrendSparkline from './TrendSparkline';
 import TrendAnalysisSection from './TrendAnalysisSection';
 import TrendBookmarkButton from '../TrendBookmarkButton';
 import { ShareButtons } from '@/components/site/ShareButtons';
+import BackLink from '@/components/site/BackLink';
 
 type Trend = {
   id: string;
@@ -166,6 +167,7 @@ export default async function TrendDetailPage({
     <div className="mx-auto max-w-6xl px-4 py-10 space-y-8">
       <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
+          <BackLink fallback="/trends" label="Back to trends" />
           <p className="text-xs uppercase tracking-[0.14em] text-indigo-600">
             Trend
           </p>

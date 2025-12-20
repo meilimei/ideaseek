@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, MouseEvent } from 'react';
 
 type TrendBookmarkButtonProps = {
   slug: string;
@@ -49,18 +49,25 @@ export default function TrendBookmarkButton({
   const isActive = bookmarked;
   const label = isActive ? 'Remove from saved' : 'Save trend';
 
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void handleToggle();
+  };
+
   return (
     <div className="flex items-center gap-2 text-xs">
       <button
         type="button"
         aria-label={label}
-        onClick={handleToggle}
+        title={isActive ? 'Saved' : 'Save'}
+        onClick={handleClick}
         disabled={loading}
-        className={`rounded-full border px-2 py-1 flex items-center gap-1 ${
+        className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm transition ${
           isActive
-            ? 'bg-yellow-400 text-black border-yellow-400'
-            : 'bg-white text-gray-700 border-gray-300'
-        } ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
+            ? 'border-amber-400/60 bg-amber-400/15 text-amber-100'
+            : 'border-border/60 bg-secondary/10 text-foreground/80 hover:bg-secondary/15'
+        } ${loading ? 'cursor-not-allowed opacity-60' : 'hover:border-border/50 active:scale-95'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40`}
       >
         <span>{isActive ? '★' : '☆'}</span>
       </button>

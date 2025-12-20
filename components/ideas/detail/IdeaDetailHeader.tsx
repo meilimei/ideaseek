@@ -1,9 +1,9 @@
 'use client';
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { toneFromValue, tonePillClasses } from "./semantic";
+import BackLink from "@/components/site/BackLink";
 
 type MetaPill = {
   label: string;
@@ -41,12 +41,7 @@ export default function IdeaDetailHeader({
   return (
     <header className="relative space-y-4 rounded-2xl border border-border/60 bg-card/50 p-5 shadow-soft">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/ideas/database"
-          className="text-xs font-semibold text-primary transition hover:underline underline-offset-4"
-        >
-          ← Back to database
-        </Link>
+        <BackLink fallback="/ideas/database" label="Back to database" className="text-primary" />
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
