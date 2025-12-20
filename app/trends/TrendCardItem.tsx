@@ -44,12 +44,10 @@ export default function TrendCardItem({
   const displayTitle = trend.title || trend.keyword || trend.slug;
 
   const sparkValues = Array.isArray(trend.sparkline) ? trend.sparkline : [];
+  const hasSparkline = sparkValues.length > 0;
 
   const interestValue =
-    trend.latest_value ??
-    trend.peak_value ??
-    trend.avg_value ??
-    null;
+    trend.latest_value ?? trend.peak_value ?? trend.avg_value ?? null;
 
   const formatInterest = (value: number | null) => {
     if (value == null) return '—';
@@ -63,93 +61,140 @@ export default function TrendCardItem({
     return `${sign}${pct}%`;
   };
 
+  const growthValue = trend.growth_pct ?? null;
+  const growthDisplay = trend.growth_display ?? formatGrowth(growthValue);
+  const growthPositive = growthValue != null && growthValue > 0;
+  const growthNegative = growthValue != null && growthValue < 0;
+
+  const sourceLabel =
+    trend.source_primary === 'google_trends'
+      ? 'Google Trends'
+      : trend.source_primary === 'youtube'
+        ? 'YouTube'
+        : trend.source_primary === 'reddit'
+          ? 'Reddit'
+          : trend.source_primary ?? 'Unknown';
+
+  const statusChip = trend.status || trend.growth_label || null;
+
+  const topicTags = Array.from(
+    new Set([...(trend.categories ?? []), ...(trend.tags ?? [])]),
+  ).filter(Boolean);
+  const visibleTags = topicTags.slice(0, 3);
+  const hiddenTagCount = Math.max(topicTags.length - visibleTags.length, 0);
+
+  const scoreValue = trend.score ?? trend.overall_score ?? null;
+
   return (
-    <div className="flex flex-col justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm transition-transform hover:-translate-y-[1px] hover:border-[var(--primary)]/50 hover:shadow-lg">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2 md:flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <Link
-              href={`/trends/${trend.slug}`}
-              className="text-lg font-semibold text-white hover:text-[var(--primary)]"
-            >
-              {displayTitle}
-            </Link>
-            <TrendBookmarkButton
-              slug={trend.slug}
-              trendId={trend.id}
-              initialBookmarked={bookmarked}
-              onChange={onBookmarkChange}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
-            <span className="text-[var(--primary)]">
-              {isGoogle
-                ? `Interest: ${formatInterest(interestValue)}`
-                : `Volume: ${trend.volume_display ?? '—'}`}
-            </span>
-            <span className="text-emerald-400">
-              Growth: {formatGrowth(trend.growth_pct)}
-            </span>
-            {trend.growth_label && (
-              <span className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-2 py-0.5 text-xs text-slate-200">
-                {trend.growth_label}
+    <Link href={`/trends/${trend.slug}`} className="group block h-full">
+      <div className="relative flex h-full flex-col gap-4 rounded-2xl border border-border/60 bg-card/70 p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-border/70 hover:bg-secondary/5">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h3 className="line-clamp-2 text-lg font-semibold leading-tight text-foreground">
+                  {displayTitle}
+                </h3>
+                {trend.summary && (
+                  <p className="line-clamp-2 text-sm text-foreground/75">
+                    {trend.summary}
+                  </p>
+                )}
+              </div>
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="shrink-0"
+              >
+                <TrendBookmarkButton
+                  slug={trend.slug}
+                  trendId={trend.id}
+                  initialBookmarked={bookmarked}
+                  onChange={onBookmarkChange}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-sm text-foreground/80">
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                {isGoogle ? 'Interest' : 'Volume'}
+                <span className="font-semibold text-foreground/85">
+                  {isGoogle
+                    ? formatInterest(interestValue)
+                    : trend.volume_display ?? '—'}
+                </span>
               </span>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs ${
+                  growthValue == null
+                    ? 'border-border/50 text-muted-foreground'
+                    : growthPositive
+                      ? 'border-emerald-500/15 bg-emerald-500/8 text-emerald-200/90'
+                      : growthNegative
+                        ? 'border-rose-500/15 bg-rose-500/8 text-rose-200/90'
+                        : 'border-border/50 text-muted-foreground'
+                }`}
+              >
+                Growth
+                <span className="font-semibold">
+                  {growthDisplay === '—' ? '—' : growthDisplay}
+                </span>
+              </span>
+              {scoreValue != null && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs text-amber-200/90">
+                  Score
+                  <span className="font-semibold">
+                    {scoreValue.toFixed(1)}
+                  </span>
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/75">
+              <span className="rounded-full border border-border/50 bg-secondary/10 px-2.5 py-1">
+                {sourceLabel}
+              </span>
+              {statusChip && (
+                <span className="rounded-full border border-border/50 bg-secondary/10 px-2.5 py-1">
+                  {statusChip}
+                </span>
+              )}
+            </div>
+
+            {topicTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {visibleTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-border/40 bg-secondary/10 px-2.5 py-1 text-[11px] font-medium text-foreground/70"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {hiddenTagCount > 0 && (
+                  <span
+                    className="rounded-full border border-border/40 bg-secondary/10 px-2.5 py-1 text-[11px] font-medium text-foreground/70"
+                    title={topicTags.slice(visibleTags.length).join(', ')}
+                  >
+                    +{hiddenTagCount}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
-            <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
-              {trend.source_primary === 'google_trends'
-                ? 'Google Trends'
-                : trend.source_primary}
-            </span>
-            {(trend.geo || trend.timeframe) && (
-              <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
-                {[trend.geo, trend.timeframe].filter(Boolean).join(' · ')}
-              </span>
+
+          <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-secondary/10 md:h-24 md:w-40">
+            {hasSparkline ? (
+              <TrendSparkline
+                values={sparkValues}
+                className="h-full w-full rounded-none border-0 bg-transparent p-1 !bg-transparent"
+              />
+            ) : (
+              <div className="h-full w-full animate-pulse bg-gradient-to-br from-secondary/20 via-background/40 to-secondary/30" />
             )}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/40" />
           </div>
         </div>
-        <div className="md:w-40 md:flex-shrink-0 md:pl-3">
-          <TrendSparkline
-            values={sparkValues}
-            className="h-16 w-full mt-2 md:mt-0"
-          />
-        </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-200">
-        {trend.status && (
-          <span className="rounded-full border border-[var(--primary)]/40 bg-[rgba(85,175,210,0.14)] px-2 py-0.5 text-[var(--primary)]">
-            {trend.status}
-          </span>
-        )}
-        {trend.score != null && (
-          <span className="rounded-full border border-amber-200/60 bg-[rgba(251,191,36,0.15)] px-2 py-0.5 text-amber-200">
-            Score: {trend.score.toFixed(1)} / 5
-          </span>
-        )}
-        {trend.categories.map((cat) => (
-          <span
-            key={cat}
-            className="rounded-full border border-[var(--border)] px-2 py-0.5"
-          >
-            {cat}
-          </span>
-        ))}
-        {trend.overall_score != null && (
-          <span className="rounded-full border border-amber-200/60 bg-[rgba(251,191,36,0.15)] px-2 py-0.5 text-amber-200">
-            Score: {trend.overall_score} / 5
-          </span>
-        )}
-        {trend.tags &&
-          trend.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full border border-[var(--border)] px-2 py-0.5"
-            >
-              {tag}
-            </span>
-          ))}
-      </div>
-    </div>
+    </Link>
   );
 }
