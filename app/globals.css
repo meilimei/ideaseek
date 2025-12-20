@@ -1,49 +1,59 @@
 @import "tailwindcss";
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 190 56% 58%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
+  --background: 215 45% 7%;
+  --foreground: 210 40% 98%;
+  --card: 215 35% 10%;
+  --card-foreground: 210 40% 98%;
+  --popover: 215 35% 10%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 173 80% 45%;
+  --primary-foreground: 215 45% 7%;
+  --secondary: 215 25% 14%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 215 18% 18%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 191 90% 50%;
+  --accent-foreground: 215 45% 7%;
+  --destructive: 0 62% 50%;
   --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 190 56% 58%;
-  --radius: 16px;
+  --border: 215 20% 22%;
+  --input: 215 20% 22%;
+  --ring: 173 80% 45%;
+  --brand: 173 80% 45%;
+  --brand-2: 191 90% 50%;
+  --radius: 1.25rem;
+  --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  color-scheme: dark;
 }
 
 .dark {
-  --background: 216 36% 10%;
-  --foreground: 213 32% 92%;
-  --card: 215 30% 15%;
-  --card-foreground: 213 32% 92%;
-  --popover: 215 30% 15%;
-  --popover-foreground: 213 32% 92%;
-  --primary: 190 56% 58%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 215 25% 20%;
-  --secondary-foreground: 213 32% 92%;
-  --muted: 215 25% 20%;
-  --muted-foreground: 216 18% 65%;
-  --accent: 215 25% 20%;
-  --accent-foreground: 213 32% 92%;
-  --destructive: 0 63% 45%;
+  --background: 215 45% 7%;
+  --foreground: 210 40% 98%;
+  --card: 215 35% 10%;
+  --card-foreground: 210 40% 98%;
+  --popover: 215 35% 10%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 173 80% 45%;
+  --primary-foreground: 215 45% 7%;
+  --secondary: 215 25% 14%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 215 18% 18%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 191 90% 50%;
+  --accent-foreground: 215 45% 7%;
+  --destructive: 0 62% 50%;
   --destructive-foreground: 210 40% 98%;
-  --border: 216 22% 28%;
-  --input: 216 22% 28%;
-  --ring: 190 56% 58%;
-  --radius: 16px;
+  --border: 215 20% 22%;
+  --input: 215 20% 22%;
+  --ring: 173 80% 45%;
+  --brand: 173 80% 45%;
+  --brand-2: 191 90% 50%;
+  --radius: 1.25rem;
+  --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -53,14 +63,14 @@
   --color-muted: hsl(var(--muted));
   --color-primary: hsl(var(--primary));
   --color-border: hsl(var(--border));
-  --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 a {
