@@ -7,6 +7,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils/cn";
+import { cardInteractive } from "@/lib/ui-classes";
 
 export type IdeaCardProps = {
   idea: {
@@ -52,7 +53,8 @@ export default function IdeaCard({
   const content = (
     <Card
       className={cn(
-        "group relative h-full overflow-hidden rounded-2xl border border-border/60 bg-card/50 p-4 shadow-soft transition hover:-translate-y-[1px] hover:border-border/80 hover:shadow-glow",
+        cardInteractive,
+        "group relative h-full overflow-hidden p-4 shadow-soft hover:shadow-soft",
         className,
       )}
     >

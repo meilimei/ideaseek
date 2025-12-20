@@ -20,6 +20,7 @@ import IdeasFiltersSheet from '@/components/ideas/IdeasFiltersSheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils/cn';
+import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
 
 type Idea = {
   id: string;
@@ -546,7 +547,11 @@ export default function IdeasDatabasePage() {
               variant="ghostPill"
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="shrink-0 px-4 py-2 text-xs md:text-sm border border-border/50 bg-secondary/8 text-foreground/75 hover:bg-secondary/12 transition"
+              className={cn(
+                pillButton,
+                "h-9 px-4 py-2 text-xs md:text-sm",
+                currentPage === 1 ? "cursor-not-allowed opacity-60" : ""
+              )}
             >
               Previous
             </Button>
@@ -560,7 +565,11 @@ export default function IdeasDatabasePage() {
                 handlePageChange(Math.min(totalPages, currentPage + 1))
               }
               disabled={currentPage === totalPages}
-              className="shrink-0 px-4 py-2 text-xs md:text-sm border border-border/50 bg-secondary/8 text-foreground/75 hover:bg-secondary/12 transition"
+              className={cn(
+                pillButton,
+                "h-9 px-4 py-2 text-xs md:text-sm",
+                currentPage === totalPages ? "cursor-not-allowed opacity-60" : ""
+              )}
             >
               Next
             </Button>
@@ -576,10 +585,9 @@ export default function IdeasDatabasePage() {
                     onClick={() => handlePageChange(page)}
                     aria-current={currentPage === page ? 'page' : undefined}
                     className={cn(
-                      'px-3 py-1 text-sm border border-border/50 transition',
-                      currentPage === page
-                        ? 'bg-primary/12 border-primary/20 text-foreground'
-                        : 'bg-secondary/8 text-foreground/75 hover:bg-secondary/12'
+                      pillButton,
+                      "h-9 px-3 py-1 text-sm",
+                      currentPage === page ? 'border-primary/20 bg-primary/12 text-foreground' : ''
                     )}
                   >
                     {page}

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, MouseEvent } from 'react';
+import { pillButton } from '@/lib/ui-classes';
+import { cn } from '@/lib/utils/cn';
 
 type TrendBookmarkButtonProps = {
   slug: string;
@@ -63,11 +65,12 @@ export default function TrendBookmarkButton({
         title={isActive ? 'Saved' : 'Save'}
         onClick={handleClick}
         disabled={loading}
-        className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm transition ${
-          isActive
-            ? 'border-amber-400/60 bg-amber-400/15 text-amber-100'
-            : 'border-border/60 bg-secondary/10 text-foreground/80 hover:bg-secondary/15'
-        } ${loading ? 'cursor-not-allowed opacity-60' : 'hover:border-border/50 active:scale-95'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40`}
+        className={cn(
+          pillButton,
+          "h-8 px-3 py-1 text-xs",
+          isActive ? "border-amber-400/60 bg-amber-400/15 text-amber-100 hover:bg-amber-400/10" : "",
+          loading ? "cursor-not-allowed opacity-60" : "active:scale-95"
+        )}
       >
         <span>{isActive ? '★' : '☆'}</span>
       </button>

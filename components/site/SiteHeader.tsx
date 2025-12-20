@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { chipActive, chipBase, pillButton } from '@/lib/ui-classes';
+import { cn } from '@/lib/utils/cn';
 
 type NavItem = { href: string; label: string };
 
@@ -18,7 +20,11 @@ function SearchButton({ className, onPress }: { className?: string; onPress: () 
     <button
       type="button"
       onClick={onPress}
-      className={`inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${className ?? ''}`}
+      className={cn(
+        pillButton,
+        "px-3 py-1.5 text-sm shadow-soft",
+        className,
+      )}
       aria-label="Open search"
     >
       <span className="text-sm">Search</span>
@@ -92,24 +98,24 @@ export default function SiteHeader() {
             Ideasignal
           </Link>
           <nav className="hidden items-center gap-2 lg:flex">
-            {navItems.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`rounded-full px-3 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 ${
-                    active
-                      ? 'border border-primary/25 bg-primary/12 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                      : 'border border-transparent text-foreground/80 hover:bg-secondary/10 hover:text-foreground'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+              {navItems.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      active ? chipActive : chipBase,
+                      "px-3 py-1.5 text-sm shadow-none",
+                      active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
         </div>
 
         <div className="flex items-center gap-2">
@@ -162,11 +168,11 @@ export default function SiteHeader() {
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
                     onClick={() => setMobileOpen(false)}
-                    className={`rounded-xl px-3 py-2 text-sm transition ${
-                      active
-                        ? 'border border-primary/25 bg-primary/12 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-                        : 'border border-transparent text-foreground/80 hover:bg-secondary/10 hover:text-foreground'
-                    }`}
+                    className={cn(
+                      active ? chipActive : chipBase,
+                      "w-full px-3 py-2 text-sm shadow-none",
+                      active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
+                    )}
                   >
                     {item.label}
                   </Link>

@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TrendCardItem from './TrendCardItem';
 import { createClient } from '@/lib/supabaseBrowserClient';
 import PageShell from '@/components/site/PageShell';
+import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
+import { cn } from '@/lib/utils/cn';
 
 type TrendCard = {
   id: string;
@@ -172,7 +174,7 @@ export default function TrendsPage() {
                 setPage(1);
               }}
               placeholder="Search trends..."
-              className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--muted)]/80 px-3 text-sm text-slate-100 placeholder:text-slate-500 md:w-72"
+              className={cn(inputBase, "md:w-72 rounded-full")}
             />
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-300">
@@ -183,7 +185,7 @@ export default function TrendsPage() {
                 setSort(e.target.value as typeof sort);
                 setPage(1);
               }}
-              className="h-9 rounded-xl border border-[var(--border)] bg-[var(--muted)]/80 px-2 text-sm text-slate-100"
+              className={cn(inputBase, "h-9 w-auto px-2")}
             >
               <option value="recent">Most Recent</option>
               <option value="growth">Highest Growth</option>
@@ -206,11 +208,10 @@ export default function TrendsPage() {
                 setSourceFilter(opt.value);
                 updateQuery({ source: opt.value, page: '1' });
               }}
-              className={`h-8 rounded-full border px-3 text-xs transition ${
-                sourceFilter === opt.value
-                  ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
-                  : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
-              }`}
+              className={cn(
+                sourceFilter === opt.value ? chipActive : chipBase,
+                "h-8"
+              )}
             >
               {opt.label}
             </button>
@@ -222,11 +223,7 @@ export default function TrendsPage() {
               setSavedOnly(next);
               updateQuery({ saved: next ? '1' : null, page: '1' });
             }}
-            className={`h-8 rounded-full border px-3 text-xs transition ${
-              savedOnly
-                ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
-                : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
-            }`}
+            className={cn(savedOnly ? chipActive : chipBase, "h-8")}
           >
             My saved
           </button>
@@ -307,7 +304,7 @@ export default function TrendsPage() {
             <button
               type="button"
               onClick={clearAllFilters}
-              className="rounded-full border border-border/60 bg-secondary/10 px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary/15"
+              className={pillButton}
             >
               Clear filters
             </button>
@@ -344,11 +341,11 @@ export default function TrendsPage() {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className={`rounded-full border px-3 py-1 ${
-                page === 1
-                  ? 'cursor-not-allowed border-border/50 text-slate-500'
-                  : 'border-border/60 text-foreground/80 hover:bg-secondary/10'
-              }`}
+              className={cn(
+                pillButton,
+                "h-9 px-3 py-1",
+                page === 1 ? "cursor-not-allowed opacity-60" : ""
+              )}
             >
               Previous
             </button>
@@ -359,11 +356,11 @@ export default function TrendsPage() {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className={`rounded-full border px-3 py-1 ${
-                page === totalPages
-                  ? 'cursor-not-allowed border-border/50 text-slate-500'
-                  : 'border-border/60 text-foreground/80 hover:bg-secondary/10'
-              }`}
+              className={cn(
+                pillButton,
+                "h-9 px-3 py-1",
+                page === totalPages ? "cursor-not-allowed opacity-60" : ""
+              )}
             >
               Next
             </button>
@@ -376,11 +373,11 @@ export default function TrendsPage() {
                     key={p}
                     type="button"
                     onClick={() => setPage(p)}
-                    className={`rounded-full border px-3 py-1 ${
-                      page === p
-                        ? 'bg-primary/12 border-primary/30 text-foreground'
-                        : 'border-border/60 text-foreground/80 hover:bg-secondary/10'
-                    }`}
+                    className={cn(
+                      pillButton,
+                      "h-9 px-3 py-1",
+                      page === p ? "border-primary/30 bg-primary/12 text-foreground" : ""
+                    )}
                   >
                     {p}
                   </button>

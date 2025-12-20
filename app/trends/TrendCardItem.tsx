@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { cn } from '@/lib/utils/cn';
 import TrendSparkline from './[slug]/TrendSparkline';
 import TrendBookmarkButton from './TrendBookmarkButton';
+import { cardInteractive } from '@/lib/ui-classes';
 
 type TrendCard = {
   id: string;
@@ -94,7 +96,7 @@ export default function TrendCardItem({
       href={`/trends/${trend.slug}`}
       className="group block h-full"
     >
-      <div className="relative flex h-full flex-col gap-4 rounded-2xl border border-border/60 bg-card/70 p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-border/60 hover:bg-secondary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 cursor-pointer">
+      <div className={cn(cardInteractive, "relative flex h-full flex-col gap-4 p-5 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40")}>
         <div className="flex items-start gap-4">
           <div className="flex-1 space-y-3">
             <div className="flex items-start justify-between gap-3">
