@@ -140,7 +140,7 @@ export default function TrendsPage() {
         {[1, 2].map((item) => (
           <div
             key={item}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur"
+            className="card-surface p-4 backdrop-blur"
           >
             <div className="h-4 w-20 rounded-full bg-[var(--muted)]" />
             <div className="mt-3 h-3 w-24 rounded-full bg-[var(--muted)]" />
@@ -156,7 +156,7 @@ export default function TrendsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+      <div className="card-surface flex flex-col gap-3 md:flex-row md:items-center md:justify-between p-4 backdrop-blur">
         <div className="text-sm text-slate-300">{total} trends</div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <div className="flex items-center gap-2">
@@ -198,10 +198,10 @@ export default function TrendsPage() {
                 key={opt.value}
                 type="button"
                 onClick={() => {
-                setSourceFilter(opt.value);
-                updateQuery({ source: opt.value, page: '1' });
-              }}
-                className={`rounded-full border px-3 py-1 text-xs transition ${
+                  setSourceFilter(opt.value);
+                  updateQuery({ source: opt.value, page: '1' });
+                }}
+                className={`pill text-xs transition ${
                   sourceFilter === opt.value
                     ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
                     : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
@@ -217,7 +217,7 @@ export default function TrendsPage() {
                 setSavedOnly(next);
                 updateQuery({ saved: next ? '1' : null, page: '1' });
               }}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
+              className={`pill text-xs transition ${
                 savedOnly
                   ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
                   : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
