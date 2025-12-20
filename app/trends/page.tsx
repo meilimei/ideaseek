@@ -131,32 +131,26 @@ export default function TrendsPage() {
       .finally(() => {});
   }, []);
 
+  const showSavedSummary = Number.isFinite(savedCount) && savedCount > 0;
+
   return (
     <PageShell
       title="Trends"
       description="Discover emerging signals and opportunities from Google, YouTube, and the community."
     >
-      <div className="grid gap-4 md:grid-cols-3">
-        {[1, 2].map((item) => (
-          <div
-            key={item}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur"
-          >
-            <div className="h-4 w-20 rounded-full bg-[var(--muted)]" />
-            <div className="mt-3 h-3 w-24 rounded-full bg-[var(--muted)]" />
-            <div className="mt-2 h-16 rounded-xl bg-gradient-to-br from-[rgba(85,175,210,0.18)] via-[var(--card)] to-[rgba(124,58,237,0.16)]" />
+      {showSavedSummary && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+            <div className="text-sm font-semibold text-slate-200">Saved trends</div>
+            <div className="mt-3 text-3xl font-bold text-white">
+              {savedCount ?? 0}
+            </div>
+            <div className="mt-2 text-sm text-slate-400">Bookmarked signals</div>
           </div>
-        ))}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
-          <div className="text-sm font-semibold text-slate-200">Saved trends</div>
-          <div className="mt-3 text-3xl font-bold text-white">
-            {savedCount ?? 0}
-          </div>
-          <div className="mt-2 text-sm text-slate-400">Bookmarked signals</div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+      <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-3 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
         <div className="text-sm text-slate-300">{total} trends</div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <div className="flex items-center gap-2">
@@ -168,7 +162,7 @@ export default function TrendsPage() {
                 setPage(1);
               }}
               placeholder="Search trends..."
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 md:w-64"
+              className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--muted)]/90 px-3 text-sm text-slate-100 placeholder:text-slate-500 md:w-64"
             />
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-200">
@@ -179,7 +173,7 @@ export default function TrendsPage() {
                 setSort(e.target.value as typeof sort);
                 setPage(1);
               }}
-              className="rounded-lg border border-[var(--border)] bg-[var(--muted)] px-2 py-1 text-sm text-slate-100"
+              className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/90 px-2 py-1 text-sm text-slate-100"
             >
               <option value="recent">Most Recent</option>
               <option value="growth">Highest Growth</option>
@@ -187,7 +181,7 @@ export default function TrendsPage() {
               <option value="score">Highest Score</option>
             </select>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {[
               { label: 'All', value: 'all' as const },
               { label: 'Google', value: 'google_trends' as const },
@@ -198,9 +192,9 @@ export default function TrendsPage() {
                 key={opt.value}
                 type="button"
                 onClick={() => {
-                setSourceFilter(opt.value);
-                updateQuery({ source: opt.value, page: '1' });
-              }}
+                  setSourceFilter(opt.value);
+                  updateQuery({ source: opt.value, page: '1' });
+                }}
                 className={`rounded-full border px-3 py-1 text-xs transition ${
                   sourceFilter === opt.value
                     ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
@@ -259,57 +253,59 @@ export default function TrendsPage() {
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-col items-center justify-center gap-3 text-sm">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className={`px-3 py-1 rounded-full border ${
-              page === 1
-                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            Previous
-          </button>
-          <span className="text-gray-600">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className={`px-3 py-1 rounded-full border ${
-              page === totalPages
-                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            Next
-          </button>
-        </div>
-        {totalPages <= 7 && (
-          <div className="flex items-center gap-2 flex-wrap justify-center">
-            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
-              (p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPage(p)}
-                  className={`px-3 py-1 rounded-full border ${
-                    page === p
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {p}
-                </button>
-              ),
-            )}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center justify-center gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className={`rounded-full border px-3 py-1 ${
+                page === 1
+                  ? 'cursor-not-allowed border-border/50 text-slate-500'
+                  : 'border-border/60 text-foreground/80 hover:bg-secondary/10'
+              }`}
+            >
+              Previous
+            </button>
+            <span className="text-slate-400">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className={`rounded-full border px-3 py-1 ${
+                page === totalPages
+                  ? 'cursor-not-allowed border-border/50 text-slate-500'
+                  : 'border-border/60 text-foreground/80 hover:bg-secondary/10'
+              }`}
+            >
+              Next
+            </button>
           </div>
-        )}
-      </div>
+          {totalPages <= 7 && (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
+                (p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    className={`rounded-full border px-3 py-1 ${
+                      page === p
+                        ? 'bg-primary/12 border-primary/30 text-foreground'
+                        : 'border-border/60 text-foreground/80 hover:bg-secondary/10'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </PageShell>
   );
 }
