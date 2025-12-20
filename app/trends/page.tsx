@@ -8,6 +8,8 @@ import PageShell from '@/components/site/PageShell';
 import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils/cn';
 import AppPagination from '@/components/site/AppPagination';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ListSkeleton } from '@/components/ui/card-skeleton';
 
 type TrendCard = {
   id: string;
@@ -292,25 +294,15 @@ export default function TrendsPage() {
       )}
 
       {error && <div className="text-sm text-red-500">{error}</div>}
-      {loading && trends.length === 0 && (
-        <div className="text-sm text-gray-600">Loading trends...</div>
-      )}
-      {!loading && trends.length === 0 && !error ? (
-        <div className="mt-6 rounded-2xl border border-border/60 bg-card/70 p-8 text-center shadow-soft">
-          <p className="text-base font-semibold text-foreground">No trends found</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Try clearing filters or changing your search.
-          </p>
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className={pillButton}
-            >
-              Clear filters
-            </button>
-          </div>
-        </div>
+      {loading && trends.length === 0 ? (
+        <ListSkeleton gridClassName="md:grid-cols-2 lg:grid-cols-3" count={6} />
+      ) : !loading && trends.length === 0 && !error ? (
+        <EmptyState
+          title="No trends found"
+          description="Try clearing filters or searching for a different topic."
+          primaryAction={{ label: "Clear filters", onClick: clearAllFilters }}
+          secondaryAction={{ label: "Browse trends", href: "/trends" }}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {trends.map((trend) => (

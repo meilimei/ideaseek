@@ -22,6 +22,8 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils/cn';
 import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
 import AppPagination from '@/components/site/AppPagination';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ListSkeleton } from '@/components/ui/card-skeleton';
 
 type Idea = {
   id: string;
@@ -507,11 +509,7 @@ export default function IdeasDatabasePage() {
           description="Recent opportunities with tags, difficulty, and demand notes."
         />
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {Array.from({ length: 6 }).map((_, idx) => (
-              <IdeaCardSkeleton key={idx} />
-            ))}
-          </div>
+          <ListSkeleton gridClassName="md:grid-cols-2" count={6} />
         ) : !isEmpty ? (
           <div className="grid gap-4 md:grid-cols-2">
             {pagedIdeas.map((idea) => (
@@ -524,19 +522,12 @@ export default function IdeasDatabasePage() {
             ))}
           </div>
         ) : (
-          <Card className="border border-border/60 bg-card/60 p-8 text-center shadow-soft">
-            <p className="text-base font-semibold text-foreground">
-              No ideas match your search.
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Try broadening keywords or clearing filters to see more opportunities.
-            </p>
-            <div className="mt-4 flex justify-center">
-              <Button variant="pill" onClick={handleResetFilters}>
-                Clear filters
-              </Button>
-            </div>
-          </Card>
+          <EmptyState
+            title="No ideas found"
+            description="Try clearing filters or changing your search."
+            primaryAction={{ label: "Clear filters", onClick: handleResetFilters }}
+            secondaryAction={{ label: "Go to ideas", href: "/ideas/database" }}
+          />
         )}
       </section>
 
