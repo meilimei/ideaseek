@@ -1,7 +1,11 @@
-import type { ElementType, ReactNode } from "react";
+import type { ElementType, MouseEvent, ReactNode } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
+import {
+  subtleTonePillClasses,
+  toneFromValue,
+} from "@/components/ideas/list/semantic";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils/cn";
 
 export type IdeaCardProps = {
@@ -16,6 +20,7 @@ export type IdeaCardProps = {
     demand_strength?: string | null;
     source_type: string | null;
     created_at: string | null;
+    overall_score?: number | null;
   };
   href?: string;
   sourceLabel: string;
@@ -35,16 +40,20 @@ export default function IdeaCard({
     ? new Date(idea.created_at).toLocaleDateString()
     : null;
 
-  const handleSaveClick = (event: React.MouseEvent) => {
+  const handleSaveClick = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
   };
+
+  const pillBase =
+    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs";
+  const neutralPill = `${pillBase} bg-secondary/10 text-foreground/75 border-border/50`;
 
   const content = (
     <Card
       className={cn(
         "group relative h-full overflow-hidden rounded-2xl border border-border/60 bg-card/50 p-4 shadow-soft transition hover:-translate-y-[1px] hover:border-border/80 hover:shadow-glow",
-        className
+        className,
       )}
     >
       <div className="flex items-start gap-3">
@@ -53,7 +62,7 @@ export default function IdeaCard({
             {idea.title}
           </h3>
           {idea.one_liner && (
-            <p className="line-clamp-2 text-sm text-muted-foreground">
+            <p className="line-clamp-2 text-sm leading-relaxed text-foreground/75">
               {idea.one_liner}
             </p>
           )}
@@ -69,28 +78,38 @@ export default function IdeaCard({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[13px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/25 px-2.5 py-1 text-xs text-foreground">
-          {sourceLabel}
-        </span>
-        {dateDisplay && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/25 px-2.5 py-1 text-xs text-foreground">
-            {dateDisplay}
-          </span>
-        )}
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[13px] text-foreground/70">
+        <span className={neutralPill}>{sourceLabel}</span>
+        {dateDisplay && <span className={neutralPill}>{dateDisplay}</span>}
         {idea.difficulty != null && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/25 px-2.5 py-1 text-xs text-foreground">
+          <span
+            className={cn(
+              pillBase,
+              subtleTonePillClasses(toneFromValue("Difficulty", idea.difficulty)),
+            )}
+          >
             Difficulty: {idea.difficulty}
           </span>
         )}
-        {idea.market_size && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/25 px-2.5 py-1 text-xs text-foreground">
-            Market: {idea.market_size}
+        {idea.market_size && <span className={neutralPill}>Market: {idea.market_size}</span>}
+        {idea.demand_strength && (
+          <span
+            className={cn(
+              pillBase,
+              subtleTonePillClasses(toneFromValue("Demand", idea.demand_strength)),
+            )}
+          >
+            Demand: {idea.demand_strength}
           </span>
         )}
-        {idea.demand_strength && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/25 px-2.5 py-1 text-xs text-foreground">
-            Demand: {idea.demand_strength}
+        {typeof idea.overall_score === "number" && (
+          <span
+            className={cn(
+              pillBase,
+              subtleTonePillClasses(toneFromValue("Score", idea.overall_score)),
+            )}
+          >
+            Score: {idea.overall_score}
           </span>
         )}
       </div>
@@ -100,7 +119,7 @@ export default function IdeaCard({
           {idea.tags.map((tag) => (
             <Badge
               key={tag}
-              className="border border-border/40 bg-secondary/15 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+              className="border border-border/40 bg-secondary/10 px-2.5 py-1 text-[11px] font-medium text-foreground/65"
             >
               {tag}
             </Badge>
