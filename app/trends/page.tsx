@@ -231,10 +231,10 @@ export default function TrendsPage() {
 
       {error && <div className="text-sm text-red-500">{error}</div>}
       {loading && trends.length === 0 && (
-        <div className="text-sm text-slate-300">Loading trends...</div>
+        <div className="text-sm text-gray-600">Loading trends...</div>
       )}
       {!loading && trends.length === 0 && !error && (
-        <div className="text-sm text-slate-400">No trends found.</div>
+        <div className="text-sm text-gray-500">No trends found.</div>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -259,31 +259,31 @@ export default function TrendsPage() {
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-300">
+      <div className="flex flex-col items-center justify-center gap-3 text-sm">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className={`px-3 py-1 rounded-full border border-[var(--border)] ${
+            className={`px-3 py-1 rounded-full border ${
               page === 1
-                ? 'text-slate-500 cursor-not-allowed'
-                : 'text-slate-100 hover:border-[var(--primary)]'
+                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'text-gray-700 hover:bg-gray-100'
             }`}
           >
             Previous
           </button>
-          <span className="text-slate-400">
+          <span className="text-gray-600">
             Page {page} of {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className={`px-3 py-1 rounded-full border border-[var(--border)] ${
+            className={`px-3 py-1 rounded-full border ${
               page === totalPages
-                ? 'text-slate-500 cursor-not-allowed'
-                : 'text-slate-100 hover:border-[var(--primary)]'
+                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'text-gray-700 hover:bg-gray-100'
             }`}
           >
             Next
@@ -297,10 +297,10 @@ export default function TrendsPage() {
                   key={p}
                   type="button"
                   onClick={() => setPage(p)}
-                  className={`px-3 py-1 rounded-full border border-[var(--border)] ${
+                  className={`px-3 py-1 rounded-full border ${
                     page === p
-                      ? 'bg-[var(--primary-strong)] text-white'
-                      : 'text-slate-100 hover:border-[var(--primary)]'
+                      ? 'bg-gray-900 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {p}
