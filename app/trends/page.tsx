@@ -52,6 +52,9 @@ export default function TrendsPage() {
   const searchParams = useSearchParams();
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const hasActiveFilters = Boolean(
+    searchQuery || sourceFilter !== 'all' || savedOnly,
+  );
 
   useEffect(() => {
     setSavedOnly(searchParams.get('saved') === '1');
@@ -131,6 +134,13 @@ export default function TrendsPage() {
       .finally(() => {});
   }, []);
 
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setSourceFilter('all');
+    setSavedOnly(false);
+    updateQuery({ q: null, source: null, saved: null, page: '1' });
+  };
+
   const showSavedSummary = Number.isFinite(savedCount) && savedCount > 0;
 
   return (
@@ -138,6 +148,7 @@ export default function TrendsPage() {
       title="Trends"
       description="Discover emerging signals and opportunities from Google, YouTube, and the community."
     >
+      <div className="mb-2 text-sm text-muted-foreground">{total} results</div>
       {showSavedSummary && (
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
@@ -150,10 +161,9 @@ export default function TrendsPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-3 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
-        <div className="text-sm text-slate-300">{total} trends</div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 rounded-2xl border border-border/30 bg-secondary/8 p-3 shadow-soft">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
+          <div className="flex flex-1 items-center gap-2">
             <input
               type="text"
               value={searchQuery}
@@ -162,18 +172,18 @@ export default function TrendsPage() {
                 setPage(1);
               }}
               placeholder="Search trends..."
-              className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--muted)]/90 px-3 text-sm text-slate-100 placeholder:text-slate-500 md:w-64"
+              className="h-9 w-full rounded-xl border border-[var(--border)] bg-[var(--muted)]/80 px-3 text-sm text-slate-100 placeholder:text-slate-500 md:w-72"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-200">
-            <span>Sort by:</span>
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <span>Sort</span>
             <select
               value={sort}
               onChange={(e) => {
                 setSort(e.target.value as typeof sort);
                 setPage(1);
               }}
-              className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/90 px-2 py-1 text-sm text-slate-100"
+              className="h-9 rounded-xl border border-[var(--border)] bg-[var(--muted)]/80 px-2 text-sm text-slate-100"
             >
               <option value="recent">Most Recent</option>
               <option value="growth">Highest Growth</option>
@@ -181,76 +191,150 @@ export default function TrendsPage() {
               <option value="score">Highest Score</option>
             </select>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {[
-              { label: 'All', value: 'all' as const },
-              { label: 'Google', value: 'google_trends' as const },
-              { label: 'YouTube', value: 'youtube' as const },
-              { label: 'Reddit', value: 'reddit' as const },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => {
-                  setSourceFilter(opt.value);
-                  updateQuery({ source: opt.value, page: '1' });
-                }}
-                className={`rounded-full border px-3 py-1 text-xs transition ${
-                  sourceFilter === opt.value
-                    ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
-                    : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { label: 'All', value: 'all' as const },
+            { label: 'Google', value: 'google_trends' as const },
+            { label: 'YouTube', value: 'youtube' as const },
+            { label: 'Reddit', value: 'reddit' as const },
+          ].map((opt) => (
             <button
+              key={opt.value}
               type="button"
               onClick={() => {
-                const next = !savedOnly;
-                setSavedOnly(next);
-                updateQuery({ saved: next ? '1' : null, page: '1' });
+                setSourceFilter(opt.value);
+                updateQuery({ source: opt.value, page: '1' });
               }}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                savedOnly
+              className={`h-8 rounded-full border px-3 text-xs transition ${
+                sourceFilter === opt.value
                   ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
                   : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
               }`}
             >
-              My saved
+              {opt.label}
             </button>
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !savedOnly;
+              setSavedOnly(next);
+              updateQuery({ saved: next ? '1' : null, page: '1' });
+            }}
+            className={`h-8 rounded-full border px-3 text-xs transition ${
+              savedOnly
+                ? 'bg-[var(--primary-strong)] text-white border-[var(--primary)]'
+                : 'bg-[var(--muted)] text-slate-100 border-[var(--border)] hover:border-[var(--primary)]/50'
+            }`}
+          >
+            My saved
+          </button>
         </div>
       </div>
+
+      {hasActiveFilters && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          {searchQuery && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-secondary/10 px-3 py-1 text-foreground/80">
+              Search: {searchQuery}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  updateQuery({ q: null, page: '1' });
+                }}
+                aria-label="Clear search"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {sourceFilter !== 'all' && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-secondary/10 px-3 py-1 text-foreground/80">
+              Source: {sourceFilter === 'google_trends' ? 'Google' : sourceFilter}
+              <button
+                type="button"
+                onClick={() => {
+                  setSourceFilter('all');
+                  updateQuery({ source: null, page: '1' });
+                }}
+                aria-label="Clear source filter"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {savedOnly && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-secondary/10 px-3 py-1 text-foreground/80">
+              Saved
+              <button
+                type="button"
+                onClick={() => {
+                  setSavedOnly(false);
+                  updateQuery({ saved: null, page: '1' });
+                }}
+                aria-label="Clear saved filter"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="text-xs font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       {error && <div className="text-sm text-red-500">{error}</div>}
       {loading && trends.length === 0 && (
         <div className="text-sm text-gray-600">Loading trends...</div>
       )}
-      {!loading && trends.length === 0 && !error && (
-        <div className="text-sm text-gray-500">No trends found.</div>
+      {!loading && trends.length === 0 && !error ? (
+        <div className="mt-6 rounded-2xl border border-border/60 bg-card/70 p-8 text-center shadow-soft">
+          <p className="text-base font-semibold text-foreground">No trends found</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Try clearing filters or changing your search.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="rounded-full border border-border/60 bg-secondary/10 px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary/15"
+            >
+              Clear filters
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {trends.map((trend) => (
+            <TrendCardItem
+              key={trend.id}
+              trend={trend}
+              bookmarked={bookmarkedIds.has(trend.id)}
+              onBookmarkChange={(next) => {
+                setBookmarkedIds((prev) => {
+                  const copy = new Set(prev);
+                  if (next) {
+                    copy.add(trend.id);
+                  } else {
+                    copy.delete(trend.id);
+                  }
+                  return copy;
+                });
+              }}
+            />
+          ))}
+        </div>
       )}
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {trends.map((trend) => (
-          <TrendCardItem
-            key={trend.id}
-            trend={trend}
-            bookmarked={bookmarkedIds.has(trend.id)}
-            onBookmarkChange={(next) => {
-              setBookmarkedIds((prev) => {
-                const copy = new Set(prev);
-                if (next) {
-                  copy.add(trend.id);
-                } else {
-                  copy.delete(trend.id);
-                }
-                return copy;
-              });
-            }}
-          />
-        ))}
-      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
