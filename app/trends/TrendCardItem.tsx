@@ -87,6 +87,7 @@ export default function TrendCardItem({
   const interestDisplay = isGoogle
     ? formatInterest(interestValue)
     : trend.volume_display ?? null;
+  const contextText = [trend.geo, trend.timeframe].filter(Boolean).join(' · ');
 
   return (
     <Link href={`/trends/${trend.slug}`} className="group block h-full">
@@ -149,29 +150,32 @@ export default function TrendCardItem({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/75">
-              <span className="rounded-full border border-border/50 bg-secondary/10 px-2.5 py-1">
+              <span className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1">
                 {sourceLabel}
               </span>
               {statusChip && (
-                <span className="rounded-full border border-border/50 bg-secondary/10 px-2.5 py-1">
+                <span className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1">
                   {statusChip}
                 </span>
+              )}
+              {contextText && (
+                <span className="text-[11px] text-muted-foreground">{contextText}</span>
               )}
             </div>
 
             {topicTags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
                 {visibleTags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-border/40 bg-secondary/10 px-2.5 py-1 text-[11px] font-medium text-foreground/70"
+                    className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1 font-medium text-foreground/70"
                   >
                     {tag}
                   </span>
                 ))}
                 {hiddenTagCount > 0 && (
                   <span
-                    className="rounded-full border border-border/40 bg-secondary/10 px-2.5 py-1 text-[11px] font-medium text-foreground/70"
+                    className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1 font-medium text-muted-foreground"
                     title={topicTags.slice(visibleTags.length).join(', ')}
                   >
                     +{hiddenTagCount}
