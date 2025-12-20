@@ -18,6 +18,7 @@ import IdeaCard from '@/components/ideas/IdeaCard';
 import IdeaCardSkeleton from '@/components/ideas/IdeaCardSkeleton';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils/cn';
 
 type Idea = {
   id: string;
@@ -98,7 +99,7 @@ export default function IdeasDatabasePage() {
   const currentDifficulty =
     (searchParams.get('difficulty') as 'all' | 'easy' | 'medium' | 'hard') ?? 'all';
   const currentView = (searchParams.get('view') as 'all' | 'mine') ?? 'all';
-  const currentPage = Number(searchParams.get('page') ?? '1') || 1;
+  const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
   const isDefaultState =
     !searchQuery &&
     currentSource === 'all' &&
@@ -585,7 +586,13 @@ export default function IdeasDatabasePage() {
                     type="button"
                     variant={currentPage === page ? 'pill' : 'ghostPill'}
                     onClick={() => handlePageChange(page)}
-                    className="px-3 py-1 text-sm"
+                    aria-current={currentPage === page ? 'page' : undefined}
+                    className={cn(
+                      'px-3 py-1 text-sm',
+                      currentPage === page
+                        ? 'bg-primary/20 border-primary/40 text-foreground'
+                        : 'text-muted-foreground'
+                    )}
                   >
                     {page}
                   </Button>
