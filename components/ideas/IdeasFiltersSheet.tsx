@@ -25,7 +25,9 @@ type IdeasFiltersSheetProps = {
   onDifficultyChange: (value: "all" | "easy" | "medium" | "hard") => void;
   onReset: () => void;
   isDefaultState: boolean;
+  filteredCount: number;
   totalCount: number;
+  activeFiltersCount?: number;
   activeChips: Array<{
     label: string;
     key: string;
@@ -66,7 +68,9 @@ export default function IdeasFiltersSheet({
   onDifficultyChange,
   onReset,
   isDefaultState,
+  filteredCount,
   totalCount,
+  activeFiltersCount = 0,
   activeChips,
   onClearAll,
 }: IdeasFiltersSheetProps) {
@@ -98,19 +102,36 @@ export default function IdeasFiltersSheet({
         onTransitionEnd={() => searchRef.current?.focus()}
       >
         <div className="flex items-center justify-between">
-          <div>
+          <div className="space-y-1">
             <div className="text-sm font-semibold text-foreground">Filters</div>
-            <div className="text-xs text-muted-foreground">{totalCount} ideas</div>
+            <div className="text-xs text-muted-foreground">
+              {totalCount
+                ? `Showing ${filteredCount} of ${totalCount} ideas`
+                : `Showing ${filteredCount} ideas`}
+            </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="rounded-full px-3 text-xs"
-            onClick={() => onOpenChange(false)}
-          >
-            Close
-          </Button>
+          <div className="flex items-center gap-2">
+            {activeFiltersCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="rounded-full px-3 text-xs"
+                onClick={onClearAll}
+              >
+                Clear all
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="rounded-full px-3 text-xs"
+              onClick={() => onOpenChange(false)}
+            >
+              Close
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 overflow-y-auto pb-2">

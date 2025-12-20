@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils/cn";
 
 type IdeasToolbarProps = {
   totalCount: number;
+  filteredCount?: number;
+  activeFiltersCount?: number;
   sortValue: "newest" | "oldest" | "published" | "pinned" | "featured";
   onSortChange: (value: IdeasToolbarProps["sortValue"]) => void;
   onOpenFilters: () => void;
@@ -14,6 +16,8 @@ type IdeasToolbarProps = {
 
 export default function IdeasToolbar({
   totalCount,
+  filteredCount,
+  activeFiltersCount = 0,
   sortValue,
   onSortChange,
   onOpenFilters,
@@ -25,7 +29,7 @@ export default function IdeasToolbar({
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-foreground">All ideas</span>
         <span className="rounded-full border border-border/60 bg-secondary/20 px-2.5 py-0.5 text-xs text-muted-foreground">
-          {totalCount}
+          {filteredCount ?? totalCount}
         </span>
       </div>
 
@@ -79,6 +83,11 @@ export default function IdeasToolbar({
           onClick={onOpenFilters}
         >
           Filters
+          {activeFiltersCount > 0 && (
+            <span className="ml-1 inline-flex items-center rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[10px] text-foreground">
+              {activeFiltersCount}
+            </span>
+          )}
         </Button>
         <span className="hidden text-[11px] text-muted-foreground sm:inline-flex items-center gap-1">
           <kbd className="rounded border border-border/60 bg-secondary/20 px-1.5 py-0.5 text-[10px]">/</kbd>

@@ -322,6 +322,11 @@ export default function IdeasDatabasePage() {
 
   const displayedCount = filteredIdeas.length + (ideaOfTheDay ? 1 : 0);
   const isEmpty = !loading && filteredIdeas.length === 0;
+  const activeFiltersCount =
+    (searchQuery ? 1 : 0) +
+    (currentSource !== 'all' ? 1 : 0) +
+    (currentView !== 'all' ? 1 : 0) +
+    (currentDifficulty !== 'all' ? 1 : 0);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -372,6 +377,8 @@ export default function IdeasDatabasePage() {
 
       <IdeasToolbar
         totalCount={displayedCount}
+        filteredCount={displayedCount}
+        activeFiltersCount={activeFiltersCount}
         sortValue={currentSort}
         onSortChange={(v) => {
           if (v === currentSort) return;
@@ -418,7 +425,9 @@ export default function IdeasDatabasePage() {
         }}
         onReset={handleResetFilters}
         isDefaultState={isDefaultState}
-        totalCount={displayedCount}
+        filteredCount={displayedCount}
+        totalCount={stats?.totalIdeas ?? displayedCount}
+        activeFiltersCount={activeFiltersCount}
         activeChips={[
           ...(searchQuery
             ? [
