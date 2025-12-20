@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils/cn';
 import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
+import AppPagination from '@/components/site/AppPagination';
 
 type Idea = {
   id: string;
@@ -539,65 +540,22 @@ export default function IdeasDatabasePage() {
         )}
       </section>
 
-      {totalPages > 1 && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground shadow-soft">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button
-              type="button"
-              variant="ghostPill"
-              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={cn(
-                pillButton,
-                "h-9 px-4 py-2 text-xs md:text-sm",
-                currentPage === 1 ? "cursor-not-allowed opacity-60" : ""
-              )}
-            >
-              Previous
-            </Button>
-            <span className="text-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              type="button"
-              variant="ghostPill"
-              onClick={() =>
-                handlePageChange(Math.min(totalPages, currentPage + 1))
-              }
-              disabled={currentPage === totalPages}
-              className={cn(
-                pillButton,
-                "h-9 px-4 py-2 text-xs md:text-sm",
-                currentPage === totalPages ? "cursor-not-allowed opacity-60" : ""
-              )}
-            >
-              Next
-            </Button>
-          </div>
-          {totalPages <= 7 && (
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
-                (page) => (
-                  <Button
-                    key={page}
-                    type="button"
-                    variant={currentPage === page ? 'pill' : 'ghostPill'}
-                    onClick={() => handlePageChange(page)}
-                    aria-current={currentPage === page ? 'page' : undefined}
-                    className={cn(
-                      pillButton,
-                      "h-9 px-3 py-1 text-sm",
-                      currentPage === page ? 'border-primary/20 bg-primary/12 text-foreground' : ''
-                    )}
-                  >
-                    {page}
-                  </Button>
-                ),
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <AppPagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        makeHref={(page) => {
+          const params = new URLSearchParams(searchParams.toString());
+          if (page > 1) {
+            params.set('page', String(page));
+          } else {
+            params.delete('page');
+          }
+          const qs = params.toString();
+          return qs ? `${pathname}?${qs}` : pathname;
+        }}
+        onNavigate={handlePageChange}
+        className="rounded-2xl border border-border/60 bg-card/60 p-4 text-muted-foreground shadow-soft"
+      />
     </PageShell>
   );
 }

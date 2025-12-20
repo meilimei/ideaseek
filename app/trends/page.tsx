@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabaseBrowserClient';
 import PageShell from '@/components/site/PageShell';
 import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils/cn';
+import AppPagination from '@/components/site/AppPagination';
 
 type TrendCard = {
   id: string;
@@ -333,60 +334,19 @@ export default function TrendsPage() {
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex flex-col items-center justify-center gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className={cn(
-                pillButton,
-                "h-9 px-3 py-1",
-                page === 1 ? "cursor-not-allowed opacity-60" : ""
-              )}
-            >
-              Previous
-            </button>
-            <span className="text-slate-400">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className={cn(
-                pillButton,
-                "h-9 px-3 py-1",
-                page === totalPages ? "cursor-not-allowed opacity-60" : ""
-              )}
-            >
-              Next
-            </button>
-          </div>
-          {totalPages <= 7 && (
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
-                (p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPage(p)}
-                    className={cn(
-                      pillButton,
-                      "h-9 px-3 py-1",
-                      page === p ? "border-primary/30 bg-primary/12 text-foreground" : ""
-                    )}
-                  >
-                    {p}
-                  </button>
-                ),
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      <AppPagination
+        currentPage={page}
+        totalPages={totalPages}
+        makeHref={(p) => {
+          const params = new URLSearchParams(searchParams.toString());
+          if (p > 1) params.set('page', String(p));
+          else params.delete('page');
+          const qs = params.toString();
+          return qs ? `${pathname}?${qs}` : pathname;
+        }}
+        onNavigate={(p) => setPage(p)}
+        className="text-sm"
+      />
     </PageShell>
   );
 }
