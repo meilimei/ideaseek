@@ -12,7 +12,12 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabaseBrowserClient';
 import PageShell from '@/components/site/PageShell';
-import FilterBar from './FilterBar';
+import SectionTitle from '@/components/site/SectionTitle';
+import IdeasFilterBar from '@/components/ideas/IdeasFilterBar';
+import IdeaCard from '@/components/ideas/IdeaCard';
+import IdeaCardSkeleton from '@/components/ideas/IdeaCardSkeleton';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 type Idea = {
   id: string;
@@ -52,15 +57,15 @@ function StatCard({
   subtext?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
-      <div className="text-sm font-semibold text-slate-200">{label}</div>
+    <Card className="h-full bg-card/70 p-4 shadow-soft backdrop-blur">
+      <div className="text-sm font-semibold text-foreground/80">{label}</div>
       <div
-        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-white`}
+        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-foreground`}
       >
         {value}
       </div>
-      {subtext && <div className="mt-2 text-sm text-slate-400">{subtext}</div>}
-    </div>
+      {subtext && <div className="mt-2 text-sm text-muted-foreground">{subtext}</div>}
+    </Card>
   );
 }
 
@@ -312,72 +317,30 @@ export default function IdeasDatabasePage() {
     }
   };
 
-  if (loading) {
-    return <div className="p-6">Loading ideas...</div>;
-  }
-  if (error) {
-    return (
-      <div className="p-6 text-red-500">
-        Error loading ideas: {error}
-      </div>
-    );
-  }
+  const displayedCount = filteredIdeas.length + (ideaOfTheDay ? 1 : 0);
+  const isEmpty = !loading && filteredIdeas.length === 0;
 
   return (
     <PageShell
       title="Find Your Next Startup Idea"
       description="Browse validated opportunities with research, market analysis, execution plans, and more."
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total ideas"
-          value={stats?.totalIdeas ?? 0}
-          accent="from-amber-50 via-white to-indigo-50"
-        />
-        <StatCard
-          label="Published"
-          value={stats?.publishedIdeas ?? 0}
-          accent="from-green-50 via-white to-emerald-50"
-        />
-        <StatCard
-          label="New (7d)"
-          value={stats?.newLast7d ?? 0}
-          accent="from-blue-50 via-white to-indigo-50"
-        />
-        {typeof stats?.mySavedIdeas === 'number' && (
-          <StatCard
-            label="My saved"
-            value={stats.mySavedIdeas}
-            accent="from-[rgba(85,175,210,0.22)] via-[rgba(124,58,237,0.15)] to-[rgba(124,58,237,0.28)]"
-            subtext="Ideas you've bookmarked"
-          />
-        )}
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
-          <div className="text-sm font-semibold text-slate-200">Sources</div>
-          <div className="mt-3 space-y-2 text-sm text-slate-300">
-            {stats?.sourceCounts
-              ? Object.entries(stats.sourceCounts).map(([src, count]) => (
-                  <div key={src} className="flex items-center justify-between">
-                    <span className="capitalize">{src || 'unknown'}</span>
-                    <span className="text-slate-50 font-semibold">{count}</span>
-                  </div>
-                ))
-              : [1, 2, 3].map((k) => (
-                  <div
-                    key={k}
-                    className="flex items-center justify-between text-slate-500"
-                  >
-                    <span className="h-3 w-20 rounded-full bg-[var(--muted)]" />
-                    <span className="h-3 w-6 rounded-full bg-[var(--muted)]" />
-                  </div>
-                ))}
-          </div>
-        </div>
-      </div>
+      {error && (
+        <Card className="border-destructive/60 bg-destructive/10 p-4 text-destructive-foreground shadow-soft">
+          <div className="font-semibold">Error loading ideas</div>
+          <div className="text-sm text-destructive-foreground/80">{error}</div>
+        </Card>
+      )}
 
-      <FilterBar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+      <SectionTitle
+        title="Idea library"
+      description="Search and filter validated opportunities sourced from trends, communities, and curated research."
+      actions={<div className="text-sm text-muted-foreground">{displayedCount} ideas</div>}
+    />
+
+    <IdeasFilterBar
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
         onSearchSubmit={() => {
           updateQuery({ q: searchQuery || null }, { resetPage: true });
           scrollToListTop();
@@ -405,7 +368,7 @@ export default function IdeasDatabasePage() {
         }}
         onReset={handleResetFilters}
         isDefaultState={isDefaultState}
-        totalCount={filteredIdeas.length}
+        totalCount={displayedCount}
         activeChips={[
           ...(searchQuery
             ? [
@@ -474,150 +437,164 @@ export default function IdeasDatabasePage() {
         }}
       />
 
-      {/* Idea of the Day spotlight */}
-      {ideaOfTheDay && (
-        <div ref={listTopRef}>
-          <div id="ideas-top" />
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/95 p-6 shadow-sm backdrop-blur">
-            <h2 className="mb-2 text-xl font-semibold text-white">
-              Idea of the Day
-            </h2>
-            <h3 className="mb-2 text-2xl font-bold text-white">
-              {ideaOfTheDay.title}
-            </h3>
-            {ideaOfTheDay.one_liner && (
-              <p className="mb-2 text-slate-200">
-                {ideaOfTheDay.one_liner}
-              </p>
-            )}
-            {/* Use the description as teaser. Ensure we show truncated content */}
-            {ideaOfTheDay.description && (
-              <p className="mb-4 text-slate-300">
-                {ideaOfTheDay.description.slice(0, 200)}...
-              </p>
-            )}
-            <Link
-              href={`/ideas/${ideaOfTheDay.id}`}
-              className="text-[var(--primary)] underline"
-            >
-              View Full Report
-            </Link>
-          </section>
+      <div ref={listTopRef} className="h-0" />
 
-          {/* Ideas list */}
-          <section className="mt-4 space-y-4">
-            {pagedIdeas.map((idea) => (
-              <Link
-                href={`/ideas/${idea.id}`}
-                key={idea.id}
-                className="block rounded-xl border border-[var(--border)] bg-[var(--card)]/90 p-4 transition hover:-translate-y-[1px] hover:border-[var(--primary)]/50 hover:shadow-lg"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="mb-1 text-lg font-semibold text-white">
-                    {idea.title}
-                  </h3>
-                  <div className="text-xs text-slate-400">
-                    {idea.created_at
-                      ? new Date(idea.created_at).toLocaleDateString()
-                      : ''}
+      <SectionTitle
+        title="Library signals"
+        description="How the database is trending this week."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total ideas"
+          value={stats?.totalIdeas ?? 0}
+          accent="from-emerald-500/10 via-cyan-500/10 to-sky-500/10"
+        />
+        <StatCard
+          label="Published"
+          value={stats?.publishedIdeas ?? 0}
+          accent="from-teal-400/10 via-cyan-400/10 to-blue-400/10"
+        />
+        <StatCard
+          label="New (7d)"
+          value={stats?.newLast7d ?? 0}
+          accent="from-amber-400/10 via-orange-400/10 to-pink-400/10"
+        />
+        {typeof stats?.mySavedIdeas === 'number' && (
+          <StatCard
+            label="My saved"
+            value={stats.mySavedIdeas}
+            accent="from-[rgba(86,212,230,0.15)] via-[rgba(0,186,206,0.16)] to-[rgba(4,16,38,0.4)]"
+            subtext="Ideas you've bookmarked"
+          />
+        )}
+        <Card className="border border-border/60 bg-card/70 p-4 shadow-soft backdrop-blur">
+          <div className="text-sm font-semibold text-foreground/80">Sources</div>
+          <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {stats?.sourceCounts
+              ? Object.entries(stats.sourceCounts).map(([src, count]) => (
+                  <div key={src} className="flex items-center justify-between">
+                    <span className="capitalize text-foreground">{src || 'unknown'}</span>
+                    <span className="font-semibold text-foreground">{count}</span>
                   </div>
-                </div>
-                {idea.one_liner && (
-                  <p className="mb-2 text-slate-300">{idea.one_liner}</p>
-                )}
-                <div className="flex flex-wrap gap-2 text-sm text-slate-300">
-                  <span className="px-2 py-0.5 rounded-full border border-[var(--border)] text-xs">
-                    Source: {sourceLabel(idea.source_type)}
-                  </span>
-                  {idea.tags?.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 rounded-full border border-[var(--border)] bg-[var(--muted)] text-xs"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  {idea.difficulty != null && (
-                    <span className="px-2 py-0.5 rounded-full bg-[rgba(85,175,210,0.12)] text-xs text-[var(--primary)]">
-                      Difficulty: {idea.difficulty}
-                    </span>
-                  )}
-                  {idea.market_size && (
-                    <span className="px-2 py-0.5 rounded-full bg-[var(--muted)] text-xs">
-                      Market: {idea.market_size}
-                    </span>
-                  )}
-                  {idea.demand_strength && (
-                    <span className="px-2 py-0.5 rounded-full bg-[var(--muted)] text-xs">
-                      Demand: {idea.demand_strength}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
-            {filteredIdeas.length === 0 && (
-              <p className="text-slate-400">
-                No ideas match your search. Try a different keyword.
-              </p>
-            )}
-          </section>
-        </div>
+                ))
+              : [1, 2, 3].map((k) => (
+                  <div
+                    key={k}
+                    className="flex items-center justify-between text-muted-foreground"
+                  >
+                    <span className="h-3 w-20 rounded-full bg-muted/60" />
+                    <span className="h-3 w-6 rounded-full bg-muted/60" />
+                  </div>
+                ))}
+          </div>
+        </Card>
+      </div>
+
+      {ideaOfTheDay && (
+        <section className="space-y-3">
+          <SectionTitle
+            title="Idea of the Day"
+            description="A spotlighted opportunity worth reading first."
+            actions={
+              <Button variant="pill" asChild>
+                <Link href={`/ideas/${ideaOfTheDay.id}`}>View full report</Link>
+              </Button>
+            }
+          />
+          <IdeaCard
+            idea={ideaOfTheDay}
+            href={`/ideas/${ideaOfTheDay.id}`}
+            sourceLabel={`Source: ${sourceLabel(ideaOfTheDay.source_type)}`}
+          />
+        </section>
       )}
 
-      {/* Pagination */}
-      <div className="mt-6 flex flex-col items-center justify-center gap-3 text-sm text-slate-300">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className={`px-3 py-1 rounded-full border border-[var(--border)] ${
-              currentPage === 1
-                ? 'text-slate-500 cursor-not-allowed'
-                : 'text-slate-100 hover:border-[var(--primary)]'
-            }`}
-          >
-            Previous
-          </button>
-          <span className="text-slate-400">
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              handlePageChange(Math.min(totalPages, currentPage + 1))
-            }
-            disabled={currentPage === totalPages}
-            className={`px-3 py-1 rounded-full border border-[var(--border)] ${
-              currentPage === totalPages
-                ? 'text-slate-500 cursor-not-allowed'
-                : 'text-slate-100 hover:border-[var(--primary)]'
-            }`}
-          >
-            Next
-          </button>
-        </div>
-        {totalPages <= 7 && (
-          <div className="flex items-center gap-2 flex-wrap justify-center">
-            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
-              (page) => (
-                <button
-                  key={page}
-                  type="button"
-                  onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 rounded-full border border-[var(--border)] ${
-                    currentPage === page
-                      ? 'bg-[var(--primary-strong)] text-white'
-                      : 'text-slate-100 hover:border-[var(--primary)]'
-                  }`}
-                >
-                  {page}
-                </button>
-              ),
-            )}
+      <section className="space-y-3">
+        <SectionTitle
+          title="All ideas"
+          description="Recent opportunities with tags, difficulty, and demand notes."
+        />
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <IdeaCardSkeleton key={idx} />
+            ))}
           </div>
+        ) : !isEmpty ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {pagedIdeas.map((idea) => (
+              <IdeaCard
+                key={idea.id}
+                idea={idea}
+                href={`/ideas/${idea.id}`}
+                sourceLabel={`Source: ${sourceLabel(idea.source_type)}`}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="border border-border/60 bg-card/60 p-8 text-center shadow-soft">
+            <p className="text-base font-semibold text-foreground">
+              No ideas match your search.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Try broadening keywords or clearing filters to see more opportunities.
+            </p>
+            <div className="mt-4 flex justify-center">
+              <Button variant="pill" onClick={handleResetFilters}>
+                Clear filters
+              </Button>
+            </div>
+          </Card>
         )}
-      </div>
+      </section>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground shadow-soft">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghostPill"
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-4"
+            >
+              Previous
+            </Button>
+            <span className="text-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="ghostPill"
+              onClick={() =>
+                handlePageChange(Math.min(totalPages, currentPage + 1))
+              }
+              disabled={currentPage === totalPages}
+              className="px-4"
+            >
+              Next
+            </Button>
+          </div>
+          {totalPages <= 7 && (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
+                (page) => (
+                  <Button
+                    key={page}
+                    type="button"
+                    variant={currentPage === page ? 'pill' : 'ghostPill'}
+                    onClick={() => handlePageChange(page)}
+                    className="px-3 py-1 text-sm"
+                  >
+                    {page}
+                  </Button>
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </PageShell>
   );
 }
