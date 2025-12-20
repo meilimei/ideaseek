@@ -35,42 +35,57 @@ export default function IdeaCard({
     ? new Date(idea.created_at).toLocaleDateString()
     : null;
 
+  const handleSaveClick = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   const content = (
     <Card
       className={cn(
-        "group relative h-full overflow-hidden border-border/60 bg-card/60 p-5 shadow-soft transition hover:-translate-y-[1px] hover:shadow-glow",
+        "group relative h-full overflow-hidden rounded-2xl border border-border/60 bg-card/50 p-5 shadow-soft transition hover:-translate-y-[1px] hover:border-border/80 hover:shadow-glow",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-foreground">{idea.title}</h3>
+          <h3 className="text-lg font-semibold leading-snug text-foreground group-hover:text-foreground">
+            {idea.title}
+          </h3>
           {idea.one_liner && (
             <p className="text-sm text-muted-foreground line-clamp-2">
               {idea.one_liner}
             </p>
           )}
         </div>
-        {saveControl && <div className="flex-shrink-0">{saveControl}</div>}
+        {saveControl && (
+          <div className="flex-shrink-0" onClick={handleSaveClick}>
+            {saveControl}
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs text-foreground">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/30 px-2.5 py-1 text-xs text-foreground">
           {sourceLabel}
         </span>
-        {dateDisplay && <span>{dateDisplay}</span>}
+        {dateDisplay && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/30 px-2.5 py-1 text-xs text-foreground">
+            {dateDisplay}
+          </span>
+        )}
         {idea.difficulty != null && (
-          <span className="rounded-full bg-background/60 px-3 py-1 text-xs text-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/30 px-2.5 py-1 text-xs text-foreground">
             Difficulty: {idea.difficulty}
           </span>
         )}
         {idea.market_size && (
-          <span className="rounded-full bg-background/60 px-3 py-1 text-xs text-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/30 px-2.5 py-1 text-xs text-foreground">
             Market: {idea.market_size}
           </span>
         )}
         {idea.demand_strength && (
-          <span className="rounded-full bg-background/60 px-3 py-1 text-xs text-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/30 px-2.5 py-1 text-xs text-foreground">
             Demand: {idea.demand_strength}
           </span>
         )}
@@ -81,7 +96,7 @@ export default function IdeaCard({
           {idea.tags.map((tag) => (
             <Badge
               key={tag}
-              className="bg-background/60 text-foreground"
+              className="border border-border/40 bg-background/40 px-2.5 py-1 text-[11px] font-medium text-foreground"
             >
               {tag}
             </Badge>
