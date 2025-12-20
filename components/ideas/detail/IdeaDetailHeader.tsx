@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils/cn";
+import { toneFromValue, tonePillClasses } from "./semantic";
 
 type MetaPill = {
   label: string;
   value: string;
-  tone?: "strong" | "medium" | "weak";
+  tone?: "good" | "info" | "warn" | "bad" | "neutral";
 };
 
 type IdeaDetailHeaderProps = {
@@ -86,16 +86,14 @@ export default function IdeaDetailHeader({
           {meta.map((item) => (
             <span
               key={item.label}
-              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/20 px-3 py-1 text-xs"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs",
+                tonePillClasses(item.tone ?? toneFromValue(item.label, item.value))
+              )}
             >
               <span className="text-muted-foreground">{item.label}:</span>
               <span
-                className={cn(
-                  "text-foreground/85",
-                  item.tone === "strong" && "text-emerald-200/80",
-                  item.tone === "medium" && "text-sky-200/80",
-                  item.tone === "weak" && "text-amber-200/80"
-                )}
+                className="text-foreground/85"
               >
                 {item.value}
               </span>

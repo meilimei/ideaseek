@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils/cn";
+import { toneFromValue, tonePillClasses } from "./semantic";
 
 type IdeaRightRailProps = {
   idea: {
@@ -99,12 +100,23 @@ export default function IdeaRightRail({
           <div className="text-sm font-semibold text-foreground">Key stats</div>
           <dl className="mt-3 space-y-2 text-xs text-muted-foreground">
             {stats.length === 0 && <div className="text-muted-foreground">No stats available.</div>}
-            {stats.map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-lg bg-background/40 px-2 py-1.5">
-                <dt className="text-[11px] uppercase tracking-wide">{item.label}</dt>
-                <dd className="text-foreground text-xs font-semibold">{item.value}</dd>
-              </div>
-            ))}
+            {stats.map((item) => {
+              const tone = toneFromValue(item.label, item.value);
+              return (
+                <div
+                  key={item.label}
+                  className={cn(
+                    "flex items-center justify-between rounded-full border px-3 py-1.5",
+                    tonePillClasses(tone)
+                  )}
+                >
+                  <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {item.label}
+                  </dt>
+                  <dd className="text-xs font-semibold text-foreground/90">{item.value}</dd>
+                </div>
+              );
+            })}
           </dl>
         </Card>
 

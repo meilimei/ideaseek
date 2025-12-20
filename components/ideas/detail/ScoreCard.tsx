@@ -27,7 +27,9 @@ export default function ScoreCard({
         <div className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
           {label}
         </div>
-        <div className="text-3xl font-bold leading-tight text-primary/90">{score}</div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-3xl font-bold leading-tight text-primary/90">
+          {score}
+        </div>
         {descriptor && (
           <p className="text-sm text-muted-foreground">{descriptor}</p>
         )}

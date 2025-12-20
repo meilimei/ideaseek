@@ -96,12 +96,6 @@ export default function IdeaDetailPage({ params }: Props) {
       pills.push({
         label: "Demand",
         value: idea.demand_strength,
-        tone:
-          idea.demand_strength === "strong"
-            ? "strong"
-            : idea.demand_strength === "medium"
-            ? "medium"
-            : "weak",
       });
     if (idea?.source_type) pills.push({ label: "Source", value: idea.source_type });
     return pills;
