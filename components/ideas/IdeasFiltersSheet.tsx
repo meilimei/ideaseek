@@ -93,7 +93,7 @@ export default function IdeasFiltersSheet({
         onClick={() => onOpenChange(false)}
       />
       <div
-        className="relative z-10 flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-border/60 bg-background/90 p-5 shadow-glow"
+        className="relative z-10 flex h-full w-full max-w-md flex-col gap-4 border-l border-border/60 bg-background/90 p-5 shadow-glow"
         onAnimationEnd={() => searchRef.current?.focus()}
         onTransitionEnd={() => searchRef.current?.focus()}
       >
@@ -113,47 +113,31 @@ export default function IdeasFiltersSheet({
           </Button>
         </div>
 
-        <form
-          className="relative"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSearchSubmit();
-          }}
-        >
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-            🔍
-          </span>
-          <Input
-            ref={searchRef}
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search ideas…"
-            className="h-10 w-full pl-10 pr-3 text-sm"
-          />
-        </form>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Sort</span>
-            <select
-              value={sortBy}
-              onChange={(e) =>
-                onSortChange(
-                  e.target.value as IdeasFiltersSheetProps["sortBy"]
-                )
-              }
-              className="rounded-xl border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-foreground shadow-soft focus:outline-none focus:ring-2 focus:ring-ring/40"
+        <div className="flex flex-col gap-4 overflow-y-auto pb-2">
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground">Search</div>
+            <form
+              className="relative"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onSearchSubmit();
+              }}
             >
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="published">Published</option>
-              <option value="pinned">Pinned</option>
-              <option value="featured">Featured</option>
-            </select>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                🔍
+              </span>
+              <Input
+                ref={searchRef}
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search ideas…"
+                className="h-10 w-full pl-10 pr-3 text-sm"
+              />
+            </form>
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-muted-foreground">Source</div>
+            <div className="text-xs font-semibold text-muted-foreground">Quick filters</div>
             <div className="flex flex-wrap items-center gap-2">
               {sourceOptions.map((opt) => (
                 <Button
@@ -171,11 +155,7 @@ export default function IdeasFiltersSheet({
                 </Button>
               ))}
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-semibold text-muted-foreground">View</div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant={viewMode === "all" ? "pill" : "ghostPill"}
@@ -218,38 +198,43 @@ export default function IdeasFiltersSheet({
             </div>
           </details>
 
-          {activeChips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {activeChips.map((chip) => (
-                <Badge
-                  key={chip.key}
-                  className="flex items-center gap-2 bg-card/70 text-foreground"
-                >
-                  <span>{chip.label}</span>
-                  <button
-                    type="button"
-                    onClick={chip.onRemove}
-                    className="text-muted-foreground transition hover:text-foreground"
-                    aria-label={`Remove ${chip.label}`}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground">Applied filters</div>
+            {activeChips.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {activeChips.map((chip) => (
+                  <Badge
+                    key={chip.key}
+                    className="flex items-center gap-2 rounded-full border border-border/50 bg-secondary/20 px-3 py-1 text-xs text-foreground"
                   >
-                    ×
-                  </button>
-                </Badge>
-              ))}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onClearAll}
-                className="rounded-full px-3 text-xs"
-              >
-                Clear all
-              </Button>
-            </div>
-          )}
+                    <span>{chip.label}</span>
+                    <button
+                      type="button"
+                      onClick={chip.onRemove}
+                      className="text-muted-foreground transition hover:text-foreground"
+                      aria-label={`Remove ${chip.label}`}
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClearAll}
+                  className="rounded-full px-3 text-xs"
+                >
+                  Clear all
+                </Button>
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">No filters applied.</div>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className="text-[11px]">
             Reset clears search & filters.
           </span>
