@@ -13,10 +13,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased bg-[#faf7f3] text-gray-900">
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <div
+          className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(85,175,210,0.08),transparent_30%),radial-gradient(circle_at_80%_0%,rgba(124,58,237,0.08),transparent_28%)]"
+          aria-hidden
+        />
         <SiteHeader />
-        <main>{children}</main>
+        <main className="pb-12">{children}</main>
       </body>
     </html>
   );

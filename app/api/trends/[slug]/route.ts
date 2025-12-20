@@ -74,10 +74,10 @@ export async function GET(
   const { data: relatedIdeas, error: ideasError } = await supabaseService
     .from('ideas')
     .select(
-      'id, title, one_liner, difficulty, demand_strength, score_overall, source_type',
+      'id, title, one_liner, difficulty, demand_strength, score, status, source_type',
     )
     .eq('primary_trend_id', trend.id)
-    .order('score_overall', { ascending: false })
+    .order('score', { ascending: false, nullsFirst: false })
     .limit(10);
 
   if (ideasError) {

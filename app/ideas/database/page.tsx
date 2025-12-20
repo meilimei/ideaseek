@@ -52,14 +52,14 @@ function StatCard({
   subtext?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="text-sm font-semibold text-gray-900">{label}</div>
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+      <div className="text-sm font-semibold text-slate-200">{label}</div>
       <div
-        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-gray-900`}
+        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-white`}
       >
         {value}
       </div>
-      {subtext && <div className="mt-2 text-sm text-gray-600">{subtext}</div>}
+      {subtext && <div className="mt-2 text-sm text-slate-400">{subtext}</div>}
     </div>
   );
 }
@@ -348,27 +348,27 @@ export default function IdeasDatabasePage() {
           <StatCard
             label="My saved"
             value={stats.mySavedIdeas}
-            accent="from-purple-50 via-white to-indigo-50"
+            accent="from-[rgba(85,175,210,0.22)] via-[rgba(124,58,237,0.15)] to-[rgba(124,58,237,0.28)]"
             subtext="Ideas you've bookmarked"
           />
         )}
-        <div className="rounded-2xl border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-          <div className="text-sm font-semibold text-gray-900">Sources</div>
-          <div className="mt-3 space-y-2 text-sm text-gray-700">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
+          <div className="text-sm font-semibold text-slate-200">Sources</div>
+          <div className="mt-3 space-y-2 text-sm text-slate-300">
             {stats?.sourceCounts
               ? Object.entries(stats.sourceCounts).map(([src, count]) => (
                   <div key={src} className="flex items-center justify-between">
                     <span className="capitalize">{src || 'unknown'}</span>
-                    <span className="text-gray-900 font-semibold">{count}</span>
+                    <span className="text-slate-50 font-semibold">{count}</span>
                   </div>
                 ))
               : [1, 2, 3].map((k) => (
                   <div
                     key={k}
-                    className="flex items-center justify-between text-gray-400"
+                    className="flex items-center justify-between text-slate-500"
                   >
-                    <span className="h-3 w-20 rounded-full bg-gray-100" />
-                    <span className="h-3 w-6 rounded-full bg-gray-100" />
+                    <span className="h-3 w-20 rounded-full bg-[var(--muted)]" />
+                    <span className="h-3 w-6 rounded-full bg-[var(--muted)]" />
                   </div>
                 ))}
           </div>
@@ -478,27 +478,27 @@ export default function IdeasDatabasePage() {
       {ideaOfTheDay && (
         <div ref={listTopRef}>
           <div id="ideas-top" />
-          <section className="rounded-2xl border border-indigo-100 bg-white/80 p-6 shadow-sm backdrop-blur">
-            <h2 className="mb-2 text-xl font-semibold">
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/95 p-6 shadow-sm backdrop-blur">
+            <h2 className="mb-2 text-xl font-semibold text-white">
               Idea of the Day
             </h2>
-            <h3 className="mb-2 text-2xl font-bold">
+            <h3 className="mb-2 text-2xl font-bold text-white">
               {ideaOfTheDay.title}
             </h3>
             {ideaOfTheDay.one_liner && (
-              <p className="mb-2 text-gray-800">
+              <p className="mb-2 text-slate-200">
                 {ideaOfTheDay.one_liner}
               </p>
             )}
             {/* Use the description as teaser. Ensure we show truncated content */}
             {ideaOfTheDay.description && (
-              <p className="mb-4 text-gray-700">
+              <p className="mb-4 text-slate-300">
                 {ideaOfTheDay.description.slice(0, 200)}...
               </p>
             )}
             <Link
               href={`/ideas/${ideaOfTheDay.id}`}
-              className="text-indigo-600 underline"
+              className="text-[var(--primary)] underline"
             >
               View Full Report
             </Link>
@@ -510,43 +510,45 @@ export default function IdeasDatabasePage() {
               <Link
                 href={`/ideas/${idea.id}`}
                 key={idea.id}
-                className="block rounded-xl border bg-white p-4 transition hover:shadow-sm"
+                className="block rounded-xl border border-[var(--border)] bg-[var(--card)]/90 p-4 transition hover:-translate-y-[1px] hover:border-[var(--primary)]/50 hover:shadow-lg"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="mb-1 text-lg font-semibold">{idea.title}</h3>
-                  <div className="text-xs text-gray-500">
+                  <h3 className="mb-1 text-lg font-semibold text-white">
+                    {idea.title}
+                  </h3>
+                  <div className="text-xs text-slate-400">
                     {idea.created_at
                       ? new Date(idea.created_at).toLocaleDateString()
                       : ''}
                   </div>
                 </div>
                 {idea.one_liner && (
-                  <p className="mb-2 text-gray-700">{idea.one_liner}</p>
+                  <p className="mb-2 text-slate-300">{idea.one_liner}</p>
                 )}
-                <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                  <span className="px-2 py-0.5 rounded-full border text-xs">
+                <div className="flex flex-wrap gap-2 text-sm text-slate-300">
+                  <span className="px-2 py-0.5 rounded-full border border-[var(--border)] text-xs">
                     Source: {sourceLabel(idea.source_type)}
                   </span>
                   {idea.tags?.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-0.5 rounded-full border text-xs"
+                      className="px-2 py-0.5 rounded-full border border-[var(--border)] bg-[var(--muted)] text-xs"
                     >
                       {tag}
                     </span>
                   ))}
                   {idea.difficulty != null && (
-                    <span className="px-2 py-0.5 rounded-full bg-gray-100 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-[rgba(85,175,210,0.12)] text-xs text-[var(--primary)]">
                       Difficulty: {idea.difficulty}
                     </span>
                   )}
                   {idea.market_size && (
-                    <span className="px-2 py-0.5 rounded-full bg-gray-100 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--muted)] text-xs">
                       Market: {idea.market_size}
                     </span>
                   )}
                   {idea.demand_strength && (
-                    <span className="px-2 py-0.5 rounded-full bg-gray-100 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--muted)] text-xs">
                       Demand: {idea.demand_strength}
                     </span>
                   )}
@@ -554,7 +556,7 @@ export default function IdeasDatabasePage() {
               </Link>
             ))}
             {filteredIdeas.length === 0 && (
-              <p className="text-gray-500">
+              <p className="text-slate-400">
                 No ideas match your search. Try a different keyword.
               </p>
             )}
@@ -563,21 +565,21 @@ export default function IdeasDatabasePage() {
       )}
 
       {/* Pagination */}
-      <div className="mt-6 flex flex-col items-center justify-center gap-3 text-sm">
+      <div className="mt-6 flex flex-col items-center justify-center gap-3 text-sm text-slate-300">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className={`px-3 py-1 rounded-full border ${
+            className={`px-3 py-1 rounded-full border border-[var(--border)] ${
               currentPage === 1
-                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-gray-100'
+                ? 'text-slate-500 cursor-not-allowed'
+                : 'text-slate-100 hover:border-[var(--primary)]'
             }`}
           >
             Previous
           </button>
-          <span className="text-gray-600">
+          <span className="text-slate-400">
             Page {currentPage} of {totalPages}
           </span>
           <button
@@ -586,10 +588,10 @@ export default function IdeasDatabasePage() {
               handlePageChange(Math.min(totalPages, currentPage + 1))
             }
             disabled={currentPage === totalPages}
-            className={`px-3 py-1 rounded-full border ${
+            className={`px-3 py-1 rounded-full border border-[var(--border)] ${
               currentPage === totalPages
-                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-gray-100'
+                ? 'text-slate-500 cursor-not-allowed'
+                : 'text-slate-100 hover:border-[var(--primary)]'
             }`}
           >
             Next
@@ -603,10 +605,10 @@ export default function IdeasDatabasePage() {
                   key={page}
                   type="button"
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 rounded-full border ${
+                  className={`px-3 py-1 rounded-full border border-[var(--border)] ${
                     currentPage === page
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      ? 'bg-[var(--primary-strong)] text-white'
+                      : 'text-slate-100 hover:border-[var(--primary)]'
                   }`}
                 >
                   {page}

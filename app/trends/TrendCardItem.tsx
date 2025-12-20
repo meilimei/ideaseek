@@ -64,13 +64,13 @@ export default function TrendCardItem({
   };
 
   return (
-    <div className="flex flex-col justify-between rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <div className="flex flex-col justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm transition-transform hover:-translate-y-[1px] hover:border-[var(--primary)]/50 hover:shadow-lg">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2 md:flex-1">
           <div className="flex items-start justify-between gap-2">
             <Link
               href={`/trends/${trend.slug}`}
-              className="text-lg font-semibold hover:underline"
+              className="text-lg font-semibold text-white hover:text-[var(--primary)]"
             >
               {displayTitle}
             </Link>
@@ -81,29 +81,29 @@ export default function TrendCardItem({
               onChange={onBookmarkChange}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-700">
-            <span className="text-blue-600">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-200">
+            <span className="text-[var(--primary)]">
               {isGoogle
                 ? `Interest: ${formatInterest(interestValue)}`
                 : `Volume: ${trend.volume_display ?? '—'}`}
             </span>
-            <span className="text-green-600">
+            <span className="text-emerald-400">
               Growth: {formatGrowth(trend.growth_pct)}
             </span>
             {trend.growth_label && (
-              <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700 border border-green-100">
+              <span className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-2 py-0.5 text-xs text-slate-200">
                 {trend.growth_label}
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-            <span className="rounded-full border px-2 py-0.5">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
               {trend.source_primary === 'google_trends'
                 ? 'Google Trends'
                 : trend.source_primary}
             </span>
             {(trend.geo || trend.timeframe) && (
-              <span className="rounded-full border px-2 py-0.5">
+              <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
                 {[trend.geo, trend.timeframe].filter(Boolean).join(' · ')}
               </span>
             )}
@@ -116,27 +116,27 @@ export default function TrendCardItem({
           />
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-700">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-200">
         {trend.status && (
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 border border-blue-100">
+          <span className="rounded-full border border-[var(--primary)]/40 bg-[rgba(85,175,210,0.14)] px-2 py-0.5 text-[var(--primary)]">
             {trend.status}
           </span>
         )}
         {trend.score != null && (
-          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+          <span className="rounded-full border border-amber-200/60 bg-[rgba(251,191,36,0.15)] px-2 py-0.5 text-amber-200">
             Score: {trend.score.toFixed(1)} / 5
           </span>
         )}
         {trend.categories.map((cat) => (
           <span
             key={cat}
-            className="rounded-full border px-2 py-0.5"
+            className="rounded-full border border-[var(--border)] px-2 py-0.5"
           >
             {cat}
           </span>
         ))}
         {trend.overall_score != null && (
-          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+          <span className="rounded-full border border-amber-200/60 bg-[rgba(251,191,36,0.15)] px-2 py-0.5 text-amber-200">
             Score: {trend.overall_score} / 5
           </span>
         )}
@@ -144,7 +144,7 @@ export default function TrendCardItem({
           trend.tags.map((tag) => (
             <span
               key={tag}
-              className="rounded-full border px-2 py-0.5"
+              className="rounded-full border border-[var(--border)] px-2 py-0.5"
             >
               {tag}
             </span>

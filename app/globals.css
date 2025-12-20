@@ -1,34 +1,182 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 190 56% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 190 56% 58%;
+  --radius: 16px;
+}
+
+.dark {
+  --background: 216 36% 10%;
+  --foreground: 213 32% 92%;
+  --card: 215 30% 15%;
+  --card-foreground: 213 32% 92%;
+  --popover: 215 30% 15%;
+  --popover-foreground: 213 32% 92%;
+  --primary: 190 56% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 20%;
+  --secondary-foreground: 213 32% 92%;
+  --muted: 215 25% 20%;
+  --muted-foreground: 216 18% 65%;
+  --accent: 215 25% 20%;
+  --accent-foreground: 213 32% 92%;
+  --destructive: 0 63% 45%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 216 22% 28%;
+  --input: 216 22% 28%;
+  --ring: 190 56% 58%;
+  --radius: 16px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-muted: hsl(var(--muted));
+  --color-primary: hsl(var(--primary));
+  --color-border: hsl(var(--border));
   --font-sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+.card-surface {
+  border: 1px solid hsl(var(--border));
+  background: hsla(var(--card), 0.9);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.card-surface:hover {
+  transform: translateY(-1px);
+  border-color: hsla(var(--primary), 0.5);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border));
+  background: hsla(var(--muted), 0.85);
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  color: white;
+  border: 1px solid hsl(var(--primary));
+  font-weight: 600;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  border-radius: 9999px;
+  background: hsla(var(--card), 0.9);
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.btn-secondary:hover {
+  border-color: hsla(var(--primary), 0.6);
+  color: hsl(var(--primary));
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 9999px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover {
+  color: hsl(var(--primary));
+  border-color: hsla(var(--primary), 0.4);
+}
+
+input,
+select,
+textarea {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: hsl(var(--foreground));
+}
+
 .prose-heading {
-  @apply font-bold tracking-tight text-gray-900;
+  @apply font-bold tracking-tight text-slate-50;
 }
 
 .prose-subtle {
-  @apply text-base text-gray-600;
+  @apply text-base text-slate-300;
 }
