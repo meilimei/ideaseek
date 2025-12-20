@@ -552,13 +552,13 @@ export default function IdeasDatabasePage() {
 
       {totalPages > 1 && (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground shadow-soft">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
               type="button"
               variant="ghostPill"
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="px-4"
+              className="shrink-0 px-4 py-2 text-xs md:text-sm bg-secondary/10 border border-border/50 hover:bg-secondary/20"
             >
               Previous
             </Button>
@@ -572,7 +572,7 @@ export default function IdeasDatabasePage() {
                 handlePageChange(Math.min(totalPages, currentPage + 1))
               }
               disabled={currentPage === totalPages}
-              className="px-4"
+              className="shrink-0 px-4 py-2 text-xs md:text-sm bg-secondary/10 border border-border/50 hover:bg-secondary/20"
             >
               Next
             </Button>
@@ -588,10 +588,10 @@ export default function IdeasDatabasePage() {
                     onClick={() => handlePageChange(page)}
                     aria-current={currentPage === page ? 'page' : undefined}
                     className={cn(
-                      'px-3 py-1 text-sm',
+                      'px-3 py-1 text-sm border border-border/50',
                       currentPage === page
-                        ? 'bg-primary/20 border-primary/40 text-foreground'
-                        : 'text-muted-foreground'
+                        ? 'bg-primary/15 border-primary/30 text-foreground'
+                        : 'bg-secondary/10 text-muted-foreground hover:bg-secondary/20'
                     )}
                   >
                     {page}
