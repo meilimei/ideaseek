@@ -7,8 +7,6 @@ type IdeasToolbarProps = {
   totalCount: number;
   filteredCount?: number;
   activeFiltersCount?: number;
-  sortValue: "newest" | "oldest" | "published" | "pinned" | "featured";
-  onSortChange: (value: IdeasToolbarProps["sortValue"]) => void;
   onOpenFilters: () => void;
   viewMode?: "all" | "mine";
   onViewModeChange?: (value: "all" | "mine") => void;
@@ -18,8 +16,6 @@ export default function IdeasToolbar({
   totalCount,
   filteredCount,
   activeFiltersCount = 0,
-  sortValue,
-  onSortChange,
   onOpenFilters,
   viewMode = "all",
   onViewModeChange,
@@ -34,48 +30,6 @@ export default function IdeasToolbar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
-        {onViewModeChange && (
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant={viewMode === "all" ? "pill" : "ghostPill"}
-              onClick={() => onViewModeChange("all")}
-              className="px-3 text-xs shrink-0"
-            >
-              All
-            </Button>
-            <Button
-              type="button"
-              variant={viewMode === "mine" ? "pill" : "ghostPill"}
-              onClick={() => onViewModeChange("mine")}
-              className="px-3 text-xs shrink-0"
-            >
-              Saved
-            </Button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <span>Sort</span>
-          <select
-            value={sortValue}
-            onChange={(e) =>
-              onSortChange(
-                e.target.value as IdeasToolbarProps["sortValue"]
-              )
-            }
-            className={cn(
-              "rounded-xl border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-foreground shadow-soft focus:outline-none focus:ring-2 focus:ring-ring/40 shrink-0"
-            )}
-          >
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="published">Published</option>
-            <option value="pinned">Pinned</option>
-            <option value="featured">Featured</option>
-          </select>
-        </div>
-
         <Button
           type="button"
           variant="pill"

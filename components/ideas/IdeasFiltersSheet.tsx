@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils/cn";
 
 type IdeasFiltersSheetProps = {
   open: boolean;
@@ -155,6 +156,27 @@ export default function IdeasFiltersSheet({
                 className="h-10 w-full pl-10 pr-3 text-sm"
               />
             </form>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground">Sort</div>
+            <select
+              value={sortBy}
+              onChange={(e) =>
+                onSortChange(
+                  e.target.value as IdeasFiltersSheetProps["sortBy"]
+                )
+              }
+              className={cn(
+                "w-full rounded-xl border border-border/60 bg-card/60 px-3 py-2 text-xs text-foreground shadow-soft focus:outline-none focus:ring-2 focus:ring-ring/40"
+              )}
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="published">Published</option>
+              <option value="pinned">Pinned</option>
+              <option value="featured">Featured</option>
+            </select>
           </div>
 
           <div className="space-y-2">

@@ -379,12 +379,6 @@ export default function IdeasDatabasePage() {
         totalCount={displayedCount}
         filteredCount={displayedCount}
         activeFiltersCount={activeFiltersCount}
-        sortValue={currentSort}
-        onSortChange={(v) => {
-          if (v === currentSort) return;
-          updateQuery({ sort: v }, { resetPage: true });
-          scrollToListTop();
-        }}
         viewMode={currentView}
         onViewModeChange={(v) => {
           updateQuery({ view: v }, { resetPage: true });
