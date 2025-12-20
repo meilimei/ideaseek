@@ -84,6 +84,9 @@ export default function TrendCardItem({
   const hiddenTagCount = Math.max(topicTags.length - visibleTags.length, 0);
 
   const scoreValue = trend.score ?? trend.overall_score ?? null;
+  const interestDisplay = isGoogle
+    ? formatInterest(interestValue)
+    : trend.volume_display ?? null;
 
   return (
     <Link href={`/trends/${trend.slug}`} className="group block h-full">
@@ -114,37 +117,33 @@ export default function TrendCardItem({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-sm text-foreground/80">
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                {isGoogle ? 'Interest' : 'Volume'}
-                <span className="font-semibold text-foreground/85">
-                  {isGoogle
-                    ? formatInterest(interestValue)
-                    : trend.volume_display ?? '—'}
-                </span>
-              </span>
-              <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs ${
-                  growthValue == null
-                    ? 'border-border/50 text-muted-foreground'
-                    : growthPositive
-                      ? 'border-emerald-500/15 bg-emerald-500/8 text-emerald-200/90'
-                      : growthNegative
-                        ? 'border-rose-500/15 bg-rose-500/8 text-rose-200/90'
-                        : 'border-border/50 text-muted-foreground'
-                }`}
-              >
-                Growth
-                <span className="font-semibold">
-                  {growthDisplay === '—' ? '—' : growthDisplay}
-                </span>
-              </span>
-              {scoreValue != null && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs text-amber-200/90">
-                  Score
-                  <span className="font-semibold">
-                    {scoreValue.toFixed(1)}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {interestDisplay && (
+                <span className="inline-flex items-center gap-1">
+                  <span>{isGoogle ? 'Interest' : 'Volume'}</span>
+                  <span className="font-semibold text-foreground/85">
+                    {interestDisplay}
                   </span>
+                </span>
+              )}
+              {growthDisplay && growthDisplay !== '—' && (
+                <span
+                  className={`inline-flex items-center gap-1 ${
+                    growthPositive
+                      ? 'text-emerald-200/90'
+                      : growthNegative
+                        ? 'text-rose-200/90'
+                        : 'text-muted-foreground'
+                  }`}
+                >
+                  <span>Growth</span>
+                  <span className="font-semibold">{growthDisplay}</span>
+                </span>
+              )}
+              {scoreValue != null && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-200/90">
+                  <span>Score</span>
+                  <span>{scoreValue.toFixed(1)}</span>
                 </span>
               )}
             </div>
