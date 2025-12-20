@@ -339,9 +339,9 @@ export default function IdeasDatabasePage() {
       actions={<div className="text-sm text-muted-foreground">{displayedCount} ideas</div>}
     />
 
-    <IdeasFilterBar
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
+      <IdeasFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
         onSearchSubmit={() => {
           updateQuery({ q: searchQuery || null }, { resetPage: true });
           scrollToListTop();
