@@ -215,6 +215,22 @@ export default function IdeasDatabasePage() {
     fetchStats();
   }, []);
 
+  useEffect(() => {
+    const handler = () => setFiltersOpen(true);
+    window.addEventListener('ideas:open-filters', handler);
+    return () => window.removeEventListener('ideas:open-filters', handler);
+  }, []);
+
+  useEffect(() => {
+    const shouldOpen = searchParams.get('search') === '1';
+    if (!shouldOpen) return;
+    setFiltersOpen(true);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('search');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
   // Pick the first idea as "Idea of the Day".
   const ideaOfTheDay = ideas.length > 0 ? ideas[0] : null;
 
@@ -328,35 +344,6 @@ export default function IdeasDatabasePage() {
     (currentSource !== 'all' ? 1 : 0) +
     (currentView !== 'all' ? 1 : 0) +
     (currentDifficulty !== 'all' ? 1 : 0);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target) {
-        const tagName = target.tagName.toLowerCase();
-        const isInputLike =
-          tagName === 'input' ||
-          tagName === 'textarea' ||
-          tagName === 'select' ||
-          target.isContentEditable;
-        if (isInputLike) return;
-      }
-
-      if (event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        setFiltersOpen(true);
-        return;
-      }
-      if ((event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        setFiltersOpen(true);
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
 
   return (
     <PageShell

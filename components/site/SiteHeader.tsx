@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 type NavItem = { href: string; label: string };
 
@@ -13,16 +13,11 @@ const navItems: NavItem[] = [
   { href: '/pricing', label: 'Pricing' },
 ];
 
-function SearchButton({ className }: { className?: string }) {
-  const handleClick = () => {
-    if (typeof window === 'undefined') return;
-    const evt = new CustomEvent('command-palette:open');
-    window.dispatchEvent(evt);
-  };
+function SearchButton({ className, onPress }: { className?: string; onPress: () => void }) {
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={onPress}
       className={`inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${className ?? ''}`}
       aria-label="Open search"
     >
@@ -36,6 +31,7 @@ function SearchButton({ className }: { className?: string }) {
 
 export default function SiteHeader() {
   const pathname = usePathname() || '/';
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   if (pathname.startsWith('/admin')) return null;
 
@@ -43,6 +39,46 @@ export default function SiteHeader() {
     href === '/'
       ? pathname === '/'
       : pathname === href || pathname.startsWith(`${href}/`);
+
+  const openFilters = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (pathname.startsWith('/ideas/database')) {
+      window.dispatchEvent(new CustomEvent('ideas:open-filters'));
+    } else {
+      router.push('/ideas/database?search=1');
+    }
+  }, [pathname, router]);
+
+  const handleGlobalShortcuts = useCallback(
+    (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName.toLowerCase();
+        if (
+          tag === 'input' ||
+          tag === 'textarea' ||
+          tag === 'select' ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      const isSlash = event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey;
+      const isCmdK =
+        (event.key === 'k' || event.key === 'K') && (event.metaKey || event.ctrlKey);
+      if (isSlash || isCmdK) {
+        event.preventDefault();
+        openFilters();
+      }
+    },
+    [openFilters],
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, [handleGlobalShortcuts]);
 
   return (
     <header className="relative sticky top-0 z-50 h-16 w-full bg-background/60 backdrop-blur-xl">
@@ -77,7 +113,7 @@ export default function SiteHeader() {
         </div>
 
         <div className="flex items-center gap-2">
-          <SearchButton className="hidden md:inline-flex" />
+          <SearchButton className="hidden md:inline-flex" onPress={openFilters} />
           <Link
             href="/login"
             className="hidden rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 md:inline-flex"
@@ -138,7 +174,7 @@ export default function SiteHeader() {
               })}
             </nav>
             <div className="mt-auto flex flex-col gap-2 pt-6">
-              <SearchButton className="w-full justify-center" />
+              <SearchButton className="w-full justify-center" onPress={openFilters} />
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
