@@ -1,28 +1,10 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { getIdeaDatabaseStats } from '@/lib/server/ideaStats';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name: string, value: string, options?: Record<string, unknown>) {
-            cookieStore.set({ name, value, ...(options ?? {}) });
-          },
-          remove(name: string) {
-            cookieStore.delete(name);
-          },
-        },
-      },
-    );
+    const supabase = await createServerSupabaseClient();
 
     const {
       data: { user },

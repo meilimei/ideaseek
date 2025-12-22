@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import TrendCardItem from './TrendCardItem';
-import { createClient } from '@/lib/supabaseBrowserClient';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import PageShell from '@/components/site/PageShell';
 import { chipActive, chipBase, inputBase, pillButton } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils/cn';
@@ -129,7 +129,7 @@ export default function TrendsPage() {
     ) {
       return;
     }
-    const supabase = createClient();
+    const supabase = createBrowserSupabaseClient();
     supabase.auth
       .getUser()
       .then(({ data }) => {

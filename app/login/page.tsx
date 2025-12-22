@@ -1,32 +1,13 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
 import LoginForm from "./LoginForm";
-import { cardBase } from "@/lib/ui-classes";
-import { cn } from "@/lib/utils/cn";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set() {
-          // no-op in server component
-        },
-        remove() {
-          // no-op in server component
-        },
-      },
-    },
-  );
+  const supabase = await createServerSupabaseClient();
   const { data } = await supabase.auth.getSession();
 
   if (data.session) {
@@ -37,21 +18,24 @@ export default async function LoginPage() {
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#0b0f1d] via-[#060914] to-[#02030a] text-foreground">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.12),transparent_30%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.08),transparent_26%)]" />
       <div className="relative mx-auto flex max-w-5xl flex-col items-center justify-center px-4 py-16">
-        <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">Welcome back</p>
-          <h1 className="mt-2 text-3xl font-semibold text-foreground">Sign in</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Access saved ideas, trends, and admin tools.</p>
-        </div>
-
-        <div className={cn(cardBase, "w-full max-w-md space-y-6 bg-secondary/10 p-8 shadow-soft backdrop-blur")}>
-          <LoginForm />
-          <p className="text-center text-sm text-muted-foreground">
+        <Card className="w-full max-w-md border-white/10 bg-slate-950/40 shadow-soft backdrop-blur">
+          <CardHeader className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Welcome back</p>
+            <CardTitle className="text-3xl font-semibold text-foreground">Sign in</CardTitle>
+            <CardDescription className="text-slate-400">
+              Access saved ideas, trends, and admin tools.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <LoginForm />
+          </CardContent>
+          <div className="px-6 pb-6 text-center text-sm text-slate-400">
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="font-semibold text-foreground hover:text-foreground/80">
               Create an account
             </Link>
-          </p>
-        </div>
+          </div>
+        </Card>
       </div>
     </main>
   );

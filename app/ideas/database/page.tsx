@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabaseBrowserClient';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import PageShell from '@/components/site/PageShell';
 import SectionTitle from '@/components/site/SectionTitle';
 import IdeaCard from '@/components/ideas/IdeaCard';
@@ -195,7 +195,7 @@ export default function IdeasDatabasePage() {
   }, [currentSort]);
 
   useEffect(() => {
-    const supabase = createClient();
+    const supabase = createBrowserSupabaseClient();
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id ?? null);
     });

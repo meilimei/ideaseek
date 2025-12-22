@@ -1,5 +1,5 @@
 import SiteHeaderClient from "./SiteHeaderClient";
-import { createServerSupabaseClient } from "@/lib/auth/serverClient";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 

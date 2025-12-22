@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/auth-helpers-nextjs';
 import { supabaseServiceClient as supabaseService } from '@/lib/supabaseServiceClient';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 type TrendCard = {
   id: string;
@@ -41,24 +40,7 @@ export async function GET(request: Request) {
     Math.min(50, parseInt(url.searchParams.get('pageSize') || '12', 10)),
   );
 
-  const cookieStore = await cookies();
-  const supabaseAuth = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options?: Record<string, unknown>) {
-          cookieStore.set({ name, value, ...(options ?? {}) });
-        },
-        remove(name: string) {
-          cookieStore.delete(name);
-        },
-      },
-    },
-  );
+  const supabaseAuth = await createServerSupabaseClient();
 
   const {
     data: { user },

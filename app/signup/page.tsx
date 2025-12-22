@@ -1,32 +1,14 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
 import SignupForm from "./SignupForm";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils/cn";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set() {
-          // no-op in server component
-        },
-        remove() {
-          // no-op in server component
-        },
-      },
-    },
-  );
+  const supabase = await createServerSupabaseClient();
 
   const { data } = await supabase.auth.getSession();
 

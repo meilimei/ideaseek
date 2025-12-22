@@ -36,6 +36,11 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAdminPath = useMemo(() => pathname.startsWith('/admin'), [pathname]);
+  const isAuthPage = useMemo(() => pathname === '/login' || pathname === '/signup', [pathname]);
+  const visibleNavItems = useMemo(
+    () => (isAuthPage ? navItems.filter((item) => item.href === '/pricing') : navItems),
+    [isAuthPage],
+  );
 
   const isActive = useCallback(
     (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)),
@@ -72,9 +77,10 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
   );
 
   useEffect(() => {
+    if (isAuthPage) return;
     window.addEventListener('keydown', handleGlobalShortcuts);
     return () => window.removeEventListener('keydown', handleGlobalShortcuts);
-  }, [handleGlobalShortcuts]);
+  }, [handleGlobalShortcuts, isAuthPage]);
 
   if (isAdminPath) return null;
 
@@ -89,29 +95,31 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
           >
             Ideasignal
           </Link>
-          <nav className="hidden items-center gap-2 lg:flex">
-            {navItems.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    active ? chipActive : chipBase,
-                    "px-3 py-1.5 text-sm shadow-none",
-                    active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          {visibleNavItems.length > 0 && (
+            <nav className="hidden items-center gap-2 lg:flex">
+              {visibleNavItems.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      active ? chipActive : chipBase,
+                      "px-3 py-1.5 text-sm shadow-none",
+                      active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          <SearchButton className="hidden md:inline-flex" onPress={openFilters} />
+          {!isAuthPage && <SearchButton className="hidden md:inline-flex" onPress={openFilters} />}
           {isAuthenticated ? (
             <form action="/auth/signout" method="post" className="hidden md:block">
               <button
@@ -162,28 +170,30 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
                 ✕
               </button>
             </div>
-            <nav className="mt-4 flex flex-col gap-2">
-              {navItems.map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      active ? chipActive : chipBase,
-                      "w-full px-3 py-2 text-sm shadow-none",
-                      active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
+            {visibleNavItems.length > 0 && (
+              <nav className="mt-4 flex flex-col gap-2">
+                {visibleNavItems.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        active ? chipActive : chipBase,
+                        "w-full px-3 py-2 text-sm shadow-none",
+                        active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
             <div className="mt-auto flex flex-col gap-2 pt-6">
-              <SearchButton className="w-full justify-center" onPress={openFilters} />
+              {!isAuthPage && <SearchButton className="w-full justify-center" onPress={openFilters} />}
               {isAuthenticated ? (
                 <form action="/auth/signout" method="post" className="w-full">
                   <button

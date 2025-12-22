@@ -1,9 +1,9 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabaseBrowserClient";
+import Link from "next/link";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { inputBase } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils/cn";
 
@@ -46,7 +46,7 @@ export default function SignupForm() {
     }
 
     setStatus("loading");
-    const supabase = createClient();
+    const supabase = createBrowserSupabaseClient();
     const emailRedirectTo = buildRedirectUrl();
 
     if (!emailRedirectTo) {
@@ -75,7 +75,7 @@ export default function SignupForm() {
   const handleGoogle = async () => {
     setError(null);
     // UI-only entrance for now; try to start OAuth when available.
-    const supabase = createClient();
+    const supabase = createBrowserSupabaseClient();
     const redirectTo = buildRedirectUrl();
     try {
       await supabase.auth.signInWithOAuth({

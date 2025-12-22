@@ -14,8 +14,8 @@
     "enrich:trends": "tsx scripts/enrich-trends.ts"
   },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
-    "@supabase/supabase-js": "^2.86.2",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
     "google-trends-api": "^4.9.2",
     "next": "^16.0.7",
     "openai": "^6.9.1",

@@ -1,45 +1,12 @@
-import { headers, cookies } from 'next/headers';
-import { createServerClient } from '@supabase/auth-helpers-nextjs';
+import { headers } from 'next/headers';
 import type { User } from '@supabase/supabase-js';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 type Profile = {
   id: string;
   user_id: string;
   role?: string | null;
 };
-
-async function getServerSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options?: Record<string, unknown>) {
-          try {
-            cookieStore.set({
-              name,
-              value,
-              ...(options ?? {}),
-            });
-          } catch {
-            // ignore cookie set failures
-          }
-        },
-        remove(name: string) {
-          try {
-            cookieStore.delete(name);
-          } catch {
-            // ignore cookie delete failures
-          }
-        },
-      },
-    },
-  );
-}
 
 export type RequireAdminResult =
   | { status: 'ok'; user: User; profile: Profile }
@@ -53,7 +20,7 @@ export async function requireAdmin(): Promise<RequireAdminResult> {
   } catch {
     // ignore
   }
-  const supabase = await getServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data: userData, error } = await supabase.auth.getUser();
 
