@@ -96,16 +96,16 @@ export default function TrendCardItem({
       href={`/trends/${trend.slug}`}
       className="group block h-full"
     >
-      <div className={cn(cardInteractive, "relative flex h-full flex-col gap-4 p-5 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40")}>
+      <div className={cn(cardInteractive, "relative flex h-full flex-col gap-4 rounded-2xl border-white/8 bg-white/[0.035] p-5 shadow-sm transition hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0")}>
         <div className="flex items-start gap-4">
           <div className="flex-1 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
-                <h3 className="line-clamp-2 text-lg font-semibold leading-tight text-foreground">
+                <h3 className="line-clamp-2 text-lg font-semibold leading-tight text-white/90">
                   {displayTitle}
                 </h3>
                 {trend.summary && (
-                  <p className="line-clamp-2 text-sm text-foreground/75">
+                  <p className="line-clamp-2 text-sm text-white/70">
                     {trend.summary}
                   </p>
                 )}
@@ -123,11 +123,11 @@ export default function TrendCardItem({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-white/65">
               {interestDisplay && (
                 <span className="inline-flex items-center gap-1">
                   <span>{isGoogle ? 'Interest' : 'Volume'}</span>
-                  <span className="font-semibold text-foreground/85">
+                  <span className="font-semibold text-white/90">
                     {interestDisplay}
                   </span>
                 </span>
@@ -139,7 +139,7 @@ export default function TrendCardItem({
                       ? 'text-emerald-200/90'
                       : growthNegative
                         ? 'text-rose-200/90'
-                        : 'text-muted-foreground'
+                        : 'text-white/60'
                   }`}
                 >
                   <span>Growth</span>
@@ -147,24 +147,24 @@ export default function TrendCardItem({
                 </span>
               )}
               {scoreValue != null && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-200/90">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-200/90">
                   <span>Score</span>
                   <span>{scoreValue.toFixed(1)}</span>
                 </span>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/75">
-              <span className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-white/75">
+              <span className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1">
                 {sourceLabel}
               </span>
               {statusChip && (
-                <span className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1">
+                <span className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1">
                   {statusChip}
                 </span>
               )}
               {contextText && (
-                <span className="text-[11px] text-muted-foreground">{contextText}</span>
+                <span className="text-[11px] text-white/60">{contextText}</span>
               )}
             </div>
 
@@ -173,14 +173,14 @@ export default function TrendCardItem({
                 {visibleTags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1 font-medium text-foreground/70"
+                    className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 font-medium text-white/70"
                   >
                     {tag}
                   </span>
                 ))}
                 {hiddenTagCount > 0 && (
                   <span
-                    className="rounded-full border border-border/25 bg-secondary/10 px-2.5 py-1 font-medium text-muted-foreground"
+                    className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 font-medium text-white/60"
                     title={topicTags.slice(visibleTags.length).join(', ')}
                   >
                     +{hiddenTagCount}
@@ -190,7 +190,7 @@ export default function TrendCardItem({
             )}
           </div>
 
-          <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-secondary/10 md:h-24 md:w-40">
+          <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-white/[0.04] md:h-24 md:w-40">
             {hasSparkline ? (
               <TrendSparkline
                 values={sparkValues}

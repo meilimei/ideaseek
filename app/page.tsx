@@ -61,12 +61,16 @@ export default async function Home() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#0b0f1d] via-[#060914] to-[#02030a] text-foreground">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_20%,rgba(59,130,246,0.12),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(45,212,191,0.14),transparent_28%)]" />
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-4 pb-16 pt-20 sm:px-6 lg:px-8 lg:pt-24">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(59,130,246,0.12),transparent_32%),radial-gradient(circle_at_82%_0%,rgba(45,212,191,0.12),transparent_28%),linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)]" />
+      <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-4 pb-20 pt-20 sm:px-6 lg:max-w-7xl lg:px-8 lg:pb-24 lg:pt-24">
         <Hero primaryHref={primaryHref} primaryLabel={primaryLabel} />
+        <Separator className="my-2 border-white/5" />
         <HowItWorks />
+        <Separator className="my-2 border-white/5" />
         <FeatureGrid />
+        <Separator className="my-2 border-white/5" />
         <LivePreview />
+        <Separator className="my-2 border-white/5" />
         <Pricing />
         <Footer />
       </div>
@@ -76,23 +80,23 @@ export default async function Home() {
 
 function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel: string }) {
   return (
-    <section className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-      <div className="space-y-6">
-        <Badge className="rounded-full border-white/20 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-teal-100 shadow-soft">
+    <section className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+      <div className="space-y-8">
+        <Badge className="rounded-full border-white/15 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-teal-100 shadow-soft">
           IdeaSeek by IdeaSignal
         </Badge>
         <div className="space-y-4">
-          <h1 className="text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
-            Find signals before they peak. Turn them into products.
+          <h1 className="text-4xl font-semibold leading-tight tracking-tight text-white sm:text-5xl">
+            Discover ideas backed by real demand
           </h1>
-          <p className="text-lg text-slate-300">
-            IdeaSeek surfaces fast-growing trends, scores them, and keeps your team aligned on what to build next.
+          <p className="max-w-2xl text-lg text-white/75">
+            Scan Reddit signals, validate with trends, and save opportunities—fast.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button
             asChild
-            className="w-full justify-center rounded-2xl bg-teal-500 px-5 py-3 text-base text-white shadow-soft hover:bg-teal-400 sm:w-auto"
+            className="w-full justify-center rounded-2xl bg-teal-500 px-5 py-3 text-base font-semibold text-white shadow-[0_10px_30px_rgba(45,212,191,0.2)] transition hover:bg-teal-400 focus-visible:ring-2 focus-visible:ring-teal-300/70 focus-visible:ring-offset-0 sm:w-auto"
           >
             <Link href={primaryHref}>
               {primaryLabel}
@@ -102,12 +106,12 @@ function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel
           <Button
             asChild
             variant="outline"
-            className="w-full justify-center rounded-2xl border-white/20 bg-white/5 px-5 py-3 text-base text-slate-100 shadow-soft hover:bg-white/10 sm:w-auto"
+            className="w-full justify-center rounded-2xl border-white/15 bg-white/5 px-5 py-3 text-base font-semibold text-white/80 shadow-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0 sm:w-auto"
           >
             <Link href="/trends">See live trends</Link>
           </Button>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm text-slate-400">
+        <div className="flex flex-wrap gap-3 text-sm text-white/70">
           <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1">
             <Sparkles className="h-4 w-4 text-teal-200" />
             Curated daily
@@ -129,17 +133,17 @@ function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel
           ].map((stat) => (
             <div
               key={stat.label}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 shadow-soft backdrop-blur"
+              className="rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3 shadow-sm"
             >
-              <p className="text-lg font-semibold text-slate-100">{stat.value}</p>
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{stat.label}</p>
+              <p className="text-lg font-semibold text-white">{stat.value}</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-white/60">{stat.label}</p>
             </div>
           ))}
         </div>
       </div>
 
       <div className="grid gap-4">
-        <Card className="border-white/10 bg-white/5 shadow-soft backdrop-blur">
+        <Card className="border-white/8 bg-white/[0.04] shadow-sm backdrop-blur-sm">
           <CardHeader className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Radar className="h-4 w-4 text-teal-300" />
@@ -155,11 +159,11 @@ function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel
             ].map((item) => (
               <div
                 key={item.title}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-100">{item.title}</p>
-                  <p className="text-xs text-slate-400">{item.tag}</p>
+                  <p className="text-sm font-semibold text-white">{item.title}</p>
+                  <p className="text-xs text-white/60">{item.tag}</p>
                 </div>
                 <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-200">
                   {item.growth}
@@ -168,7 +172,7 @@ function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel
             ))}
           </CardContent>
         </Card>
-        <Card className="border-white/10 bg-white/5 shadow-soft backdrop-blur">
+        <Card className="border-white/8 bg-white/[0.04] shadow-sm backdrop-blur-sm">
           <CardHeader className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Database className="h-4 w-4 text-teal-300" />
@@ -182,8 +186,8 @@ function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel
                 <div
                   key={title}
                   className={cn(
-                    "flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200",
-                    idx === 0 && "shadow-glow",
+                    "flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2 text-sm text-white/90",
+                    idx === 0 && "shadow-[0_8px_24px_rgba(255,255,255,0.06)]",
                   )}
                 >
                   <span>{title}</span>
@@ -200,20 +204,20 @@ function Hero({ primaryHref, primaryLabel }: { primaryHref: string; primaryLabel
 
 function HowItWorks() {
   return (
-    <section className="space-y-6">
+    <section className="space-y-8 py-12 md:py-16">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">How it works</p>
-        <h2 className="text-2xl font-semibold text-foreground">From signal to shipped.</h2>
+        <p className="text-xs uppercase tracking-[0.2em] text-white/50">How it works</p>
+        <h2 className="text-2xl font-semibold text-white sm:text-3xl">From signal to shipped.</h2>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {steps.map((step, idx) => (
-          <Card key={step.title} className="border-white/10 bg-white/5 shadow-soft backdrop-blur">
+          <Card key={step.title} className="border-white/8 bg-white/[0.035] shadow-sm">
             <CardContent className="space-y-3 pt-6">
               <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/15 text-sm font-semibold text-teal-100">
                 {idx + 1}
               </div>
-              <h3 className="text-lg font-semibold text-slate-100">{step.title}</h3>
-              <p className="text-sm text-slate-400">{step.body}</p>
+              <h3 className="text-lg font-semibold text-white">{step.title}</h3>
+              <p className="text-sm text-white/70">{step.body}</p>
             </CardContent>
           </Card>
         ))}
@@ -224,23 +228,23 @@ function HowItWorks() {
 
 function FeatureGrid() {
   return (
-    <section className="space-y-6">
+    <section className="space-y-8 py-12 md:py-16">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Why teams choose us</p>
-        <h2 className="text-2xl font-semibold text-foreground">Stay ahead with the right signals.</h2>
+        <p className="text-xs uppercase tracking-[0.2em] text-white/50">Why teams choose us</p>
+        <h2 className="text-2xl font-semibold text-white sm:text-3xl">Stay ahead with the right signals.</h2>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {features.map((feature) => (
-          <Card key={feature.title} className="border-white/10 bg-white/5 shadow-soft backdrop-blur">
+          <Card key={feature.title} className="border-white/8 bg-white/[0.035] shadow-sm">
             <CardContent className="space-y-3 pt-6">
               <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-teal-100">
                 <feature.icon className="h-4 w-4" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-100">{feature.title}</h3>
-              <p className="text-sm text-slate-400">{feature.body}</p>
+              <h3 className="text-lg font-semibold text-white">{feature.title}</h3>
+              <p className="text-sm text-white/70">{feature.body}</p>
               <Link
                 href={feature.href}
-                className="inline-flex items-center gap-1 text-sm text-teal-100 hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-white/60 underline-offset-4 hover:text-white hover:underline"
               >
                 Learn more →
               </Link>
@@ -273,23 +277,23 @@ function LivePreview() {
   ];
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-8 py-12 md:py-16">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">In-app preview</p>
-        <h2 className="text-2xl font-semibold text-foreground">A workspace built for momentum.</h2>
+        <p className="text-xs uppercase tracking-[0.2em] text-white/50">In-app preview</p>
+        <h2 className="text-2xl font-semibold text-white sm:text-3xl">A workspace built for momentum.</h2>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {previews.map((preview) => (
-          <Card key={preview.title} className="border-white/10 bg-white/5 shadow-soft backdrop-blur">
+          <Card key={preview.title} className="border-white/8 bg-white/[0.035] shadow-sm">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-lg text-slate-100">{preview.title}</CardTitle>
-              <CardDescription className="text-slate-400">Fresh data, auto-updated.</CardDescription>
+              <CardTitle className="text-lg text-white">{preview.title}</CardTitle>
+              <CardDescription className="text-white/60">Fresh data, auto-updated.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {preview.items.map((item) => (
                 <div
                   key={item.title}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                  className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.035] px-3 py-2 transition hover:bg-white/[0.05]"
                 >
                   <span className="text-sm text-slate-200">{item.title}</span>
                   <Badge className="rounded-full border-white/10 bg-white/10 text-xs text-teal-100">{item.score}</Badge>
@@ -305,34 +309,34 @@ function LivePreview() {
 
 function Pricing() {
   return (
-    <section className="space-y-6">
+    <section className="space-y-8 py-12 md:py-16">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Pricing</p>
-        <h2 className="text-2xl font-semibold text-foreground">Pick a plan and keep exploring.</h2>
+        <p className="text-xs uppercase tracking-[0.2em] text-white/50">Pricing</p>
+        <h2 className="text-2xl font-semibold text-white sm:text-3xl">Pick a plan and keep exploring.</h2>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {plans.map((plan) => (
           <Card
             key={plan.name}
             className={cn(
-              "border-white/10 bg-white/5 shadow-soft backdrop-blur",
+              "border-white/8 bg-white/[0.035] shadow-sm",
               plan.highlight && "border-teal-200/50 bg-teal-500/10 shadow-[0_10px_40px_rgba(45,212,191,0.25)]",
             )}
           >
             <CardHeader className="space-y-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg text-slate-100">{plan.name}</CardTitle>
+                <CardTitle className="text-lg text-white">{plan.name}</CardTitle>
                 {plan.badge && (
                   <Badge className="rounded-full border-white/30 bg-white/15 text-xs text-teal-50">
                     {plan.badge}
                   </Badge>
                 )}
               </div>
-              <div className="text-3xl font-semibold text-foreground">{plan.price}</div>
-              <CardDescription className="text-slate-300">{plan.desc}</CardDescription>
+              <div className="text-3xl font-semibold text-white">{plan.price}</div>
+              <CardDescription className="text-white/65">{plan.desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2 text-sm text-slate-200">
+              <div className="space-y-2 text-sm text-white/80">
                 {plan.features.map((feat) => (
                   <div key={feat} className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-teal-200" />
@@ -347,7 +351,7 @@ function Pricing() {
                   "w-full justify-center rounded-2xl px-4 py-2",
                   plan.highlight
                     ? "bg-teal-500 text-white hover:bg-teal-400"
-                    : "border-white/20 bg-white/5 text-slate-100 hover:bg-white/10",
+                    : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10",
                 )}
               >
                 <Link href="/pricing">{plan.cta}</Link>
@@ -363,8 +367,8 @@ function Pricing() {
 function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 px-6 py-6 text-sm text-slate-400 shadow-soft backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2 text-slate-200">
+    <footer className="flex flex-col gap-4 rounded-3xl border border-white/8 bg-white/[0.035] px-6 py-6 text-sm text-slate-400 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2 text-white">
         <Sparkles className="h-4 w-4 text-teal-200" />
         <span className="font-semibold text-foreground">IdeaSignal</span>
         <Separator className="mx-2 h-4 w-px" />

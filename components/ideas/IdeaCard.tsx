@@ -54,17 +54,17 @@ export default function IdeaCard({
     <Card
       className={cn(
         cardInteractive,
-        "group relative h-full overflow-hidden p-4 shadow-soft hover:shadow-soft",
+        "group relative h-full overflow-hidden p-4 shadow-sm hover:shadow-sm rounded-2xl border-white/8 bg-white/[0.035] hover:bg-white/[0.05]",
         className,
       )}
     >
       <div className="flex items-start gap-3">
         <div className="space-y-2">
-          <h3 className="line-clamp-2 text-lg font-semibold leading-tight text-foreground">
+          <h3 className="line-clamp-2 text-lg font-semibold leading-tight text-white/90">
             {idea.title}
           </h3>
           {idea.one_liner && (
-            <p className="line-clamp-2 text-sm leading-relaxed text-foreground/75">
+            <p className="line-clamp-2 text-sm leading-relaxed text-white/70">
               {idea.one_liner}
             </p>
           )}
@@ -80,7 +80,7 @@ export default function IdeaCard({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[13px] text-foreground/70">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[13px] text-white/70">
         <span className={neutralPill}>{sourceLabel}</span>
         {dateDisplay && <span className={neutralPill}>{dateDisplay}</span>}
         {idea.difficulty != null && (
@@ -121,7 +121,7 @@ export default function IdeaCard({
           {idea.tags.map((tag) => (
             <Badge
               key={tag}
-              className="border border-border/40 bg-secondary/10 px-2.5 py-1 text-[11px] font-medium text-foreground/65"
+              className="border border-white/20 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/70"
             >
               {tag}
             </Badge>

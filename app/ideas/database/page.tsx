@@ -65,13 +65,13 @@ function StatCard({
 }) {
   return (
     <Card className="h-full bg-card/70 p-4 shadow-soft backdrop-blur">
-      <div className="text-sm font-semibold text-foreground/80">{label}</div>
+      <div className="text-sm font-semibold text-white/85">{label}</div>
       <div
-        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-foreground`}
+        className={`mt-3 rounded-xl bg-gradient-to-br ${accent} px-3 py-4 text-3xl font-bold text-white`}
       >
         {value}
       </div>
-      {subtext && <div className="mt-2 text-sm text-muted-foreground">{subtext}</div>}
+      {subtext && <div className="mt-2 text-sm text-white/70">{subtext}</div>}
     </Card>
   );
 }
@@ -355,7 +355,7 @@ export default function IdeasDatabasePage() {
       description="Browse validated opportunities with research, market analysis, execution plans, and more."
     >
       {error && (
-        <Card className="border-destructive/60 bg-destructive/10 p-4 text-destructive-foreground shadow-soft">
+        <Card className="border-destructive/60 bg-destructive/10 p-4 text-destructive-foreground shadow-sm">
           <div className="font-semibold">Error loading ideas</div>
           <div className="text-sm text-destructive-foreground/80">{error}</div>
         </Card>
@@ -364,7 +364,7 @@ export default function IdeasDatabasePage() {
       <SectionTitle
         title="Idea library"
         description="Browse validated opportunities sourced from trends, communities, and curated research."
-        actions={<div className="text-sm text-muted-foreground">{displayedCount} ideas</div>}
+        actions={<div className="text-sm text-white/65">{displayedCount} ideas</div>}
       />
 
       <IdeasToolbar
@@ -485,12 +485,12 @@ export default function IdeasDatabasePage() {
       <div ref={listTopRef} className="h-0" />
 
       {ideaOfTheDay && (
-        <section className="space-y-3">
+        <section className="space-y-4">
           <SectionTitle
             title="Idea of the Day"
             description="A spotlighted opportunity worth reading first."
             actions={
-              <Button variant="pill" asChild>
+              <Button variant="pill" asChild className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
                 <Link href={`/ideas/${ideaOfTheDay.id}`}>View full report</Link>
               </Button>
             }
@@ -503,7 +503,7 @@ export default function IdeasDatabasePage() {
         </section>
       )}
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <SectionTitle
           title="All ideas"
           description="Recent opportunities with tags, difficulty, and demand notes."
@@ -511,7 +511,7 @@ export default function IdeasDatabasePage() {
         {loading ? (
           <ListSkeleton gridClassName="md:grid-cols-2" count={6} />
         ) : !isEmpty ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             {pagedIdeas.map((idea) => (
               <IdeaCard
                 key={idea.id}

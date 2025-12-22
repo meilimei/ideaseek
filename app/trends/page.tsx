@@ -153,21 +153,21 @@ export default function TrendsPage() {
       title="Trends"
       description="Discover emerging signals and opportunities from Google, YouTube, and the community."
     >
-      <div className="mb-2 text-sm text-muted-foreground">{total} results</div>
+      <div className="mb-2 text-sm text-white/65">{total} results</div>
       {showSavedSummary && (
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)]/90 p-4 shadow-sm backdrop-blur">
-            <div className="text-sm font-semibold text-slate-200">Saved trends</div>
+          <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4 shadow-sm backdrop-blur-sm">
+            <div className="text-sm font-semibold text-white/90">Saved trends</div>
             <div className="mt-3 text-3xl font-bold text-white">
               {savedCount ?? 0}
             </div>
-            <div className="mt-2 text-sm text-slate-400">Bookmarked signals</div>
+            <div className="mt-2 text-sm text-white/65">Bookmarked signals</div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-col gap-2 rounded-2xl border border-border/30 bg-secondary/8 p-3 shadow-soft">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
+      <div className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
           <div className="flex flex-1 items-center gap-2">
             <input
               type="text"
@@ -177,10 +177,10 @@ export default function TrendsPage() {
                 setPage(1);
               }}
               placeholder="Search trends..."
-              className={cn(inputBase, "md:w-72 rounded-full")}
+              className={cn(inputBase, "md:w-72 rounded-xl border-white/15 bg-white/[0.04] text-white placeholder:text-white/45")}
             />
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-300">
+          <div className="flex items-center gap-2 text-xs text-white/65">
             <span>Sort</span>
             <select
               value={sort}
@@ -188,7 +188,7 @@ export default function TrendsPage() {
                 setSort(e.target.value as typeof sort);
                 setPage(1);
               }}
-              className={cn(inputBase, "h-9 w-auto px-2")}
+              className={cn(inputBase, "h-9 w-auto rounded-xl border-white/15 bg-white/[0.04] px-2 text-white")}
             >
               <option value="recent">Most Recent</option>
               <option value="growth">Highest Growth</option>
@@ -234,9 +234,9 @@ export default function TrendsPage() {
       </div>
 
       {hasActiveFilters && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/65">
           {searchQuery && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-secondary/10 px-3 py-1 text-foreground/80">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-white/80">
               Search: {searchQuery}
               <button
                 type="button"
@@ -245,14 +245,14 @@ export default function TrendsPage() {
                   updateQuery({ q: null, page: '1' });
                 }}
                 aria-label="Clear search"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-white/60 hover:text-white"
               >
                 ×
               </button>
             </span>
           )}
           {sourceFilter !== 'all' && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-secondary/10 px-3 py-1 text-foreground/80">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-white/80">
               Source: {sourceFilter === 'google_trends' ? 'Google' : sourceFilter}
               <button
                 type="button"
@@ -261,14 +261,14 @@ export default function TrendsPage() {
                   updateQuery({ source: null, page: '1' });
                 }}
                 aria-label="Clear source filter"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-white/60 hover:text-white"
               >
                 ×
               </button>
             </span>
           )}
           {savedOnly && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-secondary/10 px-3 py-1 text-foreground/80">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-white/80">
               Saved
               <button
                 type="button"
@@ -277,7 +277,7 @@ export default function TrendsPage() {
                   updateQuery({ saved: null, page: '1' });
                 }}
                 aria-label="Clear saved filter"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-white/60 hover:text-white"
               >
                 ×
               </button>
@@ -286,14 +286,14 @@ export default function TrendsPage() {
           <button
             type="button"
             onClick={clearAllFilters}
-            className="text-xs font-semibold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="text-xs font-semibold text-white/60 underline-offset-4 hover:text-white hover:underline"
           >
             Clear all
           </button>
         </div>
       )}
 
-      {error && <div className="text-sm text-red-500">{error}</div>}
+      {error && <div className="text-sm text-rose-300">{error}</div>}
       {loading && trends.length === 0 ? (
         <ListSkeleton gridClassName="md:grid-cols-2 lg:grid-cols-3" count={6} />
       ) : !loading && trends.length === 0 && !error ? (

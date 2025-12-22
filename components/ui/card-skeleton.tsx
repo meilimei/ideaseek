@@ -7,7 +7,7 @@ type CardSkeletonProps = {
 
 export function CardSkeleton({ className }: CardSkeletonProps) {
   return (
-    <div className={cn(cardBase, "animate-pulse p-4 space-y-3", className)}>
+    <div className={cn(cardBase, "animate-pulse p-4 space-y-3 border-white/8 bg-white/[0.035]", className)}>
       <div className="h-4 w-2/3 rounded-full bg-secondary/15" />
       <div className="space-y-2">
         <div className="h-3 w-11/12 rounded-full bg-secondary/12" />
