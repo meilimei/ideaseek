@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import SiteHeader from '@/components/site/SiteHeader';
+import AppHeader from '@/components/header/AppHeader';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export default function RootLayout({
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(85,175,210,0.08),transparent_30%),radial-gradient(circle_at_80%_0%,rgba(124,58,237,0.08),transparent_28%)]"
           aria-hidden
         />
-        <SiteHeader />
+        <AppHeader />
         <main className="pb-12">{children}</main>
       </body>
     </html>

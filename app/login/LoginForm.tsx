@@ -102,7 +102,7 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="border-rose-400/50 bg-rose-500/10 text-white">
           <div className="flex flex-col gap-1 text-sm">
             <span>{error}</span>
             {needsEmailConfirmation && (
@@ -120,7 +120,7 @@ export default function LoginForm() {
           onClick={handleGoogleSignIn}
           variant="outline"
           disabled={status === "loading"}
-          className="w-full justify-center rounded-2xl border-white/10 bg-white/5 text-slate-50 hover:bg-white/10 disabled:opacity-70"
+          className="w-full justify-center rounded-2xl border-white/15 bg-white/[0.04] text-white/85 shadow-sm hover:bg-white/10 disabled:opacity-70"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
             <path
@@ -135,7 +135,7 @@ export default function LoginForm() {
           <span>Continue with Google</span>
         </Button>
 
-        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-slate-400">
+        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-white/55">
           <Separator />
           <span>or continue with email</span>
           <Separator />
@@ -144,7 +144,7 @@ export default function LoginForm() {
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email" className="text-white/85">Email</Label>
           <Input
             id="email"
             type="email"
@@ -153,13 +153,13 @@ export default function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             autoComplete="email"
-            className="rounded-2xl border-white/15 bg-slate-950/50"
+            className="rounded-2xl border-white/10 bg-white/[0.04] text-white/90 placeholder:text-white/40 focus-visible:ring-white/20"
           />
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-white/85">Password</Label>
             <Link href="/forgot-password" className="text-xs text-slate-400 underline-offset-4 hover:text-slate-200">
               Forgot password?
             </Link>
@@ -173,7 +173,7 @@ export default function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               autoComplete="current-password"
-              className="rounded-2xl border-white/15 bg-slate-950/50 pr-12"
+              className="rounded-2xl border-white/10 bg-white/[0.04] pr-12 text-white/90 placeholder:text-white/40 focus-visible:ring-white/20"
             />
             <button
               type="button"
@@ -198,8 +198,8 @@ export default function LoginForm() {
         type="submit"
         disabled={isDisabled}
         className={cn(
-          "w-full justify-center rounded-2xl bg-teal-500 text-white shadow-soft hover:bg-teal-400",
-          "border-none transition focus-visible:ring-2 focus-visible:ring-teal-300/60",
+          "w-full justify-center rounded-2xl bg-white text-black shadow-sm hover:bg-white/90",
+          "border-none transition focus-visible:ring-2 focus-visible:ring-white/40",
         )}
       >
         {status === "loading" ? (

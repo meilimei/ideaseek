@@ -91,9 +91,12 @@ export default function SignupForm() {
   const isLoading = status === "loading";
   const showSuccess = status === "success";
 
-  const inputStyles = cn(inputBase, "h-11 rounded-2xl bg-slate-900/60 border-white/10");
+  const inputStyles = cn(
+    inputBase,
+    "h-11 rounded-2xl border-white/10 bg-white/[0.04] text-white/90 placeholder:text-white/40 focus-visible:ring-white/20",
+  );
   const primaryButtonClasses = cn(
-    "inline-flex w-full items-center justify-center rounded-2xl bg-teal-500 px-4 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/50 focus-visible:ring-offset-0",
+    "inline-flex w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black shadow-sm transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-0",
     isLoading && "cursor-not-allowed opacity-80",
   );
 
@@ -102,7 +105,7 @@ export default function SignupForm() {
       <button
         type="button"
         onClick={handleGoogle}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-foreground shadow-soft transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/40 focus-visible:ring-offset-0"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 shadow-sm transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
           <path
@@ -117,13 +120,13 @@ export default function SignupForm() {
         Continue with Google
       </button>
 
-      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-slate-400">
+      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-white/55">
         <span className="h-px flex-1 bg-white/10" />
         <span>or continue with email</span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
 
-      <div className="rounded-2xl bg-slate-900/40 px-4 py-3 text-xs text-slate-400 ring-1 ring-white/5">
+      <div className="rounded-2xl bg-white/[0.04] px-4 py-3 text-xs text-white/65 ring-1 ring-white/8">
         We&apos;ll email you a verification link.
       </div>
 
@@ -152,7 +155,7 @@ export default function SignupForm() {
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium text-foreground/90">
+          <label htmlFor="email" className="text-sm font-medium text-white/85">
             Email
           </label>
           <input
@@ -168,7 +171,7 @@ export default function SignupForm() {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium text-foreground/90">
+          <label htmlFor="password" className="text-sm font-medium text-white/85">
             Password
           </label>
           <input
@@ -184,7 +187,7 @@ export default function SignupForm() {
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="confirm-password" className="text-sm font-medium text-foreground/90">
+          <label htmlFor="confirm-password" className="text-sm font-medium text-white/85">
             Confirm password
           </label>
           <input
@@ -207,7 +210,7 @@ export default function SignupForm() {
         {showSuccess && (
           <Link
             href="/login"
-            className="inline-flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 shadow-soft transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/40 focus-visible:ring-offset-0"
+            className="inline-flex w-full items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/85 shadow-sm transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0"
           >
             Go to sign in
           </Link>

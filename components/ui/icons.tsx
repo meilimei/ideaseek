@@ -287,3 +287,80 @@ export const Zap = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>
     </svg>
   );
 });
+
+export const CreditCard = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>(function CreditCard(
+  props,
+  ref,
+) {
+  return (
+    <svg
+      ref={ref}
+      aria-hidden="true"
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect width="20" height="14" x="2" y="5" rx="2" />
+      <line x1="2" x2="22" y1="10" y2="10" />
+      <line x1="6" x2="8" y1="15" y2="15" />
+      <line x1="10" x2="14" y1="15" y2="15" />
+    </svg>
+  );
+});
+
+export const LogOut = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>(function LogOut(
+  props,
+  ref,
+) {
+  return (
+    <svg
+      ref={ref}
+      aria-hidden="true"
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" x2="9" y1="12" y2="12" />
+    </svg>
+  );
+});
+
+export const ChevronDown = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>(function ChevronDown(
+  props,
+  ref,
+) {
+  return (
+    <svg
+      ref={ref}
+      aria-hidden="true"
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+});

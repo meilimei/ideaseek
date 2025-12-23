@@ -21,26 +21,26 @@ export default async function SignupPage() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(56,189,248,0.14),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(45,212,191,0.12),transparent_28%)]" />
       <div className="relative mx-auto flex max-w-5xl flex-col items-center justify-center px-4 py-16">
         <div className="mb-6 text-center">
-          <h1 className="text-3xl font-semibold text-foreground">Join IdeaSeek</h1>
-          <p className="mt-2 text-sm text-slate-400">Save ideas & trends. Sync across devices.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Join IdeaSeek</h1>
+          <p className="mt-2 text-sm text-white/70">Save ideas & trends. Sync across devices.</p>
         </div>
 
-        <Card className={cn("w-full max-w-md border-white/10 bg-slate-950/40 shadow-soft backdrop-blur")}>
+        <Card className={cn("w-full max-w-md border-white/8 bg-white/[0.04] shadow-sm backdrop-blur-sm")}>
           <CardHeader className="space-y-2">
-            <CardTitle className="text-xl text-foreground/90">Create your account</CardTitle>
-            <CardDescription className="text-slate-400">Get verified to start saving ideas.</CardDescription>
+            <CardTitle className="text-2xl font-semibold tracking-tight text-white/95">Create your account</CardTitle>
+            <CardDescription className="text-white/70">Get verified to start saving ideas.</CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
             <SignupForm />
           </CardContent>
-          <CardFooter className="flex flex-col gap-2 text-sm text-slate-400">
-            <div className="flex w-full items-center justify-between text-xs text-slate-500">
-              <Link href="#" className="hover:text-slate-200">Terms</Link>
-              <Link href="#" className="hover:text-slate-200">Privacy</Link>
+          <CardFooter className="flex flex-col gap-2 text-sm text-white/65">
+            <div className="flex w-full items-center justify-between text-xs text-white/55">
+              <Link href="#" className="hover:text-white">Terms</Link>
+              <Link href="#" className="hover:text-white">Privacy</Link>
             </div>
             <p className="w-full text-center text-sm">
               Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-foreground hover:text-foreground/80">
+              <Link href="/login" className="font-semibold text-white hover:text-white/80">
                 Sign in
               </Link>
             </p>

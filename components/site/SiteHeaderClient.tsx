@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { chipActive, chipBase, pillButton } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils/cn';
+import NavLinks from '@/components/header/NavLinks';
+import UserMenu from '@/components/header/UserMenu';
 
 type NavItem = { href: string; label: string };
 
@@ -31,21 +33,27 @@ function SearchButton({ className, onPress }: { className?: string; onPress: () 
   );
 }
 
-export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated: boolean }) {
+export default function SiteHeaderClient({
+  isAuthenticated,
+  userEmail,
+  userName,
+  avatarUrl,
+}: {
+  isAuthenticated: boolean;
+  userEmail?: string | null;
+  userName?: string | null;
+  avatarUrl?: string | null;
+}) {
   const pathname = usePathname() || '/';
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAdminPath = useMemo(() => pathname.startsWith('/admin'), [pathname]);
-  const isAuthPage = useMemo(() => pathname === '/login' || pathname === '/signup', [pathname]);
-  const visibleNavItems = useMemo(
-    () => (isAuthPage ? navItems.filter((item) => item.href === '/pricing') : navItems),
-    [isAuthPage],
-  );
-
-  const isActive = useCallback(
-    (href: string) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)),
+  const isAuthPage = useMemo(
+    () => pathname === '/login' || pathname === '/signup' || pathname.startsWith('/auth/'),
     [pathname],
   );
+  const isMarketingPage = useMemo(() => pathname === '/' || pathname === '/pricing', [pathname]);
+  const visibleNavItems = useMemo(() => (isAuthPage ? navItems.filter((item) => item.href === '/pricing') : navItems), [isAuthPage]);
 
   const openFilters = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -85,54 +93,29 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
   if (isAdminPath) return null;
 
   return (
-    <header className="relative sticky top-0 z-50 h-16 w-full bg-background/60 backdrop-blur-xl">
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/85 via-[#0c1a2c]/80 to-[#0f2739]/80 opacity-90" />
+    <header className="relative sticky top-0 z-50 h-14 w-full bg-background/70 backdrop-blur-xl">
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/70 via-[#0c1a2c]/70 to-[#0f2739]/70 opacity-90" />
       <div className="relative mx-auto flex h-full max-w-7xl items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="text-sm font-semibold uppercase tracking-[0.24em] text-foreground/80 transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
+            className="text-sm font-semibold uppercase tracking-[0.24em] text-white/80 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0"
           >
             Ideasignal
           </Link>
-          {visibleNavItems.length > 0 && (
-            <nav className="hidden items-center gap-2 lg:flex">
-              {visibleNavItems.map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      active ? chipActive : chipBase,
-                      "px-3 py-1.5 text-sm shadow-none",
-                      active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          )}
+          {!isAuthPage && visibleNavItems.length > 0 && <NavLinks items={visibleNavItems} />}
         </div>
 
         <div className="flex items-center gap-2">
-          {!isAuthPage && <SearchButton className="hidden md:inline-flex" onPress={openFilters} />}
+          {!isAuthPage && !isMarketingPage && <SearchButton className="hidden md:inline-flex" onPress={openFilters} />}
           {isAuthenticated ? (
-            <form action="/auth/signout" method="post" className="hidden md:block">
-              <button
-                type="submit"
-                className="rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
-              >
-                Sign out
-              </button>
-            </form>
+            <div className="hidden items-center gap-2 md:flex">
+              <UserMenu userEmail={userEmail ?? null} userName={userName ?? null} avatarUrl={avatarUrl ?? null} />
+            </div>
           ) : (
             <Link
               href="/login"
-              className="hidden rounded-full border border-border/60 bg-secondary/10 px-3 py-1.5 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 md:inline-flex"
+              className="hidden rounded-full border border-white/12 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-white/85 shadow-sm transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0 md:inline-flex"
             >
               Sign in
             </Link>
@@ -140,7 +123,7 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/60 text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 lg:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 text-white/85 shadow-sm transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0 lg:hidden"
             aria-label="Open menu"
           >
             ☰
@@ -173,7 +156,7 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
             {visibleNavItems.length > 0 && (
               <nav className="mt-4 flex flex-col gap-2">
                 {visibleNavItems.map((item) => {
-                  const active = isActive(item.href);
+                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
                     <Link
                       key={item.href}
@@ -181,9 +164,9 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
                       aria-current={active ? 'page' : undefined}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
-                        active ? chipActive : chipBase,
-                        "w-full px-3 py-2 text-sm shadow-none",
-                        active ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : ""
+                        chipBase,
+                        "w-full px-3 py-2 text-sm shadow-none text-white/80 hover:border-white/20 hover:bg-white/10",
+                        active && "border-white/25 bg-white/10 text-white",
                       )}
                     >
                       {item.label}
@@ -193,13 +176,13 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
               </nav>
             )}
             <div className="mt-auto flex flex-col gap-2 pt-6">
-              {!isAuthPage && <SearchButton className="w-full justify-center" onPress={openFilters} />}
+              {!isAuthPage && !isMarketingPage && <SearchButton className="w-full justify-center" onPress={openFilters} />}
               {isAuthenticated ? (
                 <form action="/auth/signout" method="post" className="w-full">
                   <button
                     type="submit"
                     onClick={() => setMobileOpen(false)}
-                    className="inline-flex w-full items-center justify-center rounded-full border border-border/60 bg-secondary/10 px-3 py-2 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
+                    className="inline-flex w-full items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white/85 shadow-sm transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0"
                   >
                     Sign out
                   </button>
@@ -208,7 +191,7 @@ export default function SiteHeaderClient({ isAuthenticated }: { isAuthenticated:
                 <Link
                   href="/login"
                   onClick={() => setMobileOpen(false)}
-                  className="inline-flex items-center justify-center rounded-full border border-border/60 bg-secondary/10 px-3 py-2 text-sm font-semibold text-foreground/85 shadow-soft transition hover:bg-secondary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
+                  className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white/85 shadow-sm transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-0"
                 >
                   Sign in
                 </Link>
