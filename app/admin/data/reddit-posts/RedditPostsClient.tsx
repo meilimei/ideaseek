@@ -17,6 +17,8 @@ type RawRedditPost = {
   is_deleted: boolean;
   admin_note: string | null;
   promoted_idea_id?: string | null;
+  used_for_ideas?: boolean | null;
+  promoted_at?: string | null;
 };
 
 type ApiResponse = {
@@ -34,6 +36,7 @@ export default function RedditPostsClient() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; ideaId?: string } | null>(null);
 
   const [subreddit, setSubreddit] = useState('');
   const [query, setQuery] = useState('');
@@ -41,6 +44,7 @@ export default function RedditPostsClient() {
   const [selected, setSelected] = useState<'all' | 'true' | 'false'>('all');
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [noteEdits, setNoteEdits] = useState<Record<number, string>>({});
+  const [promotingId, setPromotingId] = useState<number | null>(null);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -102,6 +106,9 @@ export default function RedditPostsClient() {
   };
 
   const promote = async (id: number) => {
+    setPromotingId(id);
+    setToast(null);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/reddit-posts/${id}/promote`, {
         method: 'POST',
@@ -110,15 +117,18 @@ export default function RedditPostsClient() {
       if (!res.ok) {
         throw new Error(json.error || 'Failed to promote');
       }
-      alert(
-        json.created
-          ? `Created idea ${json.ideaId}`
+      setToast({
+        message: json.created
+          ? `Created draft idea ${json.ideaId}`
           : `Already promoted, idea ${json.ideaId}`,
-      );
+        ideaId: json.ideaId,
+      });
       void fetchData(page);
     } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     }
+    setPromotingId(null);
   };
 
   return (
@@ -184,6 +194,32 @@ export default function RedditPostsClient() {
           </button>
         </div>
       </div>
+
+      {toast && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          <span>{toast.message}</span>
+          {toast.ideaId && (
+            <>
+              <span className="mx-2 text-gray-500">•</span>
+              <a
+                href={`/admin/data/ideas?search=${toast.ideaId}`}
+                className="text-indigo-700 underline"
+              >
+                View in ideas admin
+              </a>
+              <span className="mx-2 text-gray-500">•</span>
+              <a
+                href={`/ideas/${toast.ideaId}`}
+                className="text-indigo-700 underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open idea
+              </a>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 text-sm">
         <button
@@ -270,23 +306,36 @@ export default function RedditPostsClient() {
                   </td>
                   <td className="px-3 py-2 text-right">
                     {row.promoted_idea_id ? (
-                      <a
-                        href={`/ideas/${row.promoted_idea_id}`}
-                        className="rounded-md border px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open idea
-                      </a>
+                      <div className="space-y-1 text-right">
+                        <a
+                          href={`/ideas/${row.promoted_idea_id}`}
+                          className="rounded-md border px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open idea
+                        </a>
+                        <a
+                          href={`/admin/data/ideas?search=${row.promoted_idea_id}`}
+                          className="rounded-md border px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
+                        >
+                          View in admin
+                        </a>
+                        {row.promoted_at && (
+                          <div className="text-[11px] text-gray-500">
+                            Promoted {row.promoted_at}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => promote(row.id)}
-                        className="rounded-md border px-2 py-1 text-xs bg-indigo-600 text-white hover:bg-indigo-700"
-                        disabled={loading}
-                      >
-                        Promote to Idea
-                      </button>
+                      onClick={() => promote(row.id)}
+                      className="rounded-md border px-2 py-1 text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={loading || promotingId === row.id}
+                    >
+                      {promotingId === row.id ? 'Promoting…' : 'Promote to Idea'}
+                    </button>
                     )}
                     <button
                       type="button"

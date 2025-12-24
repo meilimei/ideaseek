@@ -16,6 +16,9 @@ export type AdminRedditPost = {
   promoted_idea_id: string | null;
   selected: boolean | null;
   created_at: string;
+  source_post_id?: string | null;
+  used_for_ideas?: boolean | null;
+  promoted_at?: string | null;
 };
 
 export async function promoteRedditPostToIdea(options: {
@@ -29,6 +32,7 @@ export async function promoteRedditPostToIdea(options: {
     .select(
       `
         id,
+        source_post_id,
         title,
         selftext,
         subreddit,
@@ -37,7 +41,9 @@ export async function promoteRedditPostToIdea(options: {
         url,
         promoted_idea_id,
         selected,
-        created_at
+        created_at,
+        used_for_ideas,
+        promoted_at
       `,
     )
     .eq('id', options.postId)
@@ -51,7 +57,26 @@ export async function promoteRedditPostToIdea(options: {
     );
   }
 
+  const nowIso = new Date().toISOString();
+
   if (post.promoted_idea_id) {
+    const needsUpdate = !post.used_for_ideas || !post.promoted_at;
+    if (needsUpdate) {
+      const { error: reuseUpdateError } = await supabase
+        .from('raw_reddit_posts')
+        .update({
+          used_for_ideas: true,
+          promoted_at: post.promoted_at ?? nowIso,
+        })
+        .eq('id', options.postId);
+
+      if (reuseUpdateError) {
+        throw new Error(
+          `Failed to flag existing promotion for post ${options.postId}: ${reuseUpdateError.message}`,
+        );
+      }
+    }
+
     return {
       ideaId: post.promoted_idea_id,
       created: false,
@@ -77,6 +102,12 @@ export async function promoteRedditPostToIdea(options: {
   ];
 
   const sourceUrl = post.url ?? null;
+  const sourceMeta = {
+    subreddit: post.subreddit,
+    score: post.score,
+    comments: post.num_comments,
+    raw_post_id: post.source_post_id ?? post.id,
+  };
 
   const insertPayload = {
     title: rawTitle || '(no title)',
@@ -85,10 +116,13 @@ export async function promoteRedditPostToIdea(options: {
     tags,
     source_type: 'reddit',
     source_url: sourceUrl,
+    source_meta: sourceMeta,
     published: false,
+    status: 'draft',
     pinned: false,
     featured: false,
     created_by: options.adminUserId,
+    updated_at: nowIso,
   };
 
   const { data: newIdea, error: ideaError } = await supabase
@@ -110,6 +144,9 @@ export async function promoteRedditPostToIdea(options: {
     .update({
       promoted_idea_id: newIdea.id,
       selected: true,
+      selected_for_idea: true,
+      used_for_ideas: true,
+      promoted_at: nowIso,
     })
     .eq('id', options.postId);
 

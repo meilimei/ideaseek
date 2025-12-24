@@ -1,6 +1,8 @@
 'use client';
 
 import { useActionState, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { IngestStrategy } from '@/lib/server/adminStrategies';
 import {
   createStrategyAction,
@@ -50,31 +52,6 @@ function formatDate(value: string | Date | null): string {
   return d.toLocaleString();
 }
 
-async function runStrategyOnce(strategy: IngestStrategy) {
-  try {
-    const res = await fetch('/api/admin/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: `${strategy.source}_ingest`,
-        strategyId: strategy.id,
-        source: strategy.source,
-        payload: {
-          strategyId: strategy.id,
-          source: strategy.source,
-        },
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json?.error || 'Failed to create job');
-    }
-    alert('Job created');
-  } catch (err) {
-    alert(err instanceof Error ? err.message : String(err));
-  }
-}
-
 function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
   const [editOpen, setEditOpen] = useState(false);
   const initial = { error: undefined, success: false };
@@ -86,6 +63,35 @@ function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
     toggleStrategyActiveAction.bind(null, strategy.id),
     initial,
   );
+  const router = useRouter();
+  const [runState, setRunState] = useState<{
+    loading: boolean;
+    error: string | null;
+    jobId: string | null;
+  }>({ loading: false, error: null, jobId: null });
+
+  const runStrategyOnce = async () => {
+    setRunState({ loading: true, error: null, jobId: null });
+    try {
+      const res = await fetch(`/api/admin/strategies/${strategy.id}/run`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.error || 'Failed to create job');
+      }
+      setRunState({ loading: false, error: null, jobId: json.jobId ?? null });
+      if (json.jobId) {
+        router.prefetch(`/admin/jobs/${json.jobId}`);
+      }
+    } catch (err) {
+      setRunState({
+        loading: false,
+        error: err instanceof Error ? err.message : String(err),
+        jobId: null,
+      });
+    }
+  };
 
   return (
     <tr className="border-t">
@@ -147,11 +153,30 @@ function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
         </button>
         <button
           type="button"
-          onClick={() => runStrategyOnce(strategy)}
-          className="rounded-md border px-2 py-1 text-xs text-gray-800 hover:bg-gray-100"
+          onClick={runStrategyOnce}
+          className="rounded-md border px-2 py-1 text-xs text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={runState.loading}
         >
-          Run once
+          {runState.loading ? 'Queuing…' : 'Run now'}
         </button>
+        {runState.error && (
+          <div className="text-xs text-red-600">{runState.error}</div>
+        )}
+        {runState.jobId && (
+          <div className="text-xs text-gray-700">
+            Job queued:{' '}
+            <Link
+              href={`/admin/jobs/${runState.jobId}`}
+              className="text-indigo-600 hover:underline"
+            >
+              View job
+            </Link>{' '}
+            or{' '}
+            <Link href="/admin/jobs" className="text-indigo-600 hover:underline">
+              go to jobs
+            </Link>
+          </div>
+        )}
         {toggleState.error && (
           <div className="text-xs text-red-600">{toggleState.error}</div>
         )}

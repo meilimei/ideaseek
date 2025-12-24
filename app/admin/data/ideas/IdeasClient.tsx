@@ -15,6 +15,9 @@ type IdeaRow = {
   pinned: boolean | null;
   featured: boolean | null;
   created_by?: string | null;
+  published_at?: string | null;
+  unpublished_at?: string | null;
+  status?: string | null;
 };
 
 type ListResponse = {
@@ -217,6 +220,19 @@ export default function IdeasClient() {
                     : row.published
                       ? 'Published'
                       : 'Draft'}
+                  {row.published_at && row.published && (
+                    <div className="text-xs text-gray-600">
+                      Published at {row.published_at}
+                    </div>
+                  )}
+                  {row.unpublished_at && !row.published && (
+                    <div className="text-xs text-gray-600">
+                      Unpublished at {row.unpublished_at}
+                    </div>
+                  )}
+                  {row.status && (
+                    <div className="text-[11px] text-gray-500">Status: {row.status}</div>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-xs">{row.pinned ? 'Yes' : 'No'}</td>
                 <td className="px-3 py-2 text-xs">{row.featured ? 'Yes' : 'No'}</td>
@@ -310,7 +326,7 @@ export default function IdeasClient() {
             void fetchList(next);
           }}
           disabled={page >= totalPages}
-        className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
         </button>

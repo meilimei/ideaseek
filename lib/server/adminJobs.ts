@@ -86,3 +86,39 @@ export async function getAdminJob(id: string) {
   if (error) throw error;
   return data ?? null;
 }
+
+const JOB_TYPE_MAP: Record<string, AdminJobType> = {
+  'reddit-ingest': 'reddit-ingest',
+  'reddit_ingest': 'reddit-ingest',
+  reddit: 'reddit-ingest',
+  'youtube-ingest': 'youtube-ingest',
+  'youtube_ingest': 'youtube-ingest',
+  youtube: 'youtube-ingest',
+  'trends-ingest': 'trends-ingest',
+  'trends_ingest': 'trends-ingest',
+  'google_trends': 'trends-ingest',
+  'google-trends': 'trends-ingest',
+  'google-trends-ingest': 'trends-ingest',
+  'process-trends-snapshot': 'process-trends-snapshot',
+};
+
+export function normalizeAdminJobType(
+  jobType: string | null | undefined,
+  source?: string | null,
+): AdminJobType | null {
+  if (jobType) {
+    const normalizedKey = jobType.toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+    if (JOB_TYPE_MAP[normalizedKey]) {
+      return JOB_TYPE_MAP[normalizedKey];
+    }
+  }
+
+  if (source) {
+    const normalizedSource = source.toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+    if (JOB_TYPE_MAP[normalizedSource]) {
+      return JOB_TYPE_MAP[normalizedSource];
+    }
+  }
+
+  return null;
+}

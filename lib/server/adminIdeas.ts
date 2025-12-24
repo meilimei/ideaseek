@@ -1,7 +1,7 @@
 import { supabaseServiceClient } from '@/lib/supabaseServiceClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type AdminIdeaStatus = 'published' | 'unpublished' | 'deleted';
+export type AdminIdeaStatus = 'published' | 'unpublished' | 'deleted' | 'draft' | 'archived';
 
 export type AdminIdea = {
   id: string;
@@ -13,6 +13,9 @@ export type AdminIdea = {
   pinned: boolean;
   featured: boolean;
   deleted_at: string | null;
+  published_at?: string | null;
+  unpublished_at?: string | null;
+  status?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -65,6 +68,9 @@ export async function listIdeas(
       published,
       pinned,
       featured,
+      published_at,
+      unpublished_at,
+      status,
       deleted_at,
       created_by,
       created_at,
@@ -117,12 +123,20 @@ export async function updateIdeaFlags(
   adminUserId: string,
 ) {
   const supabase = getAdminSupabaseClient();
+  const nowIso = new Date().toISOString();
   const update: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso,
   };
 
   if (typeof changes.published === 'boolean') {
     update.published = changes.published;
+    update.status = changes.published ? 'published' : 'draft';
+    if (changes.published) {
+      update.published_at = nowIso;
+      update.unpublished_at = null;
+    } else {
+      update.unpublished_at = nowIso;
+    }
   }
   if (typeof changes.pinned === 'boolean') {
     update.pinned = changes.pinned;
@@ -133,9 +147,17 @@ export async function updateIdeaFlags(
   if (changes.softDelete === true) {
     update.deleted_at = new Date().toISOString();
     update.deleted_by = adminUserId;
+    update.status = 'archived';
   } else if (changes.softDelete === false) {
     update.deleted_at = null;
     update.deleted_by = null;
+    if (typeof update.published === 'undefined') {
+      update.published = false;
+      update.unpublished_at = nowIso;
+    }
+    if (!update.status) {
+      update.status = update.published ? 'published' : 'draft';
+    }
   }
 
   const { data, error } = await supabase
@@ -152,6 +174,9 @@ export async function updateIdeaFlags(
       published,
       pinned,
       featured,
+      published_at,
+      unpublished_at,
+      status,
       deleted_at,
       created_by,
       created_at,
