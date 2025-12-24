@@ -1,9 +1,12 @@
 'use client';
 
-import { useActionState, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useActionState, useMemo, useState } from 'react';
 import type { IngestStrategy } from '@/lib/server/adminStrategies';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { DataTable, GlassCard, CardBody, CardHeading } from '@/components/admin/primitives';
 import {
   createStrategyAction,
   toggleStrategyActiveAction,
@@ -19,6 +22,10 @@ const SOURCE_LABELS: Record<string, string> = {
   youtube: 'YouTube',
   google_trends: 'Google Trends',
 };
+
+const inputClass =
+  'w-full rounded-xl border border-border/50 bg-card/60 px-3 py-2 text-sm text-foreground shadow-soft transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
+const textareaClass = `${inputClass} rounded-2xl`;
 
 function exampleConfig(source: string): string {
   switch (source) {
@@ -94,114 +101,120 @@ function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
   };
 
   return (
-    <tr className="border-t">
-      <td className="px-3 py-2 align-top">
-        <div className="font-medium text-gray-900">{strategy.name}</div>
-        <div className="text-xs text-gray-500">
+    <tr className="align-top transition hover:bg-secondary/8">
+      <td className="px-3 py-3">
+        <div className="font-semibold text-foreground">{strategy.name}</div>
+        <div className="text-xs text-muted-foreground">
           {strategy.description || '—'}
         </div>
       </td>
-      <td className="px-3 py-2 align-top text-sm text-gray-700">
+      <td className="px-3 py-3 align-top text-sm text-muted-foreground">
         {SOURCE_LABELS[strategy.source] ?? strategy.source}
       </td>
-      <td className="px-3 py-2 align-top">
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
+      <td className="px-3 py-3 align-top">
+        <Badge
+          className={
             strategy.is_active
-              ? 'bg-green-50 text-green-700 ring-1 ring-green-100'
-              : 'bg-gray-100 text-gray-600'
-          }`}
+              ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
+              : 'bg-secondary/40 text-muted-foreground border-border/60'
+          }
         >
-          {strategy.is_active ? 'Yes' : 'No'}
-        </span>
+          {strategy.is_active ? 'Active' : 'Inactive'}
+        </Badge>
       </td>
-      <td className="px-3 py-2 align-top text-sm text-gray-700">
+      <td className="px-3 py-3 align-top text-sm text-muted-foreground">
         {strategy.cron_expr || '—'}
       </td>
-      <td className="px-3 py-2 align-top text-sm text-gray-700">
+      <td className="px-3 py-3 align-top text-sm text-muted-foreground">
         {formatDate(strategy.last_run_at)}
       </td>
-      <td className="px-3 py-2 align-top text-sm">
+      <td className="px-3 py-3 align-top text-sm">
         <span
           className={
             strategy.last_run_status === 'error'
-              ? 'text-red-600'
-              : 'text-gray-700'
+              ? 'text-destructive'
+              : 'text-foreground'
           }
         >
           {strategy.last_run_status || '—'}
         </span>
         {strategy.last_error && (
-          <div className="text-xs text-red-600">{strategy.last_error}</div>
+          <div className="text-xs text-destructive">{strategy.last_error}</div>
         )}
       </td>
-      <td className="px-3 py-2 align-top space-y-2 text-right">
+      <td className="px-3 py-3 align-top space-y-2 text-right">
         <form action={toggleAction} className="inline">
-          <button
+          <Button
             type="submit"
-            className="rounded-md border px-2 py-1 text-xs text-gray-800 hover:bg-gray-100"
+            size="sm"
+            variant="ghost"
+            className="rounded-full px-3"
           >
             {strategy.is_active ? 'Deactivate' : 'Activate'}
-          </button>
+          </Button>
         </form>
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
+          className="rounded-full px-3 text-primary"
           onClick={() => setEditOpen((v) => !v)}
-          className="rounded-md border px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
         >
           {editOpen ? 'Close' : 'Edit'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          size="sm"
+          variant="secondary"
+          className="rounded-full px-3"
           onClick={runStrategyOnce}
-          className="rounded-md border px-2 py-1 text-xs text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={runState.loading}
         >
           {runState.loading ? 'Queuing…' : 'Run now'}
-        </button>
+        </Button>
         {runState.error && (
-          <div className="text-xs text-red-600">{runState.error}</div>
+          <div className="text-xs text-destructive">{runState.error}</div>
         )}
         {runState.jobId && (
-          <div className="text-xs text-gray-700">
+          <div className="text-xs text-muted-foreground">
             Job queued:{' '}
             <Link
               href={`/admin/jobs/${runState.jobId}`}
-              className="text-indigo-600 hover:underline"
+              className="text-primary hover:underline"
             >
               View job
             </Link>{' '}
             or{' '}
-            <Link href="/admin/jobs" className="text-indigo-600 hover:underline">
+            <Link href="/admin/jobs" className="text-primary hover:underline">
               go to jobs
             </Link>
           </div>
         )}
         {toggleState.error && (
-          <div className="text-xs text-red-600">{toggleState.error}</div>
+          <div className="text-xs text-destructive">{toggleState.error}</div>
         )}
         {editOpen && (
-          <div className="mt-2 rounded-lg border bg-gray-50 p-3 text-left">
+          <div className="mt-2 rounded-2xl border border-border/50 bg-card/70 p-4 text-left shadow-soft">
             <form action={updateAction} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700">
+                <label className="text-xs font-semibold text-muted-foreground">
                   Name
                 </label>
                 <input
                   name="name"
                   defaultValue={strategy.name}
-                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  className={inputClass}
                   required
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700">
+                <label className="text-xs font-semibold text-muted-foreground">
                   Source
                 </label>
                 <select
                   name="source"
                   defaultValue={strategy.source}
-                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  className={inputClass}
                   required
                 >
                   <option value="reddit">Reddit</option>
@@ -210,13 +223,13 @@ function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700">
+                <label className="text-xs font-semibold text-muted-foreground">
                   Description
                 </label>
                 <textarea
                   name="description"
                   defaultValue={strategy.description ?? ''}
-                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  className={textareaClass}
                   rows={2}
                 />
               </div>
@@ -229,48 +242,45 @@ function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
                 />
                 <label
                   htmlFor={`is_active_${strategy.id}`}
-                  className="text-sm text-gray-700"
+                  className="text-sm text-foreground/80"
                 >
                   Active
                 </label>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700">
+                <label className="text-xs font-semibold text-muted-foreground">
                   Cron expression
                 </label>
                 <input
                   name="cron_expr"
                   defaultValue={strategy.cron_expr ?? ''}
-                  className="w-full rounded-md border px-2 py-1 text-sm"
+                  className={inputClass}
                   placeholder="e.g. */10 * * * *"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700">
+                <label className="text-xs font-semibold text-muted-foreground">
                   Config (JSON)
                 </label>
                 <textarea
                   name="config"
                   defaultValue={JSON.stringify(strategy.config ?? {}, null, 2)}
-                  className="w-full rounded-md border px-2 py-1 text-xs font-mono"
+                  className={`${textareaClass} font-mono text-xs`}
                   rows={6}
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Example:{' '}
-                  <code className="rounded bg-gray-100 px-1 py-0.5">
+                  <code className="rounded bg-secondary/30 px-1 py-0.5">
                     {exampleConfig(strategy.source)}
                   </code>
                 </p>
               </div>
               {updateState.error && (
-                <div className="text-xs text-red-600">{updateState.error}</div>
+                <div className="text-xs text-destructive">{updateState.error}</div>
               )}
-              <button
-                type="submit"
-                className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
-              >
+              <Button type="submit" size="sm">
                 Save
-              </button>
+              </Button>
             </form>
           </div>
         )}
@@ -291,117 +301,126 @@ export default function StrategiesClient({ strategies }: StrategiesClientProps) 
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border bg-white p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900">New strategy</h2>
-        <p className="text-sm text-gray-600">
-          Add a new ingestion strategy. Config expects JSON.
-        </p>
-        <form action={createAction} className="mt-3 grid gap-3 md:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-700">Name</label>
-            <input
-              name="name"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-700">Source</label>
-            <select
-              name="source"
-              value={newSource}
-              onChange={(e) => setNewSource(e.target.value)}
-              className="w-full rounded-md border px-3 py-2 text-sm"
-            >
-              <option value="reddit">Reddit</option>
-              <option value="youtube">YouTube</option>
-              <option value="google_trends">Google Trends</option>
-            </select>
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold text-gray-700">
-              Description
-            </label>
-            <textarea
-              name="description"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              rows={2}
-              placeholder="Optional description"
-            />
-          </div>
-          <div className="flex items-center gap-2 text-sm md:col-span-2">
-            <input id="new_is_active" type="checkbox" name="is_active" defaultChecked />
-            <label htmlFor="new_is_active" className="text-sm text-gray-700">
-              Active
-            </label>
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold text-gray-700">
-              Cron expression
-            </label>
-            <input
-              name="cron_expr"
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              placeholder="e.g. */10 * * * *"
-            />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold text-gray-700">
-              Config (JSON)
-            </label>
-            <textarea
-              name="config"
-              defaultValue={exampleConfig(newSource)}
-              className="w-full rounded-md border px-3 py-2 text-xs font-mono"
-              rows={6}
-            />
-            <p className="text-xs text-gray-500">
-              Provide JSON config for the selected source. Example shown above.
-            </p>
-          </div>
-          {createState.error && (
-            <div className="md:col-span-2 text-sm text-red-600">
-              {createState.error}
+      <GlassCard>
+        <CardHeading
+          title="New strategy"
+          description="Add a new ingestion strategy. Config expects JSON."
+        />
+        <CardBody className="pt-0">
+          <form action={createAction} className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-muted-foreground">Name</label>
+              <input
+                name="name"
+                className={inputClass}
+                required
+                placeholder="e.g. r/Entrepreneur scraping"
+              />
             </div>
-          )}
-          <div className="md:col-span-2">
-            <button
-              type="submit"
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              Create strategy
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div className="overflow-x-auto rounded-2xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Source</th>
-              <th className="px-3 py-2">Active</th>
-              <th className="px-3 py-2">Cron</th>
-              <th className="px-3 py-2">Last run</th>
-              <th className="px-3 py-2">Last status</th>
-              <th className="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((strategy) => (
-              <StrategyRow key={strategy.id} strategy={strategy} />
-            ))}
-            {sorted.length === 0 && (
-              <tr>
-                <td className="px-4 py-4 text-sm text-gray-500" colSpan={7}>
-                  No strategies found.
-                </td>
-              </tr>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-muted-foreground">Source</label>
+              <select
+                name="source"
+                value={newSource}
+                onChange={(e) => setNewSource(e.target.value)}
+                className={inputClass}
+              >
+                <option value="reddit">Reddit</option>
+                <option value="youtube">YouTube</option>
+                <option value="google_trends">Google Trends</option>
+              </select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Description
+              </label>
+              <textarea
+                name="description"
+                className={textareaClass}
+                rows={2}
+                placeholder="Optional description"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-sm md:col-span-2">
+              <input id="new_is_active" type="checkbox" name="is_active" defaultChecked />
+              <label htmlFor="new_is_active" className="text-sm text-foreground/80">
+                Active
+              </label>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-semibold text-muted-foreground">
+                Cron expression
+              </label>
+              <input
+                name="cron_expr"
+                className={inputClass}
+                placeholder="e.g. */10 * * * *"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                <span>Config (JSON)</span>
+                <span className="text-[11px] text-muted-foreground/80">
+                  Example updates when source changes
+                </span>
+              </label>
+              <textarea
+                name="config"
+                defaultValue={exampleConfig(newSource)}
+                className={`${textareaClass} font-mono text-xs`}
+                rows={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                Provide JSON config for the selected source. Example shown above.
+              </p>
+            </div>
+            {createState.error && (
+              <div className="md:col-span-2 text-sm text-destructive">
+                {createState.error}
+              </div>
             )}
-          </tbody>
-        </table>
-      </div>
+            <div className="md:col-span-2">
+              <Button type="submit" size="sm">
+                Create strategy
+              </Button>
+            </div>
+          </form>
+        </CardBody>
+      </GlassCard>
+
+      <GlassCard>
+        <CardHeading
+          title="Existing strategies"
+          description="Manage schedules and run ad-hoc ingests."
+        />
+        <CardBody className="overflow-x-auto pt-0">
+          <DataTable>
+            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Name</th>
+                <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Active</th>
+                <th className="px-3 py-2 font-medium">Cron</th>
+                <th className="px-3 py-2 font-medium">Last run</th>
+                <th className="px-3 py-2 font-medium">Last status</th>
+                <th className="px-3 py-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {sorted.map((strategy) => (
+                <StrategyRow key={strategy.id} strategy={strategy} />
+              ))}
+              {sorted.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={7}>
+                    No strategies found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </DataTable>
+        </CardBody>
+      </GlassCard>
     </div>
   );
 }

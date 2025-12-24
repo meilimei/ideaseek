@@ -53,7 +53,10 @@ export default function SiteHeaderClient({
     [pathname],
   );
   const isMarketingPage = useMemo(() => pathname === '/' || pathname === '/pricing', [pathname]);
-  const visibleNavItems = useMemo(() => (isAuthPage ? navItems.filter((item) => item.href === '/pricing') : navItems), [isAuthPage]);
+  const visibleNavItems = useMemo(
+    () => (isAuthPage ? navItems.filter((item) => item.href === '/pricing') : navItems),
+    [isAuthPage],
+  );
 
   const openFilters = useCallback(() => {
     if (typeof window === 'undefined') return;

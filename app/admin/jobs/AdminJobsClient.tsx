@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { StatusBadge } from '@/components/admin/StatusBadge';
+import { DataTable, GlassCard, CardBody } from '@/components/admin/primitives';
+import { Button } from '@/components/ui/button';
 import AdminJobActions from './JobActions';
 
 type AdminJob = {
@@ -60,67 +63,80 @@ export default function AdminJobsClient() {
   }, [hasRunning]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <AdminJobActions />
 
-      <div className="flex items-center gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
-          disabled={loading}
-        >
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-        {error && <span className="text-red-600">{error}</span>}
-      </div>
+      <GlassCard>
+        <CardBody className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              {jobs.length > 0 ? `${jobs.length} jobs loaded` : 'No jobs yet'}
+            </div>
+            {error && <span className="text-sm text-destructive">{error}</span>}
+          </div>
 
-      <div className="overflow-hidden rounded-2xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-4 py-2">ID</th>
-              <th className="px-4 py-2">Type</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Attempts</th>
-              <th className="px-4 py-2">Created</th>
-              <th className="px-4 py-2">Started</th>
-              <th className="px-4 py-2">Finished</th>
-              <th className="px-4 py-2 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => (
-              <tr key={job.id} className="border-t">
-                <td className="px-4 py-2 font-mono text-xs text-gray-600">{job.id}</td>
-                <td className="px-4 py-2">{job.job_type}</td>
-                <td className="px-4 py-2 capitalize">{job.status}</td>
-                <td className="px-4 py-2">
-                  {job.attempts ?? 0} / {job.max_attempts ?? 3}
-                </td>
-                <td className="px-4 py-2">{job.created_at ?? '—'}</td>
-                <td className="px-4 py-2">{job.started_at ?? '—'}</td>
-                <td className="px-4 py-2">{job.finished_at ?? '—'}</td>
-                <td className="px-4 py-2 text-right">
-                  <Link
-                    href={`/admin/jobs/${job.id}`}
-                    className="text-indigo-600 hover:underline"
-                  >
-                    View
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {jobs.length === 0 && !error && (
+          <DataTable>
+            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <td className="px-4 py-4 text-sm text-gray-500" colSpan={7}>
-                  No jobs yet.
-                </td>
+                <th className="px-3 py-2 font-medium">ID</th>
+                <th className="px-3 py-2 font-medium">Type</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Attempts</th>
+                <th className="px-3 py-2 font-medium">Created</th>
+                <th className="px-3 py-2 font-medium">Started</th>
+                <th className="px-3 py-2 font-medium">Finished</th>
+                <th className="px-3 py-2 text-right font-medium">Action</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {jobs.map((job) => (
+                <tr
+                  key={job.id}
+                  className="transition hover:bg-secondary/10"
+                >
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                    {job.id}
+                  </td>
+                  <td className="px-3 py-2">{job.job_type}</td>
+                  <td className="px-3 py-2">
+                    <StatusBadge status={job.status} />
+                  </td>
+                  <td className="px-3 py-2">
+                    {job.attempts ?? 0} / {job.max_attempts ?? 3}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{job.created_at ?? '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{job.started_at ?? '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{job.finished_at ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">
+                    <Link
+                      href={`/admin/jobs/${job.id}`}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+              {jobs.length === 0 && !error && (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={8}>
+                    No jobs yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </DataTable>
+        </CardBody>
+      </GlassCard>
     </div>
   );
 }

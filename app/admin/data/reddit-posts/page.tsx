@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import RedditPostsClient from './RedditPostsClient';
 
@@ -14,18 +14,10 @@ export default async function AdminRedditPostsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Reddit Posts (Raw)</h1>
-          <p className="text-sm text-gray-600">
-            Review and manage raw Reddit posts for idea selection.
-          </p>
-        </div>
-        <Link href="/admin" className="text-sm text-indigo-600 hover:underline">
-          Back to dashboard
-        </Link>
-      </div>
-
+      <AdminPageHeader
+        title="Reddit Posts (Raw)"
+        description="Review and manage raw Reddit posts for idea selection."
+      />
       <RedditPostsClient />
     </div>
   );
