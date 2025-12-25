@@ -34,11 +34,16 @@ export async function POST(
     const jobId = await createAdminJob(jobType, {
       payload: {
         strategyId: strategy.id,
-        source: strategy.source,
+        strategyKey: strategy.id,
+        strategyType: strategy.source,
+        config: strategy.config ?? {},
+        triggeredBy: 'admin',
+        userId: auth.user.id,
       },
       strategyId: strategy.id,
       source: strategy.source,
       createdBy: auth.user.id,
+      dedupeKey: `${strategy.id}:manual:${Date.now()}`,
     });
 
     return NextResponse.json({ ok: true, jobId, jobType, strategyId: strategy.id });

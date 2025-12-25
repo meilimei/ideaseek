@@ -68,6 +68,7 @@ async function runCommand(
   jobId: string,
   jobType: AdminJobType | string,
   strategy?: StrategyRow | null,
+  payload?: Record<string, any>,
 ): Promise<string> {
   let command: string;
   const normalizedType = typeof jobType === 'string' ? jobType.replace(/_/g, '-') : jobType;
@@ -79,6 +80,7 @@ async function runCommand(
       command = 'npm run ingest:youtube';
       break;
     case 'trends-ingest':
+    case 'google-trends-ingest':
       command = 'npm run ingest:trends';
       break;
     default:
@@ -93,6 +95,15 @@ async function runCommand(
       env.INGEST_STRATEGY_CONFIG = JSON.stringify(strategy.config ?? {});
     } catch {
       // ignore serialization issues
+    }
+  }
+  if (!strategy && payload?.strategyId) {
+    env.INGEST_STRATEGY_ID = payload.strategyId;
+    env.INGEST_STRATEGY_SOURCE = payload.strategyType ?? payload.source ?? '';
+    try {
+      env.INGEST_STRATEGY_CONFIG = JSON.stringify(payload.config ?? {});
+    } catch {
+      // ignore
     }
   }
 
@@ -182,14 +193,15 @@ async function processJob(job: JobWithStrategy) {
         }
       }
 
+      const payload = (job.payload as any) ?? {};
       if (strategy && strategy.source === 'reddit') {
-        log = await runCommand(jobId, 'reddit-ingest', strategy);
+        log = await runCommand(jobId, 'reddit-ingest', strategy, payload);
       } else if (strategy && strategy.source === 'youtube') {
-        log = await runCommand(jobId, 'youtube-ingest', strategy);
+        log = await runCommand(jobId, 'youtube-ingest', strategy, payload);
       } else if (strategy && strategy.source === 'google_trends') {
-        log = await runCommand(jobId, 'trends-ingest', strategy);
+        log = await runCommand(jobId, 'trends-ingest', strategy, payload);
       } else {
-        log = await runCommand(jobId, jobType, strategy);
+        log = await runCommand(jobId, jobType, strategy, payload);
       }
 
       if (strategy) {

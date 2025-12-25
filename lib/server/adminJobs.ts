@@ -4,6 +4,7 @@ export type AdminJobType =
   | 'reddit-ingest'
   | 'youtube-ingest'
   | 'trends-ingest'
+  | 'google-trends-ingest'
   | 'process-trends-snapshot';
 
 export type AdminJobRow = {
@@ -29,6 +30,7 @@ export async function createAdminJob(
     strategyId?: string | null;
     source?: string | null;
     createdBy?: string | null;
+    dedupeKey?: string | null;
   },
 ) {
   const payloadObj =
@@ -54,6 +56,7 @@ export async function createAdminJob(
       created_by: options?.createdBy ?? null,
       strategy_id: options?.strategyId ?? null,
       source: inferredSource,
+      dedupe_key: options?.dedupeKey ?? null,
     })
     .select('id')
     .single();
@@ -98,7 +101,8 @@ const JOB_TYPE_MAP: Record<string, AdminJobType> = {
   'trends_ingest': 'trends-ingest',
   'google_trends': 'trends-ingest',
   'google-trends': 'trends-ingest',
-  'google-trends-ingest': 'trends-ingest',
+  'google-trends-ingest': 'google-trends-ingest',
+  'google_trends_ingest': 'google-trends-ingest',
   'process-trends-snapshot': 'process-trends-snapshot',
 };
 
