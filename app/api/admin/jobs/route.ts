@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth/requireAdmin';
 import {
   createAdminJob,
   listAdminJobs,
+  normalizeAdminJobType,
   type AdminJobType,
 } from '@/lib/server/adminJobs';
 
@@ -38,13 +39,17 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const jobType = (body?.job_type ?? body?.type) as AdminJobType | undefined;
-    const payload = (body?.payload as Record<string, unknown>) ?? {};
     const strategyId = body?.strategyId ?? body?.strategy_id;
     const source = body?.source ?? null;
+    const jobTypeRaw = (body?.job_type ?? body?.type) as string | undefined;
+    const jobType: AdminJobType | null = normalizeAdminJobType(jobTypeRaw, source);
+    const payload = (body?.payload as Record<string, unknown>) ?? {};
 
     if (!jobType) {
-      return NextResponse.json({ error: 'Missing job_type' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing or unsupported job_type' },
+        { status: 400 },
+      );
     }
     if (strategyId !== undefined && strategyId !== null && typeof strategyId !== 'string') {
       return NextResponse.json(

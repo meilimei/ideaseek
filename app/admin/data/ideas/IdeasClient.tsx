@@ -1,6 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  AdminInput,
+  AdminSelect,
+  CardBody,
+  CardHeading,
+  DataTable,
+  GlassCard,
+} from '@/components/admin/primitives';
 
 type IdeaRow = {
   id: string;
@@ -15,6 +24,9 @@ type IdeaRow = {
   pinned: boolean | null;
   featured: boolean | null;
   created_by?: string | null;
+  published_at?: string | null;
+  unpublished_at?: string | null;
+  status?: string | null;
 };
 
 type ListResponse = {
@@ -98,224 +110,253 @@ export default function IdeasClient() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="text-sm font-semibold text-gray-900">Filters</div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Keyword</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="title or one-liner"
-            />
+      <GlassCard>
+        <CardHeading title="Filters" description="Slice the ideas dataset quickly." />
+        <CardBody className="space-y-4 pt-0">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Keyword</label>
+              <AdminInput
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="title or one-liner"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Source type</label>
+              <AdminInput
+                value={sourceType}
+                onChange={(e) => setSourceType(e.target.value)}
+                placeholder="reddit / youtube / trends"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Status</label>
+              <AdminSelect
+                value={status}
+                onChange={(e) => setStatus(e.target.value as typeof status)}
+              >
+                <option value="all">All</option>
+                <option value="published">Published</option>
+                <option value="unpublished">Unpublished</option>
+                <option value="deleted">Deleted</option>
+              </AdminSelect>
+            </div>
           </div>
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Source type</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={sourceType}
-              onChange={(e) => setSourceType(e.target.value)}
-              placeholder="reddit / youtube / trends"
-            />
+          <div className="flex flex-wrap items-center gap-3 text-sm text-foreground/80">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={includeDeleted}
+                onChange={(e) => setIncludeDeleted(e.target.checked)}
+              />
+              Include deleted
+            </label>
+            <div className="flex items-center gap-2">
+              <span>Created by</span>
+              <AdminInput
+                className="h-9 w-40 px-3 py-1"
+                value={createdBy}
+                onChange={(e) => setCreatedBy(e.target.value)}
+                placeholder="user id"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void fetchList(1)}
+            >
+              Apply
+            </Button>
           </div>
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as typeof status)}
-              className="w-full rounded-md border px-3 py-2 text-sm"
-           >
-             <option value="all">All</option>
-             <option value="published">Published</option>
-              <option value="unpublished">Unpublished</option>
-              <option value="deleted">Deleted</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm text-gray-700">
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={includeDeleted}
-              onChange={(e) => setIncludeDeleted(e.target.checked)}
-            />
-            Include deleted
-          </label>
-          <div className="flex items-center gap-2">
-            <span>Created by</span>
-            <input
-              className="rounded-md border px-3 py-1 text-sm"
-              value={createdBy}
-              onChange={(e) => setCreatedBy(e.target.value)}
-              placeholder="user id"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => void fetchList(1)}
-            className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
-          >
-            Apply
-          </button>
-        </div>
-      </div>
+        </CardBody>
+      </GlassCard>
 
-      <div className="flex items-center gap-3 text-sm">
-        <button
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => void fetchList(page)}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
           disabled={loading}
         >
           {loading ? 'Loading…' : 'Refresh'}
-        </button>
-        <div>
+        </Button>
+        <div className="text-muted-foreground">
           Page {page} of {totalPages} ({total} rows)
         </div>
-        {error && <div className="text-red-600">{error}</div>}
-        {toast && <div className="text-green-700">{toast}</div>}
+        {error && <div className="text-destructive">{error}</div>}
+        {toast && <div className="text-emerald-500">{toast}</div>}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-2">Created</th>
-              <th className="px-3 py-2">Source</th>
-              <th className="px-3 py-2">Title</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Pinned</th>
-              <th className="px-3 py-2">Featured</th>
-              <th className="px-3 py-2">Updated</th>
-              <th className="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => (
-              <tr key={row.id} className="border-t align-top">
-                <td className="px-3 py-2 text-xs text-gray-600">
-                  {row.created_at ?? '—'}
-                </td>
-                <td className="px-3 py-2">
-                  {row.source_type ?? '—'}
-                  {row.deleted_at && (
-                    <div className="text-xs text-red-600">
-                      Deleted {row.deleted_at}
-                    </div>
-                  )}
-                </td>
-                <td className="px-3 py-2 max-w-xs break-words">
-                  <div className="font-medium text-gray-900">{row.title}</div>
-                  {row.one_liner && (
-                    <div className="text-xs text-gray-600">{row.one_liner}</div>
-                  )}
-                </td>
-                <td className="px-3 py-2 capitalize">
-                  {row.deleted_at
-                    ? 'Deleted'
-                    : row.published
-                      ? 'Published'
-                      : 'Draft'}
-                </td>
-                <td className="px-3 py-2 text-xs">{row.pinned ? 'Yes' : 'No'}</td>
-                <td className="px-3 py-2 text-xs">{row.featured ? 'Yes' : 'No'}</td>
-                <td className="px-3 py-2 text-xs text-gray-600">
-                  {row.updated_at ?? '—'}
-                </td>
-                <td className="px-3 py-2 text-right space-y-1">
-                  {row.deleted_at ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleFlag(row.id, 'soft_delete', false)}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Restore
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => toggleFlag(row.id, 'soft_delete', true)}
-                      className="rounded-md border px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  )}
-                  {row.published ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleFlag(row.id, 'publish', false)}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Unpublish
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => toggleFlag(row.id, 'publish', true)}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Publish
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => toggleFlag(row.id, 'pin', !(row.pinned ?? false))}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    {row.pinned ? 'Unpin' : 'Pin'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleFlag(row.id, 'feature', !(row.featured ?? false))}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    {row.featured ? 'Unfeature' : 'Feature'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {items.length === 0 && !error && (
+      <GlassCard>
+        <CardBody className="overflow-x-auto p-0">
+          <DataTable>
+            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <td className="px-4 py-4 text-sm text-gray-500" colSpan={8}>
-                  No ideas found.
-                </td>
+                <th className="px-3 py-2">Created</th>
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Title</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Pinned</th>
+                <th className="px-3 py-2">Featured</th>
+                <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {items.map((row) => (
+                <tr key={row.id} className="align-top transition hover:bg-secondary/8">
+                  <td className="px-3 py-3 text-xs text-muted-foreground">
+                    {row.created_at ?? '—'}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="text-foreground">{row.source_type ?? '—'}</div>
+                    {row.deleted_at && (
+                      <div className="text-xs text-destructive">
+                        Deleted {row.deleted_at}
+                      </div>
+                    )}
+                  </td>
+                  <td className="max-w-xs break-words px-3 py-3">
+                    <div className="font-semibold text-foreground">{row.title}</div>
+                    {row.one_liner && (
+                      <div className="text-xs text-muted-foreground">{row.one_liner}</div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 capitalize">
+                    {row.deleted_at
+                      ? 'Deleted'
+                      : row.published
+                        ? 'Published'
+                        : 'Draft'}
+                    {row.published_at && row.published && (
+                      <div className="text-xs text-muted-foreground">
+                        Published at {row.published_at}
+                      </div>
+                    )}
+                    {row.unpublished_at && !row.published && (
+                      <div className="text-xs text-muted-foreground">
+                        Unpublished at {row.unpublished_at}
+                      </div>
+                    )}
+                    {row.status && (
+                      <div className="text-[11px] text-muted-foreground/80">Status: {row.status}</div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-xs">{row.pinned ? 'Yes' : 'No'}</td>
+                  <td className="px-3 py-3 text-xs">{row.featured ? 'Yes' : 'No'}</td>
+                  <td className="px-3 py-3 text-xs text-muted-foreground">
+                    {row.updated_at ?? '—'}
+                  </td>
+                  <td className="px-3 py-3 text-right space-y-1">
+                    {row.deleted_at ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleFlag(row.id, 'soft_delete', false)}
+                        className="rounded-full px-3"
+                      >
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3 text-destructive hover:bg-destructive/10"
+                        onClick={() => toggleFlag(row.id, 'soft_delete', true)}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                    {row.published ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => toggleFlag(row.id, 'publish', false)}
+                      >
+                        Unpublish
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => toggleFlag(row.id, 'publish', true)}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full px-3"
+                      onClick={() => toggleFlag(row.id, 'pin', !(row.pinned ?? false))}
+                    >
+                      {row.pinned ? 'Unpin' : 'Pin'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full px-3"
+                      onClick={() => toggleFlag(row.id, 'feature', !(row.featured ?? false))}
+                    >
+                      {row.featured ? 'Unfeature' : 'Feature'}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && !error && (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={8}>
+                    No ideas found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </DataTable>
+        </CardBody>
+      </GlassCard>
 
       <div className="flex items-center gap-3 text-sm">
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             const next = Math.max(1, page - 1);
             setPage(next);
             void fetchList(next);
           }}
           disabled={page === 1}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Prev
-        </button>
-        <div>
+        </Button>
+        <div className="text-muted-foreground">
           Page {page} of {totalPages}
         </div>
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             const next = Math.min(totalPages, page + 1);
             setPage(next);
             void fetchList(next);
           }}
           disabled={page >= totalPages}
-        className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
-        </button>
+        </Button>
       </div>
-
     </div>
   );
 }

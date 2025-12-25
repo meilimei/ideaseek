@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { listStrategies } from '@/lib/server/adminStrategies';
 import StrategiesClient from './StrategiesClient';
@@ -17,18 +17,10 @@ export default async function AdminStrategiesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Strategies</h1>
-          <p className="text-sm text-gray-600">
-            Configure ingestion strategies for Reddit, YouTube, and Google Trends without touching code.
-          </p>
-        </div>
-        <Link href="/admin" className="text-sm text-indigo-600 hover:underline">
-          Back to dashboard
-        </Link>
-      </div>
-
+      <AdminPageHeader
+        title="Strategies"
+        description="Configure ingestion strategies for Reddit, YouTube, and Google Trends without touching code."
+      />
       <StrategiesClient strategies={strategies} />
     </div>
   );

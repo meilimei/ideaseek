@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 
 export default async function AdminTrendsPage() {
@@ -9,9 +10,11 @@ export default async function AdminTrendsPage() {
   }
 
   return (
-    <div className="space-y-2">
-      <h1 className="text-2xl font-semibold text-gray-900">Trends</h1>
-      <p className="text-sm text-gray-600">Inspect trends and enrichment (coming soon).</p>
+    <div className="space-y-4">
+      <AdminPageHeader
+        title="Trends"
+        description="Inspect trends and enrichment (coming soon)."
+      />
     </div>
   );
 }

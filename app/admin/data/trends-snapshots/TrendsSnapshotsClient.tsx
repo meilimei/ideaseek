@@ -1,6 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  AdminInput,
+  AdminSelect,
+  CardBody,
+  CardHeading,
+  DataTable,
+  GlassCard,
+} from '@/components/admin/primitives';
 
 type SnapshotRow = {
   id: number;
@@ -166,237 +175,252 @@ export default function TrendsSnapshotsClient() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="text-sm font-semibold text-gray-900">Filters</div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Strategy name</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={strategy}
-              onChange={(e) => setStrategy(e.target.value)}
-              placeholder="strategy name"
-            />
+      <GlassCard>
+        <CardHeading title="Filters" description="Inspect Google Trends snapshots." />
+        <CardBody className="space-y-4 pt-0">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Strategy name</label>
+              <AdminInput
+                value={strategy}
+                onChange={(e) => setStrategy(e.target.value)}
+                placeholder="strategy name"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Keyword</label>
+              <AdminInput
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="keyword"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Processed</label>
+              <AdminSelect
+                value={processed}
+                onChange={(e) => setProcessed(e.target.value as typeof processed)}
+              >
+                <option value="all">All</option>
+                <option value="processed">Processed</option>
+                <option value="unprocessed">Unprocessed</option>
+              </AdminSelect>
+            </div>
           </div>
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Keyword</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="keyword"
-            />
-          </div>
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Processed</label>
-            <select
-              value={processed}
-              onChange={(e) => setProcessed(e.target.value as typeof processed)}
-              className="w-full rounded-md border px-3 py-2 text-sm"
+          <div className="flex flex-wrap items-center gap-3 text-sm text-foreground/80">
+            <label className="flex items-center gap-2">
+              <span>Start date</span>
+              <AdminInput
+                type="date"
+                className="h-10 w-auto px-3 py-1"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <span>End date</span>
+              <AdminInput
+                type="date"
+                className="h-10 w-auto px-3 py-1"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={includeDeleted}
+                onChange={(e) => setIncludeDeleted(e.target.checked)}
+              />
+              Include deleted
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void fetchList(1)}
             >
-              <option value="all">All</option>
-              <option value="processed">Processed</option>
-              <option value="unprocessed">Unprocessed</option>
-            </select>
+              Apply
+            </Button>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm text-gray-700">
-          <label className="flex items-center gap-2">
-            <span>Start date</span>
-            <input
-              type="date"
-              className="rounded-md border px-2 py-1 text-sm"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </label>
-          <label className="flex items-center gap-2">
-            <span>End date</span>
-            <input
-              type="date"
-              className="rounded-md border px-2 py-1 text-sm"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={includeDeleted}
-              onChange={(e) => setIncludeDeleted(e.target.checked)}
-            />
-            Include deleted
-          </label>
-          <button
-            type="button"
-            onClick={() => void fetchList(1)}
-            className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
-          >
-            Apply
-          </button>
-        </div>
-      </div>
+        </CardBody>
+      </GlassCard>
 
-      <div className="flex items-center gap-3 text-sm">
-        <button
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => void fetchList(page)}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
           disabled={loading}
         >
           {loading ? 'Loading…' : 'Refresh'}
-        </button>
-        <div>
+        </Button>
+        <div className="text-muted-foreground">
           Page {page} of {totalPages} ({total} rows)
         </div>
-        {error && <div className="text-red-600">{error}</div>}
-        {toast && <div className="text-green-700">{toast}</div>}
+        {error && <div className="text-destructive">{error}</div>}
+        {toast && <div className="text-emerald-500">{toast}</div>}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-2">Created</th>
-              <th className="px-3 py-2">Strategy</th>
-              <th className="px-3 py-2">Geo / Timeframe</th>
-              <th className="px-3 py-2">Keyword</th>
-              <th className="px-3 py-2">Snapshot Key</th>
-              <th className="px-3 py-2">Processed</th>
-              <th className="px-3 py-2">Deleted</th>
-              <th className="px-3 py-2">Error</th>
-              <th className="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => (
-              <tr key={row.id} className="border-t align-top">
-                <td className="px-3 py-2 text-xs text-gray-600">
-                  {row.created_at ?? '—'}
-                </td>
-                <td className="px-3 py-2">
-                  {row.strategy_name ?? '—'}
-                  <div className="text-xs text-gray-500">{row.source ?? 'google_trends'}</div>
-                </td>
-                <td className="px-3 py-2">
-                  {row.geo ?? 'GLOBAL'} / {row.timeframe ?? 'today 12-m'}
-                </td>
-                <td className="px-3 py-2">{row.keyword ?? '—'}</td>
-                <td className="px-3 py-2 max-w-[220px] break-words text-xs text-gray-600">
-                  {row.snapshot_key ?? '—'}
-                </td>
-                <td className="px-3 py-2 text-xs">
-                  <div>{row.processed ? 'Yes' : 'No'}</div>
-                  {row.processed_at && (
-                    <div className="text-gray-500">{row.processed_at}</div>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-xs text-gray-600">
-                  {row.is_deleted ? (
-                    <div>
-                      Deleted
-                      {row.deleted_at && (
-                        <div className="text-gray-500">{row.deleted_at}</div>
-                      )}
-                    </div>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td className="px-3 py-2 text-xs text-red-600">
-                  {row.last_error ?? '—'}
-                </td>
-                <td className="px-3 py-2 text-right space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => viewJson(row.id)}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    View JSON
-                  </button>
-                  {row.processed ? (
-                    <button
-                      type="button"
-                      onClick={() => updateProcessed(row.id, false)}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Mark unprocessed
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => updateProcessed(row.id, true)}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Mark processed
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => reprocess(row.id)}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                  >
-                    Reprocess
-                  </button>
-                  {row.is_deleted ? (
-                    <button
-                      type="button"
-                      onClick={() => restoreRow(row.id)}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Restore
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => deleteRow(row.id)}
-                      className="rounded-md border px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {items.length === 0 && !error && (
+      <GlassCard>
+        <CardBody className="overflow-x-auto p-0">
+          <DataTable>
+            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <td className="px-4 py-4 text-sm text-gray-500" colSpan={8}>
-                  No snapshots found.
-                </td>
+                <th className="px-3 py-2">Created</th>
+                <th className="px-3 py-2">Strategy</th>
+                <th className="px-3 py-2">Geo / Timeframe</th>
+                <th className="px-3 py-2">Keyword</th>
+                <th className="px-3 py-2">Snapshot Key</th>
+                <th className="px-3 py-2">Processed</th>
+                <th className="px-3 py-2">Deleted</th>
+                <th className="px-3 py-2">Error</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {items.map((row) => (
+                <tr key={row.id} className="align-top transition hover:bg-secondary/8">
+                  <td className="px-3 py-3 text-xs text-muted-foreground">
+                    {row.created_at ?? '—'}
+                  </td>
+                  <td className="px-3 py-3">
+                    {row.strategy_name ?? '—'}
+                    <div className="text-xs text-muted-foreground">{row.source ?? 'google_trends'}</div>
+                  </td>
+                  <td className="px-3 py-3">
+                    {row.geo ?? 'GLOBAL'} / {row.timeframe ?? 'today 12-m'}
+                  </td>
+                  <td className="px-3 py-3">{row.keyword ?? '—'}</td>
+                  <td className="max-w-[220px] break-words px-3 py-3 text-xs text-muted-foreground">
+                    {row.snapshot_key ?? '—'}
+                  </td>
+                  <td className="px-3 py-3 text-xs">
+                    <div>{row.processed ? 'Yes' : 'No'}</div>
+                    {row.processed_at && (
+                      <div className="text-muted-foreground">{row.processed_at}</div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-xs text-muted-foreground">
+                    {row.is_deleted ? (
+                      <div>
+                        Deleted
+                        {row.deleted_at && (
+                          <div className="text-muted-foreground">{row.deleted_at}</div>
+                        )}
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-xs text-destructive">
+                    {row.last_error ?? '—'}
+                  </td>
+                  <td className="px-3 py-3 text-right space-y-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full px-3"
+                      onClick={() => viewJson(row.id)}
+                    >
+                      View JSON
+                    </Button>
+                    {row.processed ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => updateProcessed(row.id, false)}
+                      >
+                        Mark unprocessed
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => updateProcessed(row.id, true)}
+                      >
+                        Mark processed
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="rounded-full px-3"
+                      onClick={() => reprocess(row.id)}
+                    >
+                      Reprocess
+                    </Button>
+                    {row.is_deleted ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => restoreRow(row.id)}
+                      >
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3 text-destructive hover:bg-destructive/10"
+                        onClick={() => deleteRow(row.id)}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && !error && (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={8}>
+                    No snapshots found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </DataTable>
+        </CardBody>
+      </GlassCard>
 
       <div className="flex items-center gap-3 text-sm">
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             const next = Math.max(1, page - 1);
             setPage(next);
             void fetchList(next);
           }}
           disabled={page === 1}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Prev
-        </button>
-        <div>
-          Page {page} of {totalPages}
-        </div>
-        <button
+        </Button>
+        <div className="text-muted-foreground">Page {page} of {totalPages}</div>
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             const next = Math.min(totalPages, page + 1);
             setPage(next);
             void fetchList(next);
           }}
           disabled={page >= totalPages}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
-        </button>
+        </Button>
       </div>
 
       {modalOpen && (

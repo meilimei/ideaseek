@@ -4,6 +4,7 @@ export type AdminJobType =
   | 'reddit-ingest'
   | 'youtube-ingest'
   | 'trends-ingest'
+  | 'google-trends-ingest'
   | 'process-trends-snapshot';
 
 export type AdminJobRow = {
@@ -29,6 +30,7 @@ export async function createAdminJob(
     strategyId?: string | null;
     source?: string | null;
     createdBy?: string | null;
+    dedupeKey?: string | null;
   },
 ) {
   const payloadObj =
@@ -54,6 +56,7 @@ export async function createAdminJob(
       created_by: options?.createdBy ?? null,
       strategy_id: options?.strategyId ?? null,
       source: inferredSource,
+      dedupe_key: options?.dedupeKey ?? null,
     })
     .select('id')
     .single();
@@ -85,4 +88,41 @@ export async function getAdminJob(id: string) {
     .maybeSingle();
   if (error) throw error;
   return data ?? null;
+}
+
+const JOB_TYPE_MAP: Record<string, AdminJobType> = {
+  'reddit-ingest': 'reddit-ingest',
+  'reddit_ingest': 'reddit-ingest',
+  reddit: 'reddit-ingest',
+  'youtube-ingest': 'youtube-ingest',
+  'youtube_ingest': 'youtube-ingest',
+  youtube: 'youtube-ingest',
+  'trends-ingest': 'trends-ingest',
+  'trends_ingest': 'trends-ingest',
+  'google_trends': 'trends-ingest',
+  'google-trends': 'trends-ingest',
+  'google-trends-ingest': 'google-trends-ingest',
+  'google_trends_ingest': 'google-trends-ingest',
+  'process-trends-snapshot': 'process-trends-snapshot',
+};
+
+export function normalizeAdminJobType(
+  jobType: string | null | undefined,
+  source?: string | null,
+): AdminJobType | null {
+  if (jobType) {
+    const normalizedKey = jobType.toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+    if (JOB_TYPE_MAP[normalizedKey]) {
+      return JOB_TYPE_MAP[normalizedKey];
+    }
+  }
+
+  if (source) {
+    const normalizedSource = source.toLowerCase().replace(/\s+/g, '').replace(/_/g, '-');
+    if (JOB_TYPE_MAP[normalizedSource]) {
+      return JOB_TYPE_MAP[normalizedSource];
+    }
+  }
+
+  return null;
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AdminShell } from '@/components/admin/AdminShell';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -18,11 +19,11 @@ export default async function AdminLayout({
   if (auth.status === 'forbidden') {
     return (
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-4 px-4 text-center">
-        <div className="text-2xl font-semibold text-gray-900">Access denied (403)</div>
-        <div className="text-sm text-gray-600">
+        <div className="text-2xl font-semibold text-foreground">Access denied (403)</div>
+        <div className="text-sm text-muted-foreground">
           You must be an admin to access this area.
           {process.env.NODE_ENV !== 'production' && (
-            <div className="mt-3 space-y-1 text-left text-xs text-gray-500">
+            <div className="mt-3 space-y-1 text-left text-xs text-muted-foreground/80">
               {auth.userId && <div>User ID: {auth.userId}</div>}
               <div>Profile found: {auth.profileFound ? 'yes' : 'no'}</div>
               <div>Role: {auth.role ?? 'null'}</div>
@@ -31,7 +32,7 @@ export default async function AdminLayout({
         </div>
         <Link
           href="/"
-          className="rounded-md border px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          className="rounded-full border border-border/60 px-4 py-2 text-sm text-foreground shadow-soft transition hover:bg-white/5"
         >
           Go home
         </Link>
@@ -39,42 +40,17 @@ export default async function AdminLayout({
     );
   }
 
-  const navItems = [
-    { href: '/admin/jobs', label: 'Jobs' },
-    { href: '/admin/ideas', label: 'Ideas' },
-    { href: '/admin/trends', label: 'Trends' },
-    { href: '/admin/strategies', label: 'Strategies' },
-    { href: '/admin/data/ideas', label: 'Ideas (Data)' },
-    { href: '/admin/data/reddit-posts', label: 'Reddit Posts' },
-    { href: '/admin/data/trends-snapshots', label: 'Trends Snapshots' },
-    { href: '/admin/raw', label: 'Raw Data' },
-  ];
+  const metadata = (auth.user.user_metadata ?? {}) as Record<string, any>;
+  const userEmail = auth.user.email ?? null;
+  const userName = typeof metadata.full_name === 'string' ? metadata.full_name : null;
+  const avatarUrl =
+    typeof metadata.avatar_url === 'string' && metadata.avatar_url.trim()
+      ? metadata.avatar_url
+      : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto flex max-w-6xl gap-6 px-4 py-8">
-        <aside className="w-48 flex-shrink-0 space-y-2">
-          <div className="text-lg font-semibold text-gray-900">Admin</div>
-          <nav className="flex flex-col gap-1 text-sm text-gray-700">
-            <Link
-              href="/admin"
-              className="rounded-md px-3 py-2 hover:bg-gray-100"
-            >
-              Dashboard
-            </Link>
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="rounded-md px-3 py-2 hover:bg-gray-100"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </aside>
-        <main className="flex-1">{children}</main>
-      </div>
-    </div>
+    <AdminShell userEmail={userEmail} userName={userName} avatarUrl={avatarUrl}>
+      {children}
+    </AdminShell>
   );
 }

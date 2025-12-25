@@ -1,6 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  AdminInput,
+  AdminSelect,
+  CardBody,
+  CardHeading,
+  DataTable,
+  GlassCard,
+} from '@/components/admin/primitives';
 
 type RawRedditPost = {
   id: number;
@@ -17,7 +26,12 @@ type RawRedditPost = {
   is_deleted: boolean;
   admin_note: string | null;
   promoted_idea_id?: string | null;
+  used_for_ideas?: boolean | null;
+  promoted_at?: string | null;
 };
+
+const textareaClass =
+  'w-full rounded-2xl border border-border/50 bg-card/60 px-3 py-2 text-sm text-foreground shadow-soft transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
 
 type ApiResponse = {
   items: RawRedditPost[];
@@ -34,6 +48,7 @@ export default function RedditPostsClient() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; ideaId?: string } | null>(null);
 
   const [subreddit, setSubreddit] = useState('');
   const [query, setQuery] = useState('');
@@ -41,6 +56,7 @@ export default function RedditPostsClient() {
   const [selected, setSelected] = useState<'all' | 'true' | 'false'>('all');
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [noteEdits, setNoteEdits] = useState<Record<number, string>>({});
+  const [promotingId, setPromotingId] = useState<number | null>(null);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -102,6 +118,9 @@ export default function RedditPostsClient() {
   };
 
   const promote = async (id: number) => {
+    setPromotingId(id);
+    setToast(null);
+    setError(null);
     try {
       const res = await fetch(`/api/admin/reddit-posts/${id}/promote`, {
         method: 'POST',
@@ -110,234 +129,287 @@ export default function RedditPostsClient() {
       if (!res.ok) {
         throw new Error(json.error || 'Failed to promote');
       }
-      alert(
-        json.created
-          ? `Created idea ${json.ideaId}`
+      setToast({
+        message: json.created
+          ? `Created draft idea ${json.ideaId}`
           : `Already promoted, idea ${json.ideaId}`,
-      );
+        ideaId: json.ideaId,
+      });
       void fetchData(page);
     } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     }
+    setPromotingId(null);
   };
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="text-sm font-semibold text-gray-900">Filters</div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Subreddit</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={subreddit}
-              onChange={(e) => setSubreddit(e.target.value)}
-              placeholder="e.g. Entrepreneur"
-            />
+      <GlassCard>
+        <CardHeading title="Filters" description="Find raw Reddit posts quickly." />
+        <CardBody className="space-y-4 pt-0">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Subreddit</label>
+              <AdminInput
+                value={subreddit}
+                onChange={(e) => setSubreddit(e.target.value)}
+                placeholder="e.g. Entrepreneur"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Keyword</label>
+              <AdminInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search title/body"
+              />
+            </div>
+            <div className="space-y-2 text-sm">
+              <label className="text-muted-foreground">Min score</label>
+              <AdminInput
+                value={minScore}
+                onChange={(e) => setMinScore(e.target.value)}
+                placeholder="e.g. 10"
+              />
+            </div>
           </div>
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Keyword</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search title/body"
-            />
-          </div>
-          <div className="space-y-1 text-sm">
-            <label className="text-gray-700">Min score</label>
-            <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={minScore}
-              onChange={(e) => setMinScore(e.target.value)}
-              placeholder="e.g. 10"
-            />
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm text-gray-700">
-          <div className="flex items-center gap-2">
-            <span>Selected:</span>
-            <select
-              value={selected}
-              onChange={(e) => setSelected(e.target.value as typeof selected)}
-              className="rounded-md border px-2 py-1 text-sm"
+          <div className="flex flex-wrap items-center gap-3 text-sm text-foreground/80">
+            <div className="flex items-center gap-2">
+              <span>Selected:</span>
+              <AdminSelect
+                value={selected}
+                onChange={(e) => setSelected(e.target.value as typeof selected)}
+                className="h-9 w-40 px-3 py-1"
+              >
+                <option value="all">All</option>
+                <option value="true">Only selected</option>
+                <option value="false">Not selected</option>
+              </AdminSelect>
+            </div>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={includeDeleted}
+                onChange={(e) => setIncludeDeleted(e.target.checked)}
+              />
+              Include deleted
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void fetchData(1)}
             >
-              <option value="all">All</option>
-              <option value="true">Only selected</option>
-              <option value="false">Not selected</option>
-            </select>
+              Apply
+            </Button>
           </div>
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={includeDeleted}
-              onChange={(e) => setIncludeDeleted(e.target.checked)}
-            />
-            Include deleted
-          </label>
-          <button
-            type="button"
-            onClick={() => void fetchData(1)}
-            className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
-          >
-            Apply
-          </button>
-        </div>
-      </div>
+        </CardBody>
+      </GlassCard>
 
-      <div className="flex items-center gap-3 text-sm">
-        <button
+      {toast && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          <span>{toast.message}</span>
+          {toast.ideaId && (
+            <>
+              <span className="mx-2 text-gray-500">•</span>
+              <a
+                href={`/admin/data/ideas?search=${toast.ideaId}`}
+                className="text-indigo-700 underline"
+              >
+                View in ideas admin
+              </a>
+              <span className="mx-2 text-gray-500">•</span>
+              <a
+                href={`/ideas/${toast.ideaId}`}
+                className="text-indigo-700 underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open idea
+              </a>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={refresh}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100"
           disabled={loading}
         >
           {loading ? 'Loading…' : 'Refresh'}
-        </button>
-        <div>
+        </Button>
+        <div className="text-muted-foreground">
           Page {page} of {totalPages} ({total} rows)
         </div>
-        {error && <div className="text-red-600">{error}</div>}
+        {error && <div className="text-destructive">{error}</div>}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-3 py-2">Created</th>
-              <th className="px-3 py-2">Subreddit</th>
-              <th className="px-3 py-2">Score</th>
-              <th className="px-3 py-2">Comments</th>
-              <th className="px-3 py-2">Title</th>
-              <th className="px-3 py-2">Selected</th>
-              <th className="px-3 py-2">Deleted</th>
-              <th className="px-3 py-2">Admin note</th>
-              <th className="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => {
-              const isSelected = row.selected ?? row.selected_for_idea ?? false;
-              const noteValue = noteEdits[row.id] ?? row.admin_note ?? '';
-              return (
-                <tr key={row.id} className="border-t align-top">
-                  <td className="px-3 py-2 text-xs text-gray-600">
-                    {row.created_utc ?? '—'}
-                  </td>
-                  <td className="px-3 py-2">{row.subreddit ?? '—'}</td>
-                  <td className="px-3 py-2">{row.score ?? 0}</td>
-                  <td className="px-3 py-2">{row.num_comments ?? 0}</td>
-                  <td className="px-3 py-2 max-w-xs">
-                    <a
-                      href={row.url ?? '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-indigo-600 hover:underline"
-                    >
-                      {row.title ?? row.source_post_id}
-                    </a>
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => updateRow(row.id, { selected: !isSelected })}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      {isSelected ? 'Selected' : 'Select'}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => updateRow(row.id, { is_deleted: !row.is_deleted })}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      {row.is_deleted ? 'Restore' : 'Delete'}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2">
-                    <textarea
-                      className="w-full rounded-md border px-2 py-1 text-xs"
-                      rows={2}
-                      value={noteValue}
-                      onChange={(e) =>
-                        setNoteEdits((prev) => ({
-                          ...prev,
-                          [row.id]: e.target.value,
-                        }))
-                      }
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {row.promoted_idea_id ? (
+      <GlassCard>
+        <CardBody className="overflow-x-auto p-0">
+          <DataTable>
+            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2">Created</th>
+                <th className="px-3 py-2">Subreddit</th>
+                <th className="px-3 py-2">Score</th>
+                <th className="px-3 py-2">Comments</th>
+                <th className="px-3 py-2">Title</th>
+                <th className="px-3 py-2">Selected</th>
+                <th className="px-3 py-2">Deleted</th>
+                <th className="px-3 py-2">Admin note</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {items.map((row) => {
+                const isSelected = row.selected ?? row.selected_for_idea ?? false;
+                const noteValue = noteEdits[row.id] ?? row.admin_note ?? '';
+                return (
+                  <tr key={row.id} className="align-top transition hover:bg-secondary/8">
+                    <td className="px-3 py-3 text-xs text-muted-foreground">
+                      {row.created_utc ?? '—'}
+                    </td>
+                    <td className="px-3 py-3">{row.subreddit ?? '—'}</td>
+                    <td className="px-3 py-3">{row.score ?? 0}</td>
+                    <td className="px-3 py-3">{row.num_comments ?? 0}</td>
+                    <td className="max-w-xs px-3 py-3">
                       <a
-                        href={`/ideas/${row.promoted_idea_id}`}
-                        className="rounded-md border px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50"
+                        href={row.url ?? '#'}
                         target="_blank"
                         rel="noreferrer"
+                        className="text-primary underline-offset-4 hover:underline"
                       >
-                        Open idea
+                        {row.title ?? row.source_post_id}
                       </a>
-                    ) : (
-                      <button
+                    </td>
+                    <td className="px-3 py-3">
+                      <Button
                         type="button"
-                        onClick={() => promote(row.id)}
-                        className="rounded-md border px-2 py-1 text-xs bg-indigo-600 text-white hover:bg-indigo-700"
-                        disabled={loading}
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => updateRow(row.id, { selected: !isSelected })}
                       >
-                        Promote to Idea
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => updateRow(row.id, { admin_note: noteValue })}
-                      className="rounded-md border px-2 py-1 text-xs hover:bg-gray-100"
-                    >
-                      Save
-                    </button>
+                        {isSelected ? 'Selected' : 'Select'}
+                      </Button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                        onClick={() => updateRow(row.id, { is_deleted: !row.is_deleted })}
+                      >
+                        {row.is_deleted ? 'Restore' : 'Delete'}
+                      </Button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <textarea
+                        className={`${textareaClass} h-20 text-xs`}
+                        rows={2}
+                        value={noteValue}
+                        onChange={(e) =>
+                          setNoteEdits((prev) => ({
+                            ...prev,
+                            [row.id]: e.target.value,
+                          }))
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-right space-y-2">
+                      {row.promoted_idea_id ? (
+                        <div className="space-y-1 text-right">
+                          <a
+                            href={`/ideas/${row.promoted_idea_id}`}
+                            className="text-primary underline-offset-4 hover:underline"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open idea
+                          </a>
+                          <a
+                            href={`/admin/data/ideas?search=${row.promoted_idea_id}`}
+                            className="text-primary underline-offset-4 hover:underline"
+                          >
+                            View in admin
+                          </a>
+                          {row.promoted_at && (
+                            <div className="text-[11px] text-muted-foreground">
+                              Promoted {row.promoted_at}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="w-full rounded-full"
+                          onClick={() => promote(row.id)}
+                          disabled={loading || promotingId === row.id}
+                        >
+                          {promotingId === row.id ? 'Promoting…' : 'Promote to Idea'}
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="w-full rounded-full"
+                        onClick={() => updateRow(row.id, { admin_note: noteValue })}
+                      >
+                        Save note
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {items.length === 0 && !error && (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={9}>
+                    No posts found.
                   </td>
                 </tr>
-              );
-            })}
-            {items.length === 0 && !error && (
-              <tr>
-                <td className="px-4 py-4 text-sm text-gray-500" colSpan={9}>
-                  No posts found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              )}
+            </tbody>
+          </DataTable>
+        </CardBody>
+      </GlassCard>
 
       <div className="flex items-center gap-3 text-sm">
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             const next = Math.max(1, page - 1);
             setPage(next);
             void fetchData(next);
           }}
           disabled={page === 1}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Prev
-        </button>
-        <div>
-          Page {page} of {totalPages}
-        </div>
-        <button
+        </Button>
+        <div className="text-muted-foreground">Page {page} of {totalPages}</div>
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             const next = Math.min(totalPages, page + 1);
             setPage(next);
             void fetchData(next);
           }}
           disabled={page >= totalPages}
-          className="rounded-md border px-3 py-1 text-sm text-gray-800 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

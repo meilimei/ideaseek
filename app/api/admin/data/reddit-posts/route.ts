@@ -17,6 +17,8 @@ type RawRedditPost = {
   selected: boolean | null;
   admin_note: string | null;
   promoted_idea_id: string | null;
+  used_for_ideas?: boolean | null;
+  promoted_at?: string | null;
 };
 
 export async function GET(request: Request) {
@@ -47,7 +49,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('raw_reddit_posts')
     .select(
-      'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, selected, promoted_idea_id, admin_note',
+      'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, selected, promoted_idea_id, admin_note, used_for_ideas, promoted_at',
       { count: 'exact' },
     );
 
@@ -139,7 +141,7 @@ export async function PATCH(request: Request) {
       .update(updates)
       .eq('id', id)
       .select(
-        'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, selected, promoted_idea_id, admin_note',
+        'id, source_post_id, subreddit, title, url, score, num_comments, selftext, created_utc, is_deleted, selected_for_idea, selected, promoted_idea_id, admin_note, used_for_ideas, promoted_at',
       )
       .single();
 
