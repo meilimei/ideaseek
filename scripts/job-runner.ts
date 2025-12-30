@@ -4,7 +4,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { supabaseServiceClient as supabase } from '../lib/supabaseServiceClient';
 import { type AdminJobType, type AdminJobRow } from '../lib/server/adminJobs';
-import { enrichIdea } from '../lib/server/ideaEnrich';
+import { ideaEnrich } from '../lib/ai/ideaEnrich';
 import { processSingleTrendsSnapshot } from '../lib/server/processTrendsSnapshot';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -574,9 +574,51 @@ async function processJob(job: JobWithStrategy) {
         throw new Error('Missing idea_id in payload');
       }
 
-      const result = await enrichIdea(ideaId);
-      log = `Enriched idea ${ideaId} with ${result.tags.length} tags, score ${result.score_overall}`;
-      await markJob(jobId, 'success', log, null, null, result);
+      const { data: idea, error: ideaError } = await supabase
+        .from('ideas')
+        .select('*')
+        .eq('id', ideaId)
+        .single();
+      if (ideaError || !idea) {
+        throw new Error(`Idea not found: ${ideaId}`);
+      }
+
+      const { data: evidence, error: evidenceError } = await supabase
+        .from('idea_evidence')
+        .select('*')
+        .eq('idea_id', ideaId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (evidenceError) {
+        throw new Error(`Failed to load evidence for ${ideaId}: ${evidenceError.message}`);
+      }
+
+      const result = await ideaEnrich({
+        idea,
+        evidence: evidence ?? [],
+      });
+
+      const patch: Record<string, unknown> = {
+        tags: result.tags,
+        score_overall: result.score_overall,
+        score_detail: result.score_detail,
+        enriched_at: new Date().toISOString(),
+      };
+      if (idea.status !== 'published') {
+        patch.status = 'draft';
+      }
+
+      const { error: updateError } = await supabase
+        .from('ideas')
+        .update(patch)
+        .eq('id', ideaId);
+      if (updateError) {
+        throw new Error(`Failed to update idea ${ideaId}: ${updateError.message}`);
+      }
+
+      const summary = `idea_enrich ok: tags=${result.tags.length} score=${result.score_overall}`;
+      log = job.log ? `${job.log}\n${summary}` : summary;
+      await markJob(jobId, 'success', log, undefined, undefined);
       return;
     }
 
@@ -636,7 +678,7 @@ async function processJob(job: JobWithStrategy) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log += `\nError: ${message}`;
-    await markJob(jobId, 'error', log, message, null);
+    await markJob(jobId, 'error', log, message);
   }
 }
 
