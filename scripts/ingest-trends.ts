@@ -8,9 +8,12 @@ import OpenAI from 'openai';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-// google-trends-api is CommonJS
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const googleTrends = require('google-trends-api');
+class TransientError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TransientError';
+  }
+}
 
 type DailyTrendArticle = { title: string; snippet: string };
 const TRENDS_SOURCE_URL =
@@ -183,14 +186,40 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
 }
 
 async function fetchDailyTrends(geo = 'US'): Promise<DailyTrendTopic[]> {
-  const results = await googleTrends.dailyTrends({
-    trendDate: new Date(),
-    geo,
+  const url = new URL('https://trends.google.com/trends/api/dailytrends');
+  url.searchParams.set('hl', 'en-US');
+  url.searchParams.set('tz', '0');
+  url.searchParams.set('geo', geo);
+  url.searchParams.set('ns', '15');
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      Accept: 'application/json,text/plain,*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      Referer: 'https://trends.google.com/',
+    },
   });
+
+  const text = await res.text();
+  const status = res.status;
+  const contentType = res.headers.get('content-type') ?? '';
+  const firstSnippet = text.trim().slice(0, 200);
+
+  if (!res.ok || contentType.includes('text/html') || text.trim().startsWith('<')) {
+    throw new TransientError(
+      `Google Trends returned HTML or non-JSON. status=${status} content-type=${contentType} snippet=${firstSnippet}`,
+    );
+  }
 
   let parsed: TrendsResponse;
   try {
-    parsed = JSON.parse(results) as TrendsResponse;
+    let body = text.trim();
+    if (body.startsWith(")]}'")) {
+      body = body.replace(/^\)\]\}'\s*\n?/, '');
+    }
+    parsed = JSON.parse(body) as TrendsResponse;
   } catch (err) {
     throw new Error(
       `Failed to parse Google Trends response: ${

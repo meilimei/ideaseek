@@ -492,6 +492,75 @@ function computeStatusAndScore(signals: ReturnType<typeof getEvidenceSignals>) {
   return { status, score };
 }
 
+function isTransientError(err: unknown): boolean {
+  if (!err) return false;
+  if (err instanceof Error && err.name === 'TransientError') return true;
+  const candidate = [
+    err instanceof Error ? err.message : null,
+    (err as any)?.stderr,
+    (err as any)?.stdout,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join('\n');
+  return candidate.includes('TransientError');
+}
+
+function getTransientMessage(err: unknown): string {
+  const firstLine = (value: string) => {
+    const line = value.split('\n').find((entry) => entry.trim()) ?? value;
+    return line.trim();
+  };
+  if (!err) return 'Transient error';
+  const stderr = (err as any)?.stderr;
+  if (typeof stderr === 'string' && stderr.trim()) return firstLine(stderr);
+  const stdout = (err as any)?.stdout;
+  if (typeof stdout === 'string' && stdout.trim()) return firstLine(stdout);
+  if (err instanceof Error) return firstLine(err.message);
+  return String(err);
+}
+
+async function requeueJob(jobId: string, message: string) {
+  const nextRunAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const nowIso = new Date().toISOString();
+  const logLine = `Transient failure, re-queued job ${jobId} for ${nextRunAt}: ${message}`;
+
+  const { data, error } = await supabase
+    .from('admin_jobs')
+    .select('log')
+    .eq('id', jobId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to load admin job log for requeue:', error.message);
+  }
+
+  const combinedLog = data?.log ? `${data.log}\n${logLine}` : logLine;
+  const updatePayload = compactUpdate({
+    status: 'queued',
+    next_run_at: nextRunAt,
+    locked_at: null,
+    locked_by: null,
+    updated_at: nowIso,
+    finished_at: null,
+    error: null,
+    log: combinedLog,
+  });
+
+  const { error: updateError } = await supabase
+    .from('admin_jobs')
+    .update(updatePayload)
+    .eq('id', jobId);
+
+  if (updateError) {
+    console.error('Failed to re-queue admin job:', {
+      message: updateError.message,
+      keys: Object.keys(updatePayload),
+    });
+  } else {
+    console.log(logLine);
+  }
+}
+
 async function processJob(job: JobWithStrategy) {
   const jobId = job.id;
   const jobType = job.job_type;
@@ -536,14 +605,27 @@ async function processJob(job: JobWithStrategy) {
     let commandLog = 'Running job...';
     await markJob(jobId, 'running', commandLog);
 
+    let commandType: AdminJobType | string;
     if (strategy && strategy.source === 'reddit') {
-      commandLog = await runCommand(jobId, 'reddit-ingest', strategy, payload);
+      commandType = 'reddit-ingest';
     } else if (strategy && strategy.source === 'youtube') {
-      commandLog = await runCommand(jobId, 'youtube-ingest', strategy, payload);
+      commandType = 'youtube-ingest';
     } else if (strategy && strategy.source === 'google_trends') {
-      commandLog = await runCommand(jobId, 'trends-ingest', strategy, payload);
+      commandType = 'trends-ingest';
     } else {
-      commandLog = await runCommand(jobId, jobType, strategy, payload);
+      commandType = jobType;
+    }
+
+    try {
+      commandLog = await runCommand(jobId, commandType, strategy, payload);
+    } catch (err) {
+      const isTrendsCommand =
+        commandType === 'trends-ingest' || commandType === 'google-trends-ingest';
+      if (isTrendsCommand && isTransientError(err)) {
+        await requeueJob(jobId, getTransientMessage(err));
+        return;
+      }
+      throw err;
     }
 
     if (strategy) {
