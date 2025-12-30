@@ -10,6 +10,8 @@ import { processSingleTrendsSnapshot } from '../lib/server/processTrendsSnapshot
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const execAsync = promisify(exec);
+const rawPollMs = Number.parseInt(process.env.JOB_RUNNER_POLL_MS ?? '2000', 10);
+const POLL_MS = Number.isFinite(rawPollMs) && rawPollMs >= 200 ? rawPollMs : 200;
 
 type StrategyRow = {
   id: string;
@@ -113,6 +115,10 @@ function compactUpdate<T extends Record<string, unknown>>(input: T): T {
   return output as T;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function runCommand(
   jobId: string,
   jobType: AdminJobType | string,
@@ -190,6 +196,38 @@ async function printQueuedSummary() {
     }`,
   );
   return ready.length;
+}
+
+async function getIdleDiagnostics() {
+  const nowIso = new Date().toISOString();
+
+  const [readyRes, runningRes, futureRes] = await Promise.all([
+    supabase
+      .from('admin_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'queued')
+      .or('next_run_at.is.null,next_run_at.lte.now()'),
+    supabase
+      .from('admin_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'running'),
+    supabase
+      .from('admin_jobs')
+      .select('next_run_at')
+      .eq('status', 'queued')
+      .gt('next_run_at', nowIso)
+      .order('next_run_at', { ascending: true, nullsLast: true })
+      .limit(1),
+  ]);
+
+  const readyCount = readyRes.count ?? 0;
+  const runningCount = runningRes.count ?? 0;
+  const nextFuture =
+    futureRes.data && futureRes.data.length > 0
+      ? (futureRes.data[0] as { next_run_at?: string | null }).next_run_at ?? null
+      : null;
+
+  return { readyCount, runningCount, nextFuture };
 }
 
 async function markJob(
@@ -687,22 +725,32 @@ async function main() {
   const maxFlag = args.find((a) => a.startsWith('--max='));
   const maxJobs = maxFlag ? parseInt(maxFlag.split('=')[1], 10) || 3 : 3;
   const worker = `local-${Date.now()}`;
+  let processed = 0;
+  let idleLoops = 0;
+  let lastIdleKey = '';
 
   console.log(`Job runner started. worker=${worker}, max=${maxJobs}`);
-  const queuedCount = await printQueuedSummary();
-  if (queuedCount === 0) {
-    console.log('No queued jobs available.');
-    return;
-  }
+  await printQueuedSummary();
 
-  for (let i = 0; i < maxJobs; i++) {
+  while (processed < maxJobs) {
     const job = await claimJob(worker);
     if (!job) {
-      console.log('No more queued jobs to claim.');
-      break;
+      idleLoops += 1;
+      const { readyCount, runningCount, nextFuture } = await getIdleDiagnostics();
+      const idleKey = `${readyCount}|${runningCount}|${nextFuture ?? 'null'}`;
+      if (idleLoops % 10 === 0 || idleKey !== lastIdleKey) {
+        console.log(
+          `Idle: readyQueued=${readyCount} running=${runningCount} nextFuture=${nextFuture ?? 'null'} pollMs=${POLL_MS}`,
+        );
+        lastIdleKey = idleKey;
+      }
+      await sleep(POLL_MS);
+      continue;
     }
     console.log(`Claimed job ${job.id} (${job.job_type})`);
     await processJob(job);
+    processed += 1;
+    idleLoops = 0;
   }
 
   console.log('Job runner finished.');
