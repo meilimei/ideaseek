@@ -5,6 +5,7 @@ export type AdminJobType =
   | 'youtube-ingest'
   | 'trends-ingest'
   | 'google-trends-ingest'
+  | 'idea_enrich'
   | 'process-trends-snapshot';
 
 export type AdminJobRow = {
@@ -23,6 +24,39 @@ export type AdminJobRow = {
   source?: string | null;
 };
 
+type AdminJobInsert = {
+  job_type: AdminJobType;
+  payload: Record<string, unknown>;
+  status: string;
+  created_by?: string | null;
+  strategy_id?: string | null;
+  source?: string | null;
+  dedupe_key?: string | null;
+  next_run_at?: string | null;
+};
+
+export function buildAdminJobInsert(input: AdminJobInsert) {
+  if (input.next_run_at === null) {
+    throw new Error('admin_jobs insert must not set next_run_at = null');
+  }
+
+  const payload: Record<string, unknown> = {
+    job_type: input.job_type,
+    payload: input.payload,
+    status: input.status,
+    created_by: input.created_by ?? null,
+    strategy_id: input.strategy_id ?? null,
+    source: input.source ?? null,
+    dedupe_key: input.dedupe_key ?? null,
+  };
+
+  if (typeof input.next_run_at !== 'undefined') {
+    payload.next_run_at = input.next_run_at;
+  }
+
+  return payload;
+}
+
 export async function createAdminJob(
   type: AdminJobType,
   options?: {
@@ -31,6 +65,7 @@ export async function createAdminJob(
     source?: string | null;
     createdBy?: string | null;
     dedupeKey?: string | null;
+    nextRunAt?: string | null;
   },
 ) {
   const payloadObj =
@@ -46,18 +81,20 @@ export async function createAdminJob(
       ? String((options.payload as Record<string, unknown>).source)
       : null);
 
+  const insertPayload = buildAdminJobInsert({
+    job_type: type,
+    payload: payloadObj,
+    status: 'queued',
+    created_by: options?.createdBy ?? null,
+    strategy_id: options?.strategyId ?? null,
+    source: inferredSource,
+    dedupe_key: options?.dedupeKey ?? null,
+    next_run_at: options?.nextRunAt,
+  });
+
   const { data, error } = await supabase
     .from('admin_jobs')
-    .insert({
-      job_type: type,
-      payload: payloadObj,
-      status: 'queued',
-      next_run_at: new Date().toISOString(),
-      created_by: options?.createdBy ?? null,
-      strategy_id: options?.strategyId ?? null,
-      source: inferredSource,
-      dedupe_key: options?.dedupeKey ?? null,
-    })
+    .insert(insertPayload)
     .select('id')
     .single();
 
@@ -103,6 +140,8 @@ const JOB_TYPE_MAP: Record<string, AdminJobType> = {
   'google-trends': 'trends-ingest',
   'google-trends-ingest': 'google-trends-ingest',
   'google_trends_ingest': 'google-trends-ingest',
+  'idea-enrich': 'idea_enrich',
+  'idea_enrich': 'idea_enrich',
   'process-trends-snapshot': 'process-trends-snapshot',
 };
 

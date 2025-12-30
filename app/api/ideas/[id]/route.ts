@@ -55,5 +55,19 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Idea not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ item: data });
+  const { data: evidence, error: evidenceError } = await supabase
+    .from('idea_evidence')
+    .select('id, source_type, title, url, excerpt, metrics, created_at')
+    .eq('idea_id', id)
+    .order('created_at', { ascending: false, nullsFirst: true });
+
+  if (evidenceError) {
+    console.error(`[API] Error fetching idea evidence ${id}:`, evidenceError);
+    return NextResponse.json(
+      { error: 'Failed to fetch idea evidence' },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ item: data, evidence: evidence ?? [] });
 }

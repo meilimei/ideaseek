@@ -10,9 +10,16 @@ export const dynamic = "force-dynamic";
 export default async function SignupPage() {
   const supabase = await createServerSupabaseClient();
 
-  const { data } = await supabase.auth.getSession();
+  const {
+    data: userData,
+    error: userError,
+  } = await supabase.auth.getUser();
 
-  if (data.session) {
+  if (userError) {
+    console.error("Failed to get user:", userError.message);
+  }
+
+  if (userData?.user) {
     redirect("/ideas/database");
   }
 

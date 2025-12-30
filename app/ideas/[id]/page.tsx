@@ -29,6 +29,16 @@ type Idea = {
   created_at?: string | null;
 };
 
+type EvidenceItem = {
+  id: string;
+  source_type: string | null;
+  title: string | null;
+  url: string | null;
+  excerpt: string | null;
+  metrics: any;
+  created_at: string | null;
+};
+
 type Props = {
   params: Promise<{ id: string }>;
 };
@@ -36,6 +46,7 @@ type Props = {
 export default function IdeaDetailPage({ params }: Props) {
   const { id } = use(params);
   const [idea, setIdea] = useState<Idea | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,10 +59,12 @@ export default function IdeaDetailPage({ params }: Props) {
         }
         const json = await res.json();
         const item = json.item as Idea;
+        const evidenceItems = (json.evidence ?? []) as EvidenceItem[];
         setIdea({
           ...item,
           source_url: item?.source_url ?? null,
         });
+        setEvidence(evidenceItems);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setError(message);
@@ -99,7 +112,7 @@ export default function IdeaDetailPage({ params }: Props) {
       });
     if (idea?.source_type) pills.push({ label: "Source", value: idea.source_type });
     return pills;
-  }, [idea]);
+  }, [idea, evidence.length]);
 
   const scores = useMemo(() => {
     if (!idea) return [] as { label: string; score: string | number; descriptor: string }[];
@@ -159,6 +172,7 @@ export default function IdeaDetailPage({ params }: Props) {
   const sections = useMemo(() => {
     const list: { id: string; label: string }[] = [];
     if (idea?.description) list.push({ id: "summary", label: "Summary" });
+    if (evidence.length > 0) list.push({ id: "evidence", label: "Evidence" });
     list.push({ id: "scores", label: "Scores" });
     list.push({ id: "business-fit", label: "Business Fit" });
     if (idea?.monetization && idea.monetization.length > 0) list.push({ id: "offer", label: "Offer" });
@@ -212,6 +226,61 @@ export default function IdeaDetailPage({ params }: Props) {
             </Prose>
           </IdeaSection>
         ) : null}
+
+        {evidence.length > 0 && (
+          <IdeaSection
+            id="evidence"
+            title="Evidence"
+            description="Source snapshots supporting the idea."
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              {evidence.map((item) => {
+                const score = item.metrics?.score ?? item.metrics?.upvotes ?? null;
+                const comments = item.metrics?.comments ?? item.metrics?.num_comments ?? null;
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-border/60 bg-card/50 p-4 shadow-soft"
+                  >
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="rounded-full border border-border/60 bg-secondary/20 px-2 py-1 uppercase">
+                        {item.source_type ?? "source"}
+                      </span>
+                      {item.created_at && <span>{item.created_at}</span>}
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      <div className="text-sm font-semibold text-foreground">
+                        {item.title ?? "Untitled evidence"}
+                      </div>
+                      {(score != null || comments != null) && (
+                        <div className="text-xs text-muted-foreground">
+                          {score != null && <span>Score: {score}</span>}
+                          {score != null && comments != null && <span className="mx-2">•</span>}
+                          {comments != null && <span>Comments: {comments}</span>}
+                        </div>
+                      )}
+                      {item.excerpt && (
+                        <div className="text-xs text-muted-foreground">
+                          {item.excerpt}
+                        </div>
+                      )}
+                      {item.url && (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                        >
+                          Open source →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </IdeaSection>
+        )}
 
         <IdeaSection
           id="scores"

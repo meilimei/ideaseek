@@ -12,6 +12,8 @@ export type AdminIdea = {
   published: boolean;
   pinned: boolean;
   featured: boolean;
+  tags?: string[] | null;
+  score_overall?: number | null;
   deleted_at: string | null;
   published_at?: string | null;
   unpublished_at?: string | null;
@@ -68,6 +70,8 @@ export async function listIdeas(
       published,
       pinned,
       featured,
+      tags,
+      score_overall,
       published_at,
       unpublished_at,
       status,
@@ -130,7 +134,6 @@ export async function updateIdeaFlags(
 
   if (typeof changes.published === 'boolean') {
     update.published = changes.published;
-    update.status = changes.published ? 'published' : 'draft';
     if (changes.published) {
       update.published_at = nowIso;
       update.unpublished_at = null;
@@ -147,16 +150,12 @@ export async function updateIdeaFlags(
   if (changes.softDelete === true) {
     update.deleted_at = new Date().toISOString();
     update.deleted_by = adminUserId;
-    update.status = 'archived';
   } else if (changes.softDelete === false) {
     update.deleted_at = null;
     update.deleted_by = null;
     if (typeof update.published === 'undefined') {
       update.published = false;
       update.unpublished_at = nowIso;
-    }
-    if (!update.status) {
-      update.status = update.published ? 'published' : 'draft';
     }
   }
 
@@ -174,6 +173,8 @@ export async function updateIdeaFlags(
       published,
       pinned,
       featured,
+      tags,
+      score_overall,
       published_at,
       unpublished_at,
       status,

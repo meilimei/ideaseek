@@ -4,6 +4,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { supabaseServiceClient as supabase } from '../lib/supabaseServiceClient';
 import { type AdminJobType, type AdminJobRow } from '../lib/server/adminJobs';
+import { enrichIdea } from '../lib/server/ideaEnrich';
 import { processSingleTrendsSnapshot } from '../lib/server/processTrendsSnapshot';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -23,13 +24,38 @@ type JobWithStrategy = AdminJobRow & {
   source?: string | null;
 };
 
+type EvidenceRow = {
+  id: string;
+  title: string | null;
+  excerpt: string | null;
+  metrics: any;
+  raw_json: any;
+  source_type?: string | null;
+  created_at?: string | null;
+};
+
+type IdeaRow = {
+  id: string;
+  title: string | null;
+  one_liner: string | null;
+  source_type: string | null;
+  source_ref_id: string | null;
+};
+
 async function claimJob(worker: string): Promise<JobWithStrategy | null> {
   const { data, error } = await supabase.rpc('claim_admin_job', { worker });
   if (error) {
     console.error('claim_admin_job failed:', error);
     return null;
   }
-  if (!data) return null;
+
+  const rawClaim = Array.isArray(data) ? data[0] : data;
+  const claimedId = rawClaim?.id ?? rawClaim?.job_id;
+  const claimedType = rawClaim?.job_type ?? rawClaim?.type;
+
+  if (!claimedId) {
+    return null;
+  }
 
   // Ensure we have full fields (strategy_id/source) by reloading the row.
   const { data: fullRow, error: fetchError } = await supabase
@@ -37,15 +63,28 @@ async function claimJob(worker: string): Promise<JobWithStrategy | null> {
     .select(
       'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at, attempts, max_attempts, strategy_id, source',
     )
-    .eq('id', (data as any).id)
+    .eq('id', `${claimedId}`)
     .maybeSingle();
 
   if (fetchError) {
     console.error('Failed to hydrate claimed job:', fetchError);
-    return data as JobWithStrategy;
+    return null;
   }
 
-  return (fullRow ?? data) as JobWithStrategy;
+  const hydrated = (fullRow ?? {
+    id: `${claimedId}`,
+    job_type: claimedType ?? null,
+    status: 'queued',
+    payload: {},
+  }) as JobWithStrategy;
+
+  // Ensure id and job_type are present.
+  if (!hydrated?.id) {
+    console.warn('Hydrated job missing id', { claimedId, claimedType, keys: Object.keys(hydrated ?? {}) });
+    return null;
+  }
+
+  return hydrated;
 }
 
 async function appendLog(jobId: string, message: string) {
@@ -62,6 +101,16 @@ async function appendLog(jobId: string, message: string) {
       log: message,
     })
     .eq('id', jobId);
+}
+
+function compactUpdate<T extends Record<string, unknown>>(input: T): T {
+  const output: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === 'undefined') continue;
+    if (key === 'next_run_at' && value === null) continue;
+    output[key] = value;
+  }
+  return output as T;
 }
 
 async function runCommand(
@@ -83,6 +132,8 @@ async function runCommand(
     case 'google-trends-ingest':
       command = 'npm run ingest:trends';
       break;
+    case 'idea_enrich':
+      throw new Error('idea_enrich does not use ingest commands');
     default:
       throw new Error(`Unknown job type: ${jobType}`);
   }
@@ -124,7 +175,7 @@ async function printQueuedSummary() {
 
   if (error) {
     console.error('Failed to count queued jobs:', error);
-    return;
+    return 0;
   }
 
   const ready = (data ?? []).filter((row: any) => {
@@ -138,25 +189,62 @@ async function printQueuedSummary() {
     `Queued jobs: ${ready.length}${queuedIds.length ? ` (top ids: ${queuedIds.join(', ')})` : ''
     }`,
   );
+  return ready.length;
 }
 
 async function markJob(
   jobId: string,
-  status: 'success' | 'failed' | 'queued',
+  status: 'success' | 'failed' | 'queued' | 'running' | 'error',
   log: string,
   errorMessage?: string,
   nextRunAt?: string | null,
+  result?: Record<string, unknown> | null,
 ) {
+  const nowIso = new Date().toISOString();
   const payload: Record<string, unknown> = {
     status,
-    finished_at: new Date().toISOString(),
     log,
     error: errorMessage ?? null,
   };
-  if (typeof nextRunAt !== 'undefined') {
-    payload.next_run_at = nextRunAt;
+
+  if (status === 'running') {
+    payload.started_at = nowIso;
+    payload.finished_at = null;
+  } else {
+    payload.finished_at = nowIso;
   }
-  await supabase.from('admin_jobs').update(payload).eq('id', jobId);
+
+  if (typeof nextRunAt !== 'undefined') {
+    if (nextRunAt !== null) {
+      payload.next_run_at = nextRunAt;
+    }
+  }
+
+  if (result) {
+    payload.result = result;
+  }
+
+  const updatePayload = compactUpdate(payload);
+
+  const { error } = await supabase.from('admin_jobs').update(updatePayload).eq('id', jobId);
+
+  if (error && result) {
+    // Retry without result column in case schema lacks it.
+    const retryPayload = compactUpdate({ ...updatePayload });
+    delete (retryPayload as any).result;
+    const retry = await supabase.from('admin_jobs').update(retryPayload).eq('id', jobId);
+    if (retry.error) {
+      console.error('Failed to update admin_jobs status (retry):', {
+        message: retry.error.message,
+        keys: Object.keys(retryPayload),
+      });
+    }
+  } else if (error) {
+    console.error('Failed to update admin_jobs status:', {
+      message: error.message,
+      keys: Object.keys(updatePayload),
+    });
+  }
 }
 
 async function loadStrategy(id: string): Promise<StrategyRow | null> {
@@ -172,54 +260,301 @@ async function loadStrategy(id: string): Promise<StrategyRow | null> {
   return data as StrategyRow | null;
 }
 
+async function loadIdeaWithEvidence(ideaId: string) {
+  const { data: idea, error: ideaError } = await supabase
+    .from('ideas')
+    .select('id, title, one_liner, source_type, source_ref_id')
+    .eq('id', ideaId)
+    .single();
+  if (ideaError) {
+    throw new Error(`Failed to load idea ${ideaId}: ${ideaError.message}`);
+  }
+
+  const { data: evidence, error: evidenceError } = await supabase
+    .from('idea_evidence')
+    .select('id, title, excerpt, metrics, raw_json, source_type, created_at')
+    .eq('idea_id', ideaId);
+
+  if (evidenceError) {
+    throw new Error(`Failed to load idea evidence ${ideaId}: ${evidenceError.message}`);
+  }
+
+  return {
+    idea: idea as IdeaRow,
+    evidence: (evidence ?? []) as EvidenceRow[],
+  };
+}
+
+const TAG_ALLOWLIST = new Set([
+  'ai',
+  'automation',
+  'productivity',
+  'marketing',
+  'saas',
+  'community',
+  'creator',
+  'analytics',
+  'finance',
+  'education',
+  'health',
+  'ecommerce',
+  'hr',
+  'sales',
+  'developer',
+  'design',
+  'security',
+  'travel',
+  'fitness',
+  'real-estate',
+  'legal',
+  'customer-support',
+  'social-media',
+  'content',
+  'research',
+  'ops',
+  'b2b',
+  'b2c',
+  'startups',
+]);
+
+const TOKEN_TO_TAG: Record<string, string> = {
+  ai: 'ai',
+  gpt: 'ai',
+  llm: 'ai',
+  automate: 'automation',
+  automation: 'automation',
+  productivity: 'productivity',
+  marketing: 'marketing',
+  saas: 'saas',
+  community: 'community',
+  creator: 'creator',
+  creators: 'creator',
+  analytics: 'analytics',
+  finance: 'finance',
+  fintech: 'finance',
+  education: 'education',
+  edtech: 'education',
+  health: 'health',
+  fitness: 'fitness',
+  ecommerce: 'ecommerce',
+  'e-commerce': 'ecommerce',
+  shopify: 'ecommerce',
+  hr: 'hr',
+  hiring: 'hr',
+  sales: 'sales',
+  dev: 'developer',
+  developer: 'developer',
+  design: 'design',
+  security: 'security',
+  travel: 'travel',
+  legal: 'legal',
+  support: 'customer-support',
+  customersupport: 'customer-support',
+  social: 'social-media',
+  socialmedia: 'social-media',
+  content: 'content',
+  research: 'research',
+  ops: 'ops',
+  b2b: 'b2b',
+  b2c: 'b2c',
+  startup: 'startups',
+  startups: 'startups',
+};
+
+const SUBREDDIT_TAGS: Record<string, string[]> = {
+  entrepreneur: ['startups', 'b2b'],
+  startups: ['startups', 'b2b'],
+  sideproject: ['startups', 'productivity'],
+  saas: ['saas', 'b2b'],
+  productivity: ['productivity'],
+  marketing: ['marketing'],
+  ecommerce: ['ecommerce'],
+  indiehackers: ['startups', 'saas'],
+};
+
+function tokenize(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function extractTags(idea: IdeaRow, evidence: EvidenceRow[]) {
+  const tags = new Set<string>();
+  const textParts = [
+    idea.title ?? '',
+    idea.one_liner ?? '',
+    ...evidence.map((row) => row.title ?? ''),
+    ...evidence.map((row) => row.excerpt ?? ''),
+  ];
+
+  for (const token of tokenize(textParts.join(' '))) {
+    const normalized = token.replace(/_/g, '-');
+    const mapped = TOKEN_TO_TAG[normalized];
+    const tag = mapped ?? (TAG_ALLOWLIST.has(normalized) ? normalized : null);
+    if (tag && TAG_ALLOWLIST.has(tag)) {
+      tags.add(tag);
+    }
+  }
+
+  for (const row of evidence) {
+    const subreddit =
+      row.metrics?.subreddit ??
+      row.raw_json?.subreddit ??
+      row.raw_json?.subreddit_name_prefixed ??
+      null;
+    if (typeof subreddit === 'string') {
+      const key = subreddit.replace(/^r\//i, '').toLowerCase();
+      const mapped = SUBREDDIT_TAGS[key];
+      if (mapped) {
+        mapped.forEach((tag) => {
+          if (TAG_ALLOWLIST.has(tag)) tags.add(tag);
+        });
+      }
+    }
+  }
+
+  return Array.from(tags).slice(0, 8);
+}
+
+function getEvidenceSignals(evidence: EvidenceRow[]) {
+  let maxScore = 0;
+  let maxComments = 0;
+  let mostRecent: Date | null = null;
+  let sourceType: string | null = null;
+
+  for (const row of evidence) {
+    const score =
+      Number(row.metrics?.score ?? row.raw_json?.score ?? row.raw_json?.ups ?? 0) || 0;
+    const comments =
+      Number(row.metrics?.comments ?? row.raw_json?.num_comments ?? 0) || 0;
+    maxScore = Math.max(maxScore, score);
+    maxComments = Math.max(maxComments, comments);
+
+    const created =
+      row.metrics?.created_utc ??
+      row.raw_json?.created_utc ??
+      row.created_at ??
+      null;
+    if (created) {
+      const createdDate =
+        typeof created === 'number'
+          ? new Date(created * 1000)
+          : new Date(created);
+      if (!Number.isNaN(createdDate.getTime())) {
+        if (!mostRecent || createdDate > mostRecent) {
+          mostRecent = createdDate;
+        }
+      }
+    }
+    if (!sourceType && row.source_type) {
+      sourceType = row.source_type;
+    }
+  }
+
+  const now = Date.now();
+  const recencyDays = mostRecent
+    ? Math.max(0, Math.round((now - mostRecent.getTime()) / (1000 * 60 * 60 * 24)))
+    : null;
+  const engagementScore = maxScore + maxComments * 2;
+
+  return {
+    maxScore,
+    maxComments,
+    recencyDays,
+    engagementScore,
+    sourceType,
+  };
+}
+
+function computeStatusAndScore(signals: ReturnType<typeof getEvidenceSignals>) {
+  const recencyDays = signals.recencyDays ?? 999;
+  const engagement = signals.engagementScore;
+
+  let status = 'Stable';
+  if (recencyDays <= 2 && engagement >= 80) {
+    status = 'Exploding';
+  } else if (recencyDays <= 7 && engagement >= 30) {
+    status = 'Growing';
+  } else if (recencyDays > 30 && engagement < 10) {
+    status = 'Falling';
+  }
+
+  const normalized = Math.min(1, engagement / 200);
+  let score = 5 * normalized;
+  if (recencyDays <= 2) score += 1;
+  else if (recencyDays <= 7) score += 0.5;
+  else if (recencyDays > 30) score -= 0.5;
+  if (recencyDays > 90) score -= 0.5;
+  score = Math.max(0, Math.min(5, Number(score.toFixed(2))));
+
+  return { status, score };
+}
+
 async function processJob(job: JobWithStrategy) {
   const jobId = job.id;
   const jobType = job.job_type;
   let log = '';
   try {
+    if (jobType === 'idea_enrich') {
+      await markJob(jobId, 'running', 'Enriching idea...');
+      const payload = (job.payload as any) ?? {};
+      const ideaId = payload.idea_id ?? payload.ideaId;
+      if (!ideaId || typeof ideaId !== 'string') {
+        throw new Error('Missing idea_id in payload');
+      }
+
+      const result = await enrichIdea(ideaId);
+      log = `Enriched idea ${ideaId} with ${result.tags.length} tags, score ${result.score_overall}`;
+      await markJob(jobId, 'success', log, null, null, result);
+      return;
+    }
+
     if (jobType === 'process-trends-snapshot') {
       const snapshotId = (job.payload as any)?.snapshot_id;
       if (!snapshotId) {
         throw new Error('Missing snapshot_id in payload');
       }
+      log = 'Processing trends snapshot...';
+      await markJob(jobId, 'running', log);
       await processSingleTrendsSnapshot(Number(snapshotId));
       log = `Processed trends snapshot ${snapshotId}`;
-    } else {
-      let strategy: StrategyRow | null = null;
-      if (job.strategy_id) {
-        strategy = await loadStrategy(job.strategy_id);
-        if (!strategy || strategy.is_active === false) {
-          throw new Error('Strategy not found or inactive');
-        }
-      }
+      await markJob(jobId, 'success', log);
+      return;
+    }
 
-      const payload = (job.payload as any) ?? {};
-      if (strategy && strategy.source === 'reddit') {
-        log = await runCommand(jobId, 'reddit-ingest', strategy, payload);
-      } else if (strategy && strategy.source === 'youtube') {
-        log = await runCommand(jobId, 'youtube-ingest', strategy, payload);
-      } else if (strategy && strategy.source === 'google_trends') {
-        log = await runCommand(jobId, 'trends-ingest', strategy, payload);
-      } else {
-        log = await runCommand(jobId, jobType, strategy, payload);
-      }
-
-      if (strategy) {
-        log = `Using strategy ${strategy.id} (${strategy.name ?? ''})\n${log}`;
+    let strategy: StrategyRow | null = null;
+    if (job.strategy_id) {
+      strategy = await loadStrategy(job.strategy_id);
+      if (!strategy || strategy.is_active === false) {
+        throw new Error('Strategy not found or inactive');
       }
     }
-    await markJob(jobId, 'success', log);
+
+    const payload = (job.payload as any) ?? {};
+    let commandLog = 'Running job...';
+    await markJob(jobId, 'running', commandLog);
+
+    if (strategy && strategy.source === 'reddit') {
+      commandLog = await runCommand(jobId, 'reddit-ingest', strategy, payload);
+    } else if (strategy && strategy.source === 'youtube') {
+      commandLog = await runCommand(jobId, 'youtube-ingest', strategy, payload);
+    } else if (strategy && strategy.source === 'google_trends') {
+      commandLog = await runCommand(jobId, 'trends-ingest', strategy, payload);
+    } else {
+      commandLog = await runCommand(jobId, jobType, strategy, payload);
+    }
+
+    if (strategy) {
+      commandLog = `Using strategy ${strategy.id} (${strategy.name ?? ''})\n${commandLog}`;
+    }
+
+    await markJob(jobId, 'success', commandLog);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log += `\nError: ${message}`;
-    const attempts = job.attempts ?? 0;
-    const maxAttempts = job.max_attempts ?? 3;
-    const shouldRetry = attempts + 1 < maxAttempts;
-    const nextRunAt = shouldRetry
-      ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
-      : null;
-    const status: 'queued' | 'failed' = shouldRetry ? 'queued' : 'failed';
-    await markJob(jobId, status, log, message, nextRunAt);
+    await markJob(jobId, 'error', log, message, null);
   }
 }
 
@@ -230,7 +565,11 @@ async function main() {
   const worker = `local-${Date.now()}`;
 
   console.log(`Job runner started. worker=${worker}, max=${maxJobs}`);
-  await printQueuedSummary();
+  const queuedCount = await printQueuedSummary();
+  if (queuedCount === 0) {
+    console.log('No queued jobs available.');
+    return;
+  }
 
   for (let i = 0; i < maxJobs; i++) {
     const job = await claimJob(worker);

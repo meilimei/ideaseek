@@ -53,11 +53,17 @@ const plans = [
 export default async function Home() {
   const supabase = await createServerSupabaseClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: userData,
+    error: userError,
+  } = await supabase.auth.getUser();
 
-  const primaryHref = session ? "/ideas/database" : "/login";
-  const primaryLabel = session ? "Go to Database" : "Start exploring";
+  if (userError) {
+    console.error('Failed to get user:', userError.message);
+  }
+
+  const user = userData?.user ?? null;
+  const primaryHref = user ? "/ideas/database" : "/login";
+  const primaryLabel = user ? "Go to Database" : "Start exploring";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#0b0f1d] via-[#060914] to-[#02030a] text-foreground">

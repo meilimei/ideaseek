@@ -1,4 +1,5 @@
 import { supabaseServiceClient } from '@/lib/supabaseServiceClient';
+import { createAdminJob } from '@/lib/server/adminJobs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 function getAdminSupabaseClient(): SupabaseClient {
@@ -19,6 +20,7 @@ export type AdminRedditPost = {
   source_post_id?: string | null;
   used_for_ideas?: boolean | null;
   promoted_at?: string | null;
+  created_utc?: string | null;
 };
 
 export async function promoteRedditPostToIdea(options: {
@@ -42,6 +44,7 @@ export async function promoteRedditPostToIdea(options: {
         promoted_idea_id,
         selected,
         created_at,
+        created_utc,
         used_for_ideas,
         promoted_at
       `,
@@ -93,32 +96,16 @@ export async function promoteRedditPostToIdea(options: {
       ? rawBody.slice(0, 2000)
       : `Reddit pain point: ${rawTitle}`.slice(0, 2000);
 
-  const subredditTag = post.subreddit ? `r/${post.subreddit}` : null;
-
-  const tags = [
-    ...(subredditTag ? [subredditTag] : []),
-    'reddit',
-    'community-painpoint',
-  ];
-
   const sourceUrl = post.url ?? null;
-  const sourceMeta = {
-    subreddit: post.subreddit,
-    score: post.score,
-    comments: post.num_comments,
-    raw_post_id: post.source_post_id ?? post.id,
-  };
-
   const insertPayload = {
     title: rawTitle || '(no title)',
     one_liner: oneLiner || null,
     description,
-    tags,
+    tags: [],
     source_type: 'reddit',
+    source_ref_id: post.source_post_id ?? post.id,
     source_url: sourceUrl,
-    source_meta: sourceMeta,
     published: false,
-    status: 'draft',
     pinned: false,
     featured: false,
     created_by: options.adminUserId,
@@ -138,6 +125,42 @@ export async function promoteRedditPostToIdea(options: {
       }`,
     );
   }
+
+  const evidencePayload = {
+    idea_id: newIdea.id,
+    source: 'reddit',
+    source_type: 'reddit',
+    source_ref_id: post.source_post_id ?? post.id,
+    title: (post.title ?? rawTitle) || '(no title)',
+    url: sourceUrl,
+    excerpt: rawBody.trim().slice(0, 600) || null,
+    metrics: {
+      subreddit: post.subreddit,
+      score: post.score,
+      comments: post.num_comments,
+      created_utc: post.created_utc,
+    },
+    raw_json: post,
+  };
+
+  const { error: evidenceError } = await supabase
+    .from('idea_evidence')
+    .insert(evidencePayload);
+
+  if (evidenceError) {
+    console.error('idea_evidence insert payload keys:', Object.keys(evidencePayload));
+    throw new Error(
+      `Failed to insert idea evidence for reddit post ${options.postId}: ${
+        evidenceError.message
+      }`,
+    );
+  }
+
+  const jobId = await createAdminJob('idea_enrich', {
+    payload: { idea_id: newIdea.id, triggeredBy: 'admin', source_type: 'reddit' },
+    createdBy: options.adminUserId,
+    dedupeKey: `${newIdea.id}:manual:${Date.now()}`,
+  });
 
   const { error: updateError } = await supabase
     .from('raw_reddit_posts')
@@ -159,5 +182,6 @@ export async function promoteRedditPostToIdea(options: {
   return {
     ideaId: newIdea.id as string,
     created: true,
+    jobId,
   };
 }

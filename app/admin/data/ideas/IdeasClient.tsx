@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   AdminInput,
   AdminSelect,
@@ -18,6 +19,8 @@ type IdeaRow = {
   source_url: string | null;
   published: boolean;
   source_type: string | null;
+  tags?: string[] | null;
+  score_overall?: number | null;
   created_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
@@ -50,6 +53,7 @@ export default function IdeasClient() {
   const [status, setStatus] = useState<'all' | 'published' | 'unpublished' | 'deleted'>('all');
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [createdBy, setCreatedBy] = useState('');
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -105,6 +109,24 @@ export default function IdeasClient() {
       void fetchList(page);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function reEnrich(id: string) {
+    setEnrichingId(id);
+    setToast(null);
+    try {
+      const res = await fetch(`/api/admin/ideas/${id}/enrich`, {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to enqueue');
+      setToast(`Enqueued enrich job ${json.jobId}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+    } finally {
+      setEnrichingId(null);
     }
   }
 
@@ -199,6 +221,8 @@ export default function IdeasClient() {
                 <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Title</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Score</th>
+                <th className="px-3 py-2">Tags</th>
                 <th className="px-3 py-2">Pinned</th>
                 <th className="px-3 py-2">Featured</th>
                 <th className="px-3 py-2">Updated</th>
@@ -242,8 +266,29 @@ export default function IdeasClient() {
                       </div>
                     )}
                     {row.status && (
-                      <div className="text-[11px] text-muted-foreground/80">Status: {row.status}</div>
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="capitalize">
+                          {row.status}
+                        </Badge>
+                      </div>
                     )}
+                  </td>
+                  <td className="px-3 py-3 text-xs text-muted-foreground">
+                    {row.score_overall != null
+                      ? Number(row.score_overall).toFixed(2)
+                      : '—'}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(row.tags ?? []).slice(0, 4).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="capitalize">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {(row.tags ?? []).length === 0 && (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3 text-xs">{row.pinned ? 'Yes' : 'No'}</td>
                   <td className="px-3 py-3 text-xs">{row.featured ? 'Yes' : 'No'}</td>
@@ -251,6 +296,16 @@ export default function IdeasClient() {
                     {row.updated_at ?? '—'}
                   </td>
                   <td className="px-3 py-3 text-right space-y-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="rounded-full px-3"
+                      disabled={enrichingId === row.id}
+                      onClick={() => reEnrich(row.id)}
+                    >
+                      {enrichingId === row.id ? 'Enriching…' : 'Re-enrich'}
+                    </Button>
                     {row.deleted_at ? (
                       <Button
                         type="button"
@@ -316,7 +371,7 @@ export default function IdeasClient() {
               ))}
               {items.length === 0 && !error && (
                 <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={8}>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={10}>
                     No ideas found.
                   </td>
                 </tr>
