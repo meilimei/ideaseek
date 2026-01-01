@@ -58,7 +58,10 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   if (userError) {
-    console.error('Failed to get user:', userError.message);
+    const message = userError.message ?? '';
+    if (!message.toLowerCase().includes('fetch failed')) {
+      console.error('Failed to get user:', message);
+    }
   }
 
   const user = userData?.user ?? null;
