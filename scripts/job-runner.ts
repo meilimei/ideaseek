@@ -119,6 +119,43 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function linkJobToIdea(
+  jobId: number | string,
+  ideaId: string,
+  relationType = 'target',
+) {
+  const { error } = await supabase.from('admin_job_ideas').insert({
+    job_id: jobId,
+    idea_id: ideaId,
+    relation_type: relationType,
+  });
+
+  if (error) {
+    const code = (error as { code?: string | null }).code ?? null;
+    const isDuplicate = code === '23505' || error.message.includes('duplicate key');
+    if (!isDuplicate) {
+      throw error;
+    }
+  }
+}
+
+function extractIdeaIds(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const raw = payload as Record<string, unknown>;
+  const ids: string[] = [];
+  if (typeof raw.idea_id === 'string') {
+    ids.push(raw.idea_id);
+  }
+  if (Array.isArray(raw.idea_ids)) {
+    for (const value of raw.idea_ids) {
+      if (typeof value === 'string') {
+        ids.push(value);
+      }
+    }
+  }
+  return Array.from(new Set(ids));
+}
+
 async function runCommand(
   jobId: string,
   jobType: AdminJobType | string,
@@ -748,6 +785,19 @@ async function main() {
       continue;
     }
     console.log(`Claimed job ${job.id} (${job.job_type})`);
+    const ideaIds = extractIdeaIds(job.payload ?? null);
+    if (ideaIds.length > 0) {
+      await Promise.all(
+        ideaIds.map(async (ideaId) => {
+          try {
+            await linkJobToIdea(job.id, ideaId, 'target');
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.warn(`Failed to link job ${job.id} to idea ${ideaId}: ${message}`);
+          }
+        }),
+      );
+    }
     await processJob(job);
     processed += 1;
     idleLoops = 0;
