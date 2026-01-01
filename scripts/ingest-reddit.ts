@@ -2,10 +2,16 @@
 import path from 'node:path';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
-import { insertIdeas, type IdeaForInsert } from './ingest-utils';
+import { supabaseServiceClient } from '../lib/supabaseServiceClient';
+import { type IdeaForInsert } from './ingest-utils';
 
 // 1. 加载 .env.local（注意路径）
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
+const adminJobId =
+  adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : adminJobIdRaw;
+console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);
@@ -95,6 +101,128 @@ function sanitizeEnglishArray(values: unknown): string[] | undefined {
     .map((v) => sanitizeEnglishText(v))
     .filter((v): v is string => Boolean(v));
   return cleaned.length > 0 ? cleaned : undefined;
+}
+
+type SkipReason = 'source_url' | 'title';
+
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_]/g, '\\$&');
+}
+
+async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
+  if (ideas.length === 0) {
+    console.log('No ideas to insert.');
+    return [];
+  }
+
+  const uniqueIdeas: IdeaForInsert[] = [];
+  const skipped: { title: string; source_url?: string | null; reason: SkipReason }[] = [];
+
+  for (const idea of ideas) {
+    if (idea.source_type === 'reddit' && idea.source_url) {
+      const { data: existing, error } = await supabaseServiceClient
+        .from('ideas')
+        .select('id')
+        .eq('source_type', 'reddit')
+        .eq('source_url', idea.source_url)
+        .maybeSingle();
+
+      if (error) {
+        console.warn(
+          `Dedup check (source_url) failed for ${idea.source_url}, inserting anyway:`,
+          error.message,
+        );
+      } else if (existing) {
+        skipped.push({ title: idea.title, source_url: idea.source_url, reason: 'source_url' });
+        continue;
+      }
+    }
+
+    const titlePattern = escapeLikePattern(idea.title);
+    const { data: existingTitle, error: titleError } = await supabaseServiceClient
+      .from('ideas')
+      .select('id')
+      .ilike('title', titlePattern)
+      .limit(1)
+      .maybeSingle();
+
+    if (titleError) {
+      console.warn(
+        `Dedup check (title) failed for "${idea.title}", inserting anyway:`,
+        titleError.message,
+      );
+    } else if (existingTitle) {
+      skipped.push({ title: idea.title, reason: 'title' });
+      continue;
+    }
+
+    uniqueIdeas.push(idea);
+  }
+
+  if (uniqueIdeas.length === 0) {
+    console.log(
+      `All ${ideas.length} ideas were skipped (duplicates by source_url/title).`,
+    );
+    if (skipped.length > 0) {
+      console.log(
+        'Skipped titles:',
+        skipped.slice(0, 10).map((s) => `${s.title} (${s.reason})`),
+      );
+    }
+    return [];
+  }
+
+  const { data, error } = await supabaseServiceClient
+    .from('ideas')
+    .insert(uniqueIdeas)
+    .select('id, title');
+
+  if (error) {
+    console.error('Error inserting ideas:', error);
+    return [];
+  }
+
+  const insertedIds = (data ?? [])
+    .map((row) => row.id)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+  console.log(`Inserted ${data?.length ?? 0} idea(s).`);
+  if (data && data.length > 0) {
+    console.log('Inserted titles:', data.slice(0, 10).map((row) => row.title));
+  }
+  if (skipped.length > 0) {
+    console.log(
+      `Skipped ${skipped.length} duplicate(s) by source_url/title.`,
+      skipped.slice(0, 10).map((s) => `${s.title} (${s.reason})`),
+    );
+  }
+
+  return insertedIds;
+}
+
+async function linkOutputIdeas(jobId: string | number, ideaIds: string[]) {
+  if (ideaIds.length === 0) return;
+  const rows = ideaIds.map((id) => ({
+    job_id: jobId,
+    idea_id: id,
+    relation_type: 'output',
+  }));
+
+  const { error } = await supabaseServiceClient
+    .from('admin_job_ideas')
+    .upsert(rows, { onConflict: 'job_id,idea_id,relation_type', ignoreDuplicates: true });
+
+  if (error) {
+    const fallback = await supabaseServiceClient.from('admin_job_ideas').insert(rows);
+    if (fallback.error) {
+      const code = (fallback.error as { code?: string | null }).code ?? null;
+      const isDuplicate =
+        code === '23505' || fallback.error.message.includes('duplicate key');
+      if (!isDuplicate) {
+        console.warn('Failed to link output ideas to job:', fallback.error.message);
+      }
+    }
+  }
 }
 
 // 一些简单的关键词，用来筛选“有痛点味道”的帖子
@@ -391,7 +519,11 @@ async function main() {
   const ideas = await generateIdeasFromPosts(filtered, 5);
   console.log(`Generated ${ideas.length} ideas from DeepSeek.`);
 
-  await insertIdeas(ideas);
+  const insertedIds = await insertIdeasWithIds(ideas);
+  if (adminJobIdRaw && insertedIds.length > 0) {
+    await linkOutputIdeas(adminJobId ?? adminJobIdRaw, insertedIds);
+    console.log(`Linked ${insertedIds.length} output idea(s) to job ${adminJobIdRaw}`);
+  }
 
   console.log('Done.');
 }

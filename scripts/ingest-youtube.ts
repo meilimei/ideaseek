@@ -4,9 +4,15 @@
 import path from 'node:path';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
-import { insertIdeas, type IdeaForInsert } from './ingest-utils';
+import { supabaseServiceClient } from '../lib/supabaseServiceClient';
+import { type IdeaForInsert } from './ingest-utils';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
+const adminJobId =
+  adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : adminJobIdRaw;
+console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
 
 if (!process.env.DEEPSEEK_API_KEY) {
   throw new Error('Missing DEEPSEEK_API_KEY in environment (.env.local)');
@@ -34,6 +40,8 @@ const deepseek = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
 });
 
+type SkipReason = 'source_url' | 'title';
+
 function parseCount(value: unknown): number {
   const num = typeof value === 'string' ? Number(value) : Number.NaN;
   return Number.isFinite(num) ? num : 0;
@@ -49,6 +57,124 @@ function asStringArray(value: unknown): string[] | null {
     .map((v) => (typeof v === 'string' ? v : null))
     .filter((v): v is string => Boolean(v));
   return cleaned.length > 0 ? cleaned : null;
+}
+
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_]/g, '\\$&');
+}
+
+async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
+  if (ideas.length === 0) {
+    console.log('No ideas to insert.');
+    return [];
+  }
+
+  const uniqueIdeas: IdeaForInsert[] = [];
+  const skipped: { title: string; source_url?: string | null; reason: SkipReason }[] = [];
+
+  for (const idea of ideas) {
+    if (idea.source_type === 'reddit' && idea.source_url) {
+      const { data: existing, error } = await supabaseServiceClient
+        .from('ideas')
+        .select('id')
+        .eq('source_type', 'reddit')
+        .eq('source_url', idea.source_url)
+        .maybeSingle();
+
+      if (error) {
+        console.warn(
+          `Dedup check (source_url) failed for ${idea.source_url}, inserting anyway:`,
+          error.message,
+        );
+      } else if (existing) {
+        skipped.push({ title: idea.title, source_url: idea.source_url, reason: 'source_url' });
+        continue;
+      }
+    }
+
+    const titlePattern = escapeLikePattern(idea.title);
+    const { data: existingTitle, error: titleError } = await supabaseServiceClient
+      .from('ideas')
+      .select('id')
+      .ilike('title', titlePattern)
+      .limit(1)
+      .maybeSingle();
+
+    if (titleError) {
+      console.warn(
+        `Dedup check (title) failed for "${idea.title}", inserting anyway:`,
+        titleError.message,
+      );
+    } else if (existingTitle) {
+      skipped.push({ title: idea.title, reason: 'title' });
+      continue;
+    }
+
+    uniqueIdeas.push(idea);
+  }
+
+  if (uniqueIdeas.length === 0) {
+    console.log(
+      `All ${ideas.length} ideas were skipped (duplicates by source_url/title).`,
+    );
+    if (skipped.length > 0) {
+      console.log(
+        'Skipped titles:',
+        skipped.slice(0, 10).map((s) => `${s.title} (${s.reason})`),
+      );
+    }
+    return [];
+  }
+
+  const { data, error } = await supabaseServiceClient
+    .from('ideas')
+    .insert(uniqueIdeas)
+    .select('id, title');
+
+  if (error) {
+    console.error('Error inserting ideas:', error);
+    return [];
+  }
+
+  const insertedIds = (data ?? [])
+    .map((row) => row.id)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+  console.log(`Inserted ${data?.length ?? 0} idea(s).`);
+  if (data && data.length > 0) {
+    console.log('Inserted titles:', data.slice(0, 10).map((row) => row.title));
+  }
+  if (skipped.length > 0) {
+    console.log(
+      `Skipped ${skipped.length} duplicate(s) by source_url/title.`,
+      skipped.slice(0, 10).map((s) => `${s.title} (${s.reason})`),
+    );
+  }
+
+  return insertedIds;
+}
+
+async function linkOutputIdeas(jobId: string | number, ideaIds: string[]) {
+  if (ideaIds.length === 0) return false;
+  const rows = ideaIds.map((id) => ({
+    job_id: jobId,
+    idea_id: id,
+    relation_type: 'output',
+  }));
+
+  const { error } = await supabaseServiceClient
+    .from('admin_job_ideas')
+    .upsert(rows, { onConflict: 'job_id,idea_id,relation_type', ignoreDuplicates: true });
+
+  if (error) {
+    console.warn('admin_job_ideas link failed', { adminJobIdRaw, err: error });
+    const fallback = await supabaseServiceClient.from('admin_job_ideas').insert(rows);
+    if (fallback.error) {
+      console.warn('admin_job_ideas link failed', { adminJobIdRaw, err: fallback.error });
+      return false;
+    }
+  }
+  return true;
 }
 
 export async function fetchVideosForTopic(
@@ -255,7 +381,15 @@ async function main() {
     console.log(`Generated ${ideas.length} ideas.`);
 
     if (ideas.length > 0) {
-      await insertIdeas(ideas);
+      const insertedIds = await insertIdeasWithIds(ideas);
+      if (adminJobIdRaw && insertedIds.length > 0) {
+        const linked = await linkOutputIdeas(adminJobId ?? adminJobIdRaw, insertedIds);
+        if (linked) {
+          console.log(
+            `Linked ${insertedIds.length} output idea(s) to job ${adminJobIdRaw}`,
+          );
+        }
+      }
     }
   }
 

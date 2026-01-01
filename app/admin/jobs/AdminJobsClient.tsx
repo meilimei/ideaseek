@@ -5,7 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { DataTable, GlassCard, CardBody } from '@/components/admin/primitives';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import AdminJobActions from './JobActions';
+
+const ideaDetailHref = (ideaId: string) => `/ideas/${ideaId}`;
 
 type AdminJob = {
   id: string;
@@ -16,6 +19,8 @@ type AdminJob = {
   finished_at: string | null;
   attempts?: number | null;
   max_attempts?: number | null;
+  relatedIdeas?: { id: string; title: string | null; status: string | null }[];
+  relatedIdeasCount?: number;
 };
 
 async function fetchJobs(): Promise<{ jobs: AdminJob[] }> {
@@ -90,6 +95,7 @@ export default function AdminJobsClient() {
                 <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Ideas</th>
                 <th className="px-3 py-2 font-medium">Attempts</th>
                 <th className="px-3 py-2 font-medium">Created</th>
                 <th className="px-3 py-2 font-medium">Started</th>
@@ -111,6 +117,38 @@ export default function AdminJobsClient() {
                     <StatusBadge status={job.status} />
                   </td>
                   <td className="px-3 py-2">
+                    {job.relatedIdeas && job.relatedIdeas.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {job.relatedIdeas.slice(0, 2).map((idea) => {
+                          const label = idea.title?.trim() || idea.id.slice(0, 8);
+                          return (
+                            <Link
+                              key={idea.id}
+                              href={ideaDetailHref(idea.id)}
+                              className="hover:underline"
+                            >
+                              <Badge variant="secondary" className="capitalize">
+                                {label}
+                              </Badge>
+                            </Link>
+                          );
+                        })}
+                        {(job.relatedIdeasCount ?? job.relatedIdeas.length) >
+                          job.relatedIdeas.length && (
+                          <span className="text-xs text-muted-foreground">
+                            +{(job.relatedIdeasCount ?? job.relatedIdeas.length) - job.relatedIdeas.length}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {(job.relatedIdeasCount ?? 0) > 0
+                          ? `(${job.relatedIdeasCount ?? 0})`
+                          : '—'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
                     {job.attempts ?? 0} / {job.max_attempts ?? 3}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{job.created_at ?? '—'}</td>
@@ -128,7 +166,7 @@ export default function AdminJobsClient() {
               ))}
               {jobs.length === 0 && !error && (
                 <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={8}>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={9}>
                     No jobs yet.
                   </td>
                 </tr>

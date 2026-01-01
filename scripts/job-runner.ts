@@ -169,7 +169,7 @@ async function runCommand(
       command = 'npm run ingest:reddit';
       break;
     case 'youtube-ingest':
-      command = 'npm run ingest:youtube';
+      command = 'npm run --silent ingest:youtube';
       break;
     case 'trends-ingest':
     case 'google-trends-ingest':
@@ -182,6 +182,9 @@ async function runCommand(
   }
 
   const env = { ...process.env };
+  if (normalizedType === 'youtube-ingest' || normalizedType === 'reddit-ingest') {
+    env.ADMIN_JOB_ID = String(jobId);
+  }
   if (strategy) {
     env.INGEST_STRATEGY_ID = strategy.id;
     env.INGEST_STRATEGY_SOURCE = strategy.source;
