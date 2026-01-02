@@ -250,12 +250,12 @@ function StrategyRow({ strategy }: { strategy: IngestStrategy }) {
   const runStrategyOnce = async () => {
     setRunState({ loading: true, error: null, jobId: null });
     try {
-      const res = await fetch(`/api/admin/strategies/${strategy.id}/run`, {
+      const res = await fetch(`/api/strategies/${strategy.id}/run`, {
         method: 'POST',
       });
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json?.error || 'Failed to create job');
+        throw new Error(json?.message || json?.error || 'Failed to create job');
       }
       setRunState({ loading: false, error: null, jobId: json.jobId ?? null });
       if (json.jobId) {

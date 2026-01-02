@@ -14,19 +14,36 @@ export async function getUserPlan(opts: {
 }): Promise<Plan> {
   const { supabase, userId } = opts;
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('plan')
-    .or(`id.eq.${userId},user_id.eq.${userId}`)
-    .maybeSingle();
+  const candidates = ['id', 'user_id', 'uid'] as const;
 
-  if (error || !data) {
+  for (const column of candidates) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq(column as any, userId)
+      .maybeSingle();
+
+    if (error) {
+      const message =
+        typeof (error as any)?.message === 'string' ? (error as any).message : '';
+      if (
+        message.includes(`column profiles.${column} does not exist`) ||
+        message.includes('does not exist')
+      ) {
+        continue;
+      }
+      throw error;
+    }
+
+    if (!data) {
+      continue;
+    }
+
+    const rawPlan = typeof data.plan === 'string' ? data.plan.toLowerCase().trim() : '';
+    if (PLAN_VALUES.has(rawPlan as Plan)) {
+      return rawPlan as Plan;
+    }
     return 'free';
-  }
-
-  const rawPlan = typeof data.plan === 'string' ? data.plan.toLowerCase().trim() : '';
-  if (PLAN_VALUES.has(rawPlan as Plan)) {
-    return rawPlan as Plan;
   }
 
   return 'free';

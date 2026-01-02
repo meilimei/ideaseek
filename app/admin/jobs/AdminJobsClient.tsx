@@ -5,10 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { DataTable, GlassCard, CardBody } from '@/components/admin/primitives';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { badgeVariants } from '@/components/ui/badge';
 import AdminJobActions from './JobActions';
 
-const ideaDetailHref = (ideaId: string) => `/ideas/${ideaId}`;
+const ideaDetailHref = (ideaId: string) => `/ideas/${encodeURIComponent(ideaId)}`;
 
 type AdminJob = {
   id: string;
@@ -131,11 +131,12 @@ export default function AdminJobsClient() {
                             <Link
                               key={idea.id}
                               href={ideaDetailHref(idea.id)}
-                              className="hover:underline"
+                              className={badgeVariants({
+                                variant: 'secondary',
+                                className: 'capitalize hover:underline',
+                              })}
                             >
-                              <Badge variant="secondary" className="capitalize">
-                                {label}
-                              </Badge>
+                              {label}
                             </Link>
                           );
                         })}
