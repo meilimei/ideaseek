@@ -182,7 +182,11 @@ async function runCommand(
   }
 
   const env = { ...process.env };
-  if (normalizedType === 'youtube-ingest' || normalizedType === 'reddit-ingest') {
+  if (
+    normalizedType === 'reddit-ingest' ||
+    normalizedType === 'youtube-ingest' ||
+    command.includes('ingest:reddit')
+  ) {
     env.ADMIN_JOB_ID = String(jobId);
   }
   if (strategy) {

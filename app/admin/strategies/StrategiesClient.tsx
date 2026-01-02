@@ -25,39 +25,60 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const SUBREDDIT_SUGGESTIONS = [
   {
-    group: 'Indie SaaS',
+    group: 'Founders & SaaS (high-signal)',
     items: [
-      'SaaS',
+      'smallbusiness',
       'startups',
       'Entrepreneur',
+      'SaaS',
       'IndieHackers',
       'SideProject',
-      'smallbusiness',
+      'sales',
     ],
   },
   {
-    group: 'AI Builders',
-    items: [
-      'OpenAI',
-      'ChatGPT',
-      'MachineLearning',
-      'LocalLLaMA',
-      'artificial',
-      'singularity',
-    ],
+    group: 'DevOps & Self-hosting',
+    items: ['selfhosted', 'sysadmin', 'devops', 'kubernetes', 'docker', 'aws'],
   },
   {
-    group: 'Dev Tools',
-    items: ['webdev', 'programming', 'javascript', 'reactjs', 'nextjs', 'devops'],
+    group: 'Developers',
+    items: ['webdev', 'programming', 'opensource', 'javascript', 'reactjs', 'nextjs'],
   },
   {
-    group: 'Marketing',
-    items: ['marketing', 'SEO', 'socialmedia', 'growthhacking', 'content_marketing'],
+    group: 'Marketing & Growth',
+    items: ['marketing', 'SEO', 'PPC', 'content_marketing', 'growthhacking', 'socialmedia'],
   },
   {
     group: 'Ecommerce',
-    items: ['ecommerce', 'shopify', 'amazonFBA', 'Etsy'],
+    items: ['ecommerce', 'shopify', 'amazonseller', 'amazonFBA', 'EtsySellers', 'Etsy'],
   },
+  {
+    group: 'Creators',
+    items: ['NewTubers', 'youtubers', 'podcasting', 'Twitch'],
+  },
+  {
+    group: 'Productivity & Knowledge',
+    items: ['productivity', 'Notion', 'ObsidianMD'],
+  },
+  {
+    group: 'AI Communities (capability → workflow)',
+    items: ['LocalLLaMA', 'MachineLearning', 'ChatGPT', 'PromptEngineering', 'artificial'],
+  },
+];
+
+const REDDIT_PAINPOINT_KEYWORDS = [
+  'how do you',
+  'what tool do you use',
+  'is there a tool that',
+  'i wish there was',
+  'is there an app that',
+  'x software is terrible',
+  'alternative to',
+  "i'm spending hours",
+  'wasting time',
+  'we keep messing up',
+  'keeps breaking',
+  'error-prone',
 ];
 
 const POPULAR_SUBREDDITS = ['SaaS', 'startups', 'Entrepreneur', 'IndieHackers', 'webdev', 'marketing'];
@@ -457,7 +478,9 @@ export default function StrategiesClient({ strategies }: StrategiesClientProps) 
   );
   const [redditLimit, setRedditLimit] = useState(25);
   const [redditMinScore, setRedditMinScore] = useState(5);
-  const [redditKeywords, setRedditKeywords] = useState('');
+  const [redditKeywords, setRedditKeywords] = useState(() =>
+    REDDIT_PAINPOINT_KEYWORDS.join('\n'),
+  );
   const [subredditQuery, setSubredditQuery] = useState('');
   const [subredditResults, setSubredditResults] = useState<SubredditSearchItem[]>(
     [],
@@ -584,6 +607,12 @@ export default function StrategiesClient({ strategies }: StrategiesClientProps) 
     () => JSON.stringify(basicConfig, null, 2),
     [basicConfig],
   );
+
+  useEffect(() => {
+    if (newSource !== 'reddit') return;
+    if (redditKeywords.trim()) return;
+    setRedditKeywords(REDDIT_PAINPOINT_KEYWORDS.join('\n'));
+  }, [newSource, redditKeywords]);
 
   useEffect(() => {
     if (mode !== 'basic') return;
@@ -1010,9 +1039,20 @@ export default function StrategiesClient({ strategies }: StrategiesClientProps) 
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      Keywords (one per line)
-                    </label>
+                    <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                      <label>Keywords (one per line)</label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() =>
+                          setRedditKeywords(REDDIT_PAINPOINT_KEYWORDS.join('\n'))
+                        }
+                      >
+                        Fill pain-point templates
+                      </Button>
+                    </div>
                     <textarea
                       className={textareaClass}
                       rows={2}
@@ -1020,6 +1060,10 @@ export default function StrategiesClient({ strategies }: StrategiesClientProps) 
                       value={redditKeywords}
                       onChange={(e) => setRedditKeywords(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      These templates bias ingestion toward posts expressing pain or tool
+                      demand. Edit freely.
+                    </p>
                   </div>
                 </div>
               </div>

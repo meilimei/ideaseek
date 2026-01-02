@@ -95,11 +95,11 @@ export default function AdminJobsClient() {
                 <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Ideas</th>
                 <th className="px-3 py-2 font-medium">Attempts</th>
                 <th className="px-3 py-2 font-medium">Created</th>
                 <th className="px-3 py-2 font-medium">Started</th>
                 <th className="px-3 py-2 font-medium">Finished</th>
+                <th className="px-3 py-2 font-medium hidden xl:table-cell">Ideas</th>
                 <th className="px-3 py-2 text-right font-medium">Action</th>
               </tr>
             </thead>
@@ -117,6 +117,12 @@ export default function AdminJobsClient() {
                     <StatusBadge status={job.status} />
                   </td>
                   <td className="px-3 py-2">
+                    {job.attempts ?? 0} / {job.max_attempts ?? 3}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{job.created_at ?? '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{job.started_at ?? '—'}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{job.finished_at ?? '—'}</td>
+                  <td className="px-3 py-2 hidden xl:table-cell">
                     {job.relatedIdeas && job.relatedIdeas.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1">
                         {job.relatedIdeas.slice(0, 2).map((idea) => {
@@ -148,12 +154,6 @@ export default function AdminJobsClient() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    {job.attempts ?? 0} / {job.max_attempts ?? 3}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground">{job.created_at ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{job.started_at ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{job.finished_at ?? '—'}</td>
                   <td className="px-3 py-2 text-right">
                     <Link
                       href={`/admin/jobs/${job.id}`}

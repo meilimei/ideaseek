@@ -300,7 +300,7 @@ export default async function AdminJobDetailPage({
                     >
                       <div className="space-y-2">
                         <Link
-                          href={ideaDetailHref(related.id)}
+                          href={`/ideas/generated/${related.id}?job=${job.id}`}
                           className="text-sm font-semibold text-foreground hover:underline"
                         >
                           {related.title ?? shortId(related.id)}
