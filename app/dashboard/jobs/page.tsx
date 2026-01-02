@@ -10,6 +10,8 @@ import RunJobActions from './RunJobActions';
 
 export const dynamic = 'force-dynamic';
 
+const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
+
 type JobRow = {
   id: string | number;
   job_type: string | null;
@@ -19,6 +21,7 @@ type JobRow = {
   created_at: string | null;
   started_at: string | null;
   finished_at: string | null;
+  payload: Record<string, unknown> | null;
 };
 
 function formatDate(value: string | null) {
@@ -46,7 +49,9 @@ export default async function DashboardJobsPage() {
 
   const { data, error } = await supabase
     .from('admin_jobs')
-    .select('id, job_type, status, attempts, max_attempts, created_at, started_at, finished_at')
+    .select(
+      'id, job_type, status, attempts, max_attempts, created_at, started_at, finished_at, payload',
+    )
     .eq('created_by', user.id)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -56,6 +61,32 @@ export default async function DashboardJobsPage() {
   }
 
   const jobs = (data ?? []) as JobRow[];
+  const ideaIds = Array.from(
+    new Set(
+      jobs
+        .filter((job) => job.job_type === IDEA_ENRICH_JOB_TYPE)
+        .map((job) => (job as { payload?: Record<string, unknown> | null }).payload?.idea_id)
+        .filter(Boolean)
+        .map((value) => String(value)),
+    ),
+  );
+
+  const ideaTitleById = new Map<string, string>();
+  if (ideaIds.length > 0) {
+    const { data: ideas, error: ideasError } = await supabase
+      .from('ideas')
+      .select('id, title')
+      .in('id', ideaIds);
+
+    if (ideasError) {
+      console.error('Failed to load idea titles for dashboard jobs:', ideasError.message);
+    }
+
+    for (const idea of ideas ?? []) {
+      ideaTitleById.set(String(idea.id), idea.title ?? '');
+    }
+  }
+  void ideaTitleById;
 
   return (
     <div className="space-y-6">
@@ -85,6 +116,7 @@ export default async function DashboardJobsPage() {
                 <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Idea</th>
                 <th className="px-3 py-2 font-medium">Attempts</th>
                 <th className="px-3 py-2 font-medium">Created</th>
                 <th className="px-3 py-2 font-medium">Started</th>
@@ -103,6 +135,28 @@ export default async function DashboardJobsPage() {
                   </td>
                   <td className="px-3 py-2">
                     <StatusBadge status={job.status} />
+                  </td>
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
+                    {job.job_type === IDEA_ENRICH_JOB_TYPE ? (
+                      (() => {
+                        const ideaId = String(
+                          (job as { payload?: Record<string, unknown> | null }).payload?.idea_id ?? '',
+                        );
+                        if (!ideaId) return '—';
+                        const title = ideaTitleById.get(ideaId) || ideaId.slice(0, 8);
+                        return (
+                          <Link
+                            href={`/dashboard/ideas/${ideaId}?job=${job.id}`}
+                            className="block max-w-[260px] truncate text-foreground hover:underline"
+                            title={title}
+                          >
+                            {title}
+                          </Link>
+                        );
+                      })()
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="px-3 py-2 text-sm text-muted-foreground">
                     {job.attempts ?? 0} / {job.max_attempts ?? 3}
@@ -125,7 +179,7 @@ export default async function DashboardJobsPage() {
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={8}>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={9}>
                     No jobs yet.
                   </td>
                 </tr>
