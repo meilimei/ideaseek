@@ -11,6 +11,7 @@ import RunJobActions from './RunJobActions';
 export const dynamic = 'force-dynamic';
 
 const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
+const INGEST_JOB_TYPES = new Set(['reddit-ingest', 'youtube-ingest', 'trends-ingest']);
 
 type JobRow = {
   id: string | number;
@@ -61,6 +62,29 @@ export default async function DashboardJobsPage() {
   }
 
   const jobs = (data ?? []) as JobRow[];
+  const jobIds = jobs.map((job) => job.id).filter((id) => id !== null && id !== undefined);
+
+  const { data: outputLinks, error: outputLinksError } = await supabase
+    .from('admin_job_ideas')
+    .select('job_id, idea_id, relation_type')
+    .in(
+      'job_id',
+      jobIds.map((id) => String(id)),
+    )
+    .eq('relation_type', 'output');
+
+  if (outputLinksError) {
+    console.error('Failed to load output counts for dashboard jobs:', outputLinksError.message);
+  }
+
+  const outputCountByJobId = new Map<number, number>();
+  for (const link of outputLinks ?? []) {
+    const jid = Number((link as { job_id?: string | number | null }).job_id);
+    if (Number.isNaN(jid)) continue;
+    outputCountByJobId.set(jid, (outputCountByJobId.get(jid) ?? 0) + 1);
+  }
+  void outputCountByJobId;
+
   const ideaIds = Array.from(
     new Set(
       jobs
@@ -117,6 +141,7 @@ export default async function DashboardJobsPage() {
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Idea</th>
+                <th className="px-3 py-2 font-medium">Ideas</th>
                 <th className="px-3 py-2 font-medium">Attempts</th>
                 <th className="px-3 py-2 font-medium">Created</th>
                 <th className="px-3 py-2 font-medium">Started</th>
@@ -159,6 +184,18 @@ export default async function DashboardJobsPage() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-sm text-muted-foreground">
+                    {job.job_type && INGEST_JOB_TYPES.has(job.job_type) ? (
+                      <Link
+                        href={`/dashboard/jobs/${job.id}`}
+                        className="text-foreground hover:underline"
+                      >
+                        {outputCountByJobId.get(Number(job.id)) ?? 0}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
                     {job.attempts ?? 0} / {job.max_attempts ?? 3}
                   </td>
                   <td className="px-3 py-2 text-sm text-muted-foreground">
@@ -179,7 +216,7 @@ export default async function DashboardJobsPage() {
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={9}>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={10}>
                     No jobs yet.
                   </td>
                 </tr>

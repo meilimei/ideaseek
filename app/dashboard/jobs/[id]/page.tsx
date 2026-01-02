@@ -229,49 +229,51 @@ export default async function DashboardJobDetailPage({
             {!targetIdea ? (
               <div>Idea not found.</div>
             ) : (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/dashboard/ideas/${targetIdea.id}?job=${job.id}`}
-                    className="block truncate text-sm font-semibold text-foreground hover:underline"
-                    title={targetIdea.title ?? targetIdea.id}
-                  >
-                    {targetIdea.title ?? targetIdea.id.slice(0, 8)}
-                  </Link>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    <span>
-                      Score:{' '}
-                      {targetIdea.score_overall != null
-                        ? Number(targetIdea.score_overall).toFixed(2)
-                        : '—'}
-                    </span>
-                    <span>Enriched: {formatRelative(targetIdea.enriched_at)}</span>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/dashboard/ideas/${targetIdea.id}?job=${job.id}`}
+                      className="block truncate text-sm font-semibold text-foreground hover:underline"
+                      title={targetIdea.title ?? targetIdea.id}
+                    >
+                      {targetIdea.title ?? targetIdea.id.slice(0, 8)}
+                    </Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span>
+                        Score:{' '}
+                        {targetIdea.score_overall != null
+                          ? Number(targetIdea.score_overall).toFixed(2)
+                          : '—'}
+                      </span>
+                      <span>Enriched: {formatRelative(targetIdea.enriched_at)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {targetIdea.status && <StatusBadge status={targetIdea.status} />}
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/dashboard/ideas/${targetIdea.id}?job=${job.id}`}>
+                        View idea
+                      </Link>
+                    </Button>
+                    <form action={rerunEnrich.bind(null, payloadIdeaId, jobId)}>
+                      <Button type="submit" variant="outline" size="sm">
+                        Rerun
+                      </Button>
+                    </form>
+                    <form action={forceRerunEnrich.bind(null, payloadIdeaId, jobId)}>
+                      <Button type="submit" variant="destructive" size="sm">
+                        Force rerun
+                      </Button>
+                    </form>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {targetIdea.status && <StatusBadge status={targetIdea.status} />}
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/dashboard/ideas/${targetIdea.id}?job=${job.id}`}>
-                      View idea
-                    </Link>
-                  </Button>
-                  <form action={rerunEnrich.bind(null, payloadIdeaId, jobId)}>
-                    <Button type="submit" variant="outline" size="sm">
-                      Rerun
-                    </Button>
-                  </form>
-                  <form action={forceRerunEnrich.bind(null, payloadIdeaId, jobId)}>
-                    <Button type="submit" variant="destructive" size="sm">
-                      Force rerun
-                    </Button>
-                  </form>
+                <div className="text-xs text-muted-foreground">
+                  If an enrichment job is already queued/running for this idea, you'll be taken to it.
                 </div>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                If an enrichment job is already queued/running for this idea, you'll be taken to it.
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Force rerun creates a new job even if one is already running.
+                <div className="text-xs text-muted-foreground">
+                  Force rerun creates a new job even if one is already running.
+                </div>
               </div>
             )}
           </CardContent>
