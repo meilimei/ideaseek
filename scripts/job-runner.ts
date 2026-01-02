@@ -12,6 +12,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const execAsync = promisify(exec);
 const rawPollMs = Number.parseInt(process.env.JOB_RUNNER_POLL_MS ?? '2000', 10);
 const POLL_MS = Number.isFinite(rawPollMs) && rawPollMs >= 200 ? rawPollMs : 200;
+const HEARTBEAT_INTERVAL_MS = 10_000;
 
 type StrategyRow = {
   id: string;
@@ -118,6 +119,28 @@ function compactUpdate<T extends Record<string, unknown>>(input: T): T {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function heartbeat(worker: string) {
+  const nowIso = new Date().toISOString();
+  const meta = {
+    pid: process.pid,
+    version: process.env.npm_package_version ?? null,
+  };
+
+  const { error } = await supabase.from('admin_workers').upsert(
+    {
+      worker,
+      last_seen_at: nowIso,
+      updated_at: nowIso,
+      meta,
+    },
+    { onConflict: 'worker' },
+  );
+
+  if (error) {
+    console.warn('Heartbeat upsert failed:', error.message);
+  }
 }
 
 async function linkJobToIdea(
@@ -835,6 +858,10 @@ async function main() {
   let lastIdleKey = '';
 
   console.log(`Job runner started. worker=${worker}, max=${maxJobs}`);
+  await heartbeat(worker);
+  const heartbeatTimer = setInterval(() => {
+    void heartbeat(worker);
+  }, HEARTBEAT_INTERVAL_MS);
   await printQueuedSummary();
 
   while (processed < maxJobs) {
@@ -871,6 +898,7 @@ async function main() {
     idleLoops = 0;
   }
 
+  clearInterval(heartbeatTimer);
   console.log('Job runner finished.');
 }
 

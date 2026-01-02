@@ -8,6 +8,8 @@ import { supabaseServiceClient as supabaseService } from '../lib/supabaseService
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
+const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
+
 const SEARCHAPI_TRENDS_SOURCE_URL =
   'https://trends.google.com/trending?geo=US&hl=en&hours=24';
 
@@ -129,9 +131,13 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
     return;
   }
 
+  const rowsToInsert = ownerId
+    ? uniqueIdeas.map((idea) => ({ ...idea, created_by: ownerId }))
+    : uniqueIdeas;
+
   const { data, error } = await supabaseService
     .from('ideas')
-    .insert(uniqueIdeas)
+    .insert(rowsToInsert)
     .select('id, title, source_url');
 
   if (error) {

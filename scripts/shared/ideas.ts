@@ -90,9 +90,14 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
     return;
   }
 
+  const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
+  const rowsToInsert = ownerId
+    ? uniqueIdeas.map((idea) => ({ ...idea, created_by: ownerId }))
+    : uniqueIdeas;
+
   const { data, error } = await supabaseServiceClient
     .from('ideas')
-    .insert(uniqueIdeas)
+    .insert(rowsToInsert)
     .select('id, title, source_url');
 
   if (error) {

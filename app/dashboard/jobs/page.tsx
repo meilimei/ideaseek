@@ -32,6 +32,20 @@ function formatDate(value: string | null) {
   return date.toLocaleString();
 }
 
+function formatRelativeTime(value: Date | null) {
+  if (!value) return null;
+  const diffMs = Date.now() - value.getTime();
+  if (!Number.isFinite(diffMs)) return null;
+  const seconds = Math.max(0, Math.floor(diffMs / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default async function DashboardJobsPage() {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -47,6 +61,21 @@ export default async function DashboardJobsPage() {
 
   const plan = await getUserPlan({ supabase, userId: user.id });
   const canRun = plan === 'pro' || plan === 'admin';
+
+  const { data: workers, error: workersError } = await supabase
+    .from('admin_workers')
+    .select('worker, last_seen_at')
+    .order('last_seen_at', { ascending: false })
+    .limit(1);
+
+  if (workersError) {
+    console.error('Failed to load admin worker heartbeat:', workersError.message);
+  }
+
+  const lastSeenRaw = workers?.[0]?.last_seen_at ?? null;
+  const lastSeen = lastSeenRaw ? new Date(lastSeenRaw) : null;
+  const online = lastSeen ? Date.now() - lastSeen.getTime() < 30_000 : false;
+  const lastSeenLabel = formatRelativeTime(lastSeen);
 
   const { data, error } = await supabase
     .from('admin_jobs')
@@ -124,6 +153,22 @@ export default async function DashboardJobsPage() {
         <Button asChild variant="ghost" size="sm">
           <Link href="/dashboard">Back to Dashboard</Link>
         </Button>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={online ? 'secondary' : 'destructive'}>
+            {online ? 'Online' : 'Offline'}
+          </Badge>
+          <span className="text-foreground">
+            Runner: {online ? 'Online' : 'Offline'}
+          </span>
+          <span className="text-muted-foreground">
+            {online
+              ? `last seen ${lastSeenLabel ?? 'just now'}`
+              : 'start your job runner to process queued jobs'}
+          </span>
+        </div>
       </div>
 
       <RunJobActions canRun={canRun} />

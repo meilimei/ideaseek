@@ -1,5 +1,6 @@
 // app/api/ideas/route.ts
 import { NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { supabase } from '@/lib/supabaseClient';
 
 type SortParam = 'newest' | 'oldest' | 'published' | 'pinned' | 'featured';
@@ -94,6 +95,20 @@ export async function POST(req: Request) {
     );
   }
 
+  const supabaseServer = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabaseServer.auth.getUser();
+
+  if (userError) {
+    console.error('[API] Failed to get user:', userError.message);
+  }
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const payload = {
     title: body.title,
     one_liner: body.one_liner ?? null,
@@ -110,9 +125,10 @@ export async function POST(req: Request) {
     key_risks: body.key_risks ?? null,
     next_steps: body.next_steps ?? null,
     source_type: body.source_type ?? 'generated',
+    created_by: user.id,
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseServer
     .from('ideas')
     .insert(payload)
     .select('id')
