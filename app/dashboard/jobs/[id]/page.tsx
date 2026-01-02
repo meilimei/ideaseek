@@ -175,17 +175,25 @@ export default async function DashboardJobDetailPage({
                   className="rounded-xl border border-border/60 bg-card/40 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Link
-                      href={`/ideas/generated/${ideaId}?job=${job.id}`}
-                      className="text-sm font-semibold text-foreground hover:underline"
-                    >
-                      {label}
-                    </Link>
-                    {idea?.status && (
-                      <Badge variant="secondary" className="capitalize">
-                        {idea.status}
-                      </Badge>
-                    )}
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/dashboard/ideas/${ideaId}?job=${job.id}`}
+                        className="block truncate text-sm font-semibold text-foreground hover:underline"
+                        title={label}
+                      >
+                        {label}
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {idea?.status && (
+                        <Badge variant="secondary" className="capitalize">
+                          {idea.status}
+                        </Badge>
+                      )}
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/dashboard/ideas/${ideaId}?job=${job.id}`}>View idea</Link>
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>
