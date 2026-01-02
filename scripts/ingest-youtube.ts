@@ -5,13 +5,13 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { supabaseServiceClient } from '../lib/supabaseServiceClient';
+import { recordJobOutputs } from './lib/jobOutputs';
 import { type IdeaForInsert } from './ingest-utils';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
-const adminJobId =
-  adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : adminJobIdRaw;
+const jobId = adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : null;
 const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
 console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
 console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
@@ -158,29 +158,6 @@ async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
   }
 
   return insertedIds;
-}
-
-async function linkOutputIdeas(jobId: string | number, ideaIds: string[]) {
-  if (ideaIds.length === 0) return false;
-  const rows = ideaIds.map((id) => ({
-    job_id: jobId,
-    idea_id: id,
-    relation_type: 'output',
-  }));
-
-  const { error } = await supabaseServiceClient
-    .from('admin_job_ideas')
-    .upsert(rows, { onConflict: 'job_id,idea_id,relation_type', ignoreDuplicates: true });
-
-  if (error) {
-    console.warn('admin_job_ideas link failed', { adminJobIdRaw, err: error });
-    const fallback = await supabaseServiceClient.from('admin_job_ideas').insert(rows);
-    if (fallback.error) {
-      console.warn('admin_job_ideas link failed', { adminJobIdRaw, err: fallback.error });
-      return false;
-    }
-  }
-  return true;
 }
 
 export async function fetchVideosForTopic(
@@ -388,11 +365,16 @@ async function main() {
 
     if (ideas.length > 0) {
       const insertedIds = await insertIdeasWithIds(ideas);
-      if (adminJobIdRaw && insertedIds.length > 0) {
-        const linked = await linkOutputIdeas(adminJobId ?? adminJobIdRaw, insertedIds);
-        if (linked) {
+      if (insertedIds.length > 0) {
+        await recordJobOutputs({
+          supabase: supabaseServiceClient,
+          jobId,
+          jobCreatedBy: ownerId,
+          ideaIds: insertedIds,
+        });
+        if (jobId) {
           console.log(
-            `Linked ${insertedIds.length} output idea(s) to job ${adminJobIdRaw}`,
+            `Linked ${insertedIds.length} output idea(s) to job ${jobId}`,
           );
         }
       }

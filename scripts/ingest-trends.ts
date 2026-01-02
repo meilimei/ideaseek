@@ -5,9 +5,12 @@ import path from 'node:path';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import { recordJobOutputs } from './lib/jobOutputs';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
+const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
+const jobId = adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : null;
 const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
 console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
 
@@ -83,10 +86,10 @@ function escapeLikePattern(input: string): string {
   return input.replace(/[%_]/g, '\\$&');
 }
 
-export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
+export async function insertIdeas(ideas: IdeaForInsert[]): Promise<string[]> {
   if (ideas.length === 0) {
     console.log('No ideas to insert.');
-    return;
+    return [];
   }
 
   const supabaseServiceClient = await getSupabaseServiceClient();
@@ -163,7 +166,7 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
         skipped.slice(0, 10).map((s) => `${s.title} (${s.reason})`),
       );
     }
-    return;
+    return [];
   }
 
   const rowsToInsert = ownerId
@@ -177,8 +180,12 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
 
   if (error) {
     console.error('Error inserting ideas:', error);
-    return;
+    return [];
   }
+
+  const insertedIds = (data ?? [])
+    .map((row) => row.id)
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
 
   console.log(`Inserted ${data?.length ?? 0} idea(s).`);
   if (data && data.length > 0) {
@@ -190,6 +197,8 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
       skipped.slice(0, 10).map((s) => `${s.title} (${s.reason})`),
     );
   }
+
+  return insertedIds;
 }
 
 async function fetchDailyTrends(geo = 'US'): Promise<DailyTrendTopic[]> {
@@ -397,7 +406,19 @@ async function main() {
   const ideas = await generateIdeasFromTrends(topics, 5);
   console.log(`Generated ${ideas.length} ideas from trends.`);
 
-  await insertIdeas(ideas);
+  const insertedIds = await insertIdeas(ideas);
+  if (insertedIds.length > 0) {
+    const supabaseServiceClient = await getSupabaseServiceClient();
+    await recordJobOutputs({
+      supabase: supabaseServiceClient,
+      jobId,
+      jobCreatedBy: ownerId,
+      ideaIds: insertedIds,
+    });
+    if (jobId) {
+      console.log(`Linked ${insertedIds.length} output idea(s) to job ${jobId}`);
+    }
+  }
 
   console.log('Done.');
 }

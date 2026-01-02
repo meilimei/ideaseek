@@ -3,14 +3,14 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { supabaseServiceClient } from '../lib/supabaseServiceClient';
+import { recordJobOutputs } from './lib/jobOutputs';
 import { type IdeaForInsert } from './ingest-utils';
 
 // 1. 加载 .env.local（注意路径）
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
-const adminJobId =
-  adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : adminJobIdRaw;
+const jobId = adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : null;
 const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
 console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
 console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
@@ -204,31 +204,6 @@ async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
   }
 
   return insertedIds;
-}
-
-async function linkOutputIdeas(jobId: string | number, ideaIds: string[]) {
-  if (ideaIds.length === 0) return;
-  const rows = ideaIds.map((id) => ({
-    job_id: jobId,
-    idea_id: id,
-    relation_type: 'output',
-  }));
-
-  const { error } = await supabaseServiceClient
-    .from('admin_job_ideas')
-    .upsert(rows, { onConflict: 'job_id,idea_id,relation_type', ignoreDuplicates: true });
-
-  if (error) {
-    const fallback = await supabaseServiceClient.from('admin_job_ideas').insert(rows);
-    if (fallback.error) {
-      const code = (fallback.error as { code?: string | null }).code ?? null;
-      const isDuplicate =
-        code === '23505' || fallback.error.message.includes('duplicate key');
-      if (!isDuplicate) {
-        console.warn('Failed to link output ideas to job:', fallback.error.message);
-      }
-    }
-  }
 }
 
 // 一些简单的关键词，用来筛选“有痛点味道”的帖子
@@ -526,9 +501,16 @@ async function main() {
   console.log(`Generated ${ideas.length} ideas from DeepSeek.`);
 
   const insertedIds = await insertIdeasWithIds(ideas);
-  if (adminJobIdRaw && insertedIds.length > 0) {
-    await linkOutputIdeas(adminJobId ?? adminJobIdRaw, insertedIds);
-    console.log(`Linked ${insertedIds.length} output idea(s) to job ${adminJobIdRaw}`);
+  if (insertedIds.length > 0) {
+    await recordJobOutputs({
+      supabase: supabaseServiceClient,
+      jobId,
+      jobCreatedBy: ownerId,
+      ideaIds: insertedIds,
+    });
+    if (jobId) {
+      console.log(`Linked ${insertedIds.length} output idea(s) to job ${jobId}`);
+    }
   }
 
   console.log('Done.');
