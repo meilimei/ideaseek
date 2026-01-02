@@ -258,7 +258,7 @@ export default async function DashboardIdeasPage({
   const enrichedParam =
     typeof searchParams?.enriched === 'string' ? searchParams.enriched : 'all';
   const sortParam =
-    typeof searchParams?.sort === 'string' ? searchParams.sort : 'newest';
+    typeof searchParams?.sort === 'string' ? searchParams.sort : 'new';
 
   const sourceFilter =
     sourceParam === 'reddit' || sourceParam === 'youtube' || sourceParam === 'trends'
@@ -266,7 +266,7 @@ export default async function DashboardIdeasPage({
       : 'all';
   const enrichedFilter =
     enrichedParam === 'yes' || enrichedParam === 'no' ? enrichedParam : 'all';
-  const sortFilter = sortParam === 'score' ? 'score' : 'newest';
+  const sortFilter = sortParam === 'score' ? 'score' : 'new';
 
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -393,10 +393,20 @@ export default async function DashboardIdeasPage({
 
   const ideaIds = Array.from(ideaMeta.keys());
 
-  const { data: ideasData, error: ideasError } = await supabase
+  let ideasQuery = supabase
     .from('ideas')
     .select('id, title, status, tags, score_overall, enriched_at, created_at')
     .in('id', ideaIds);
+
+  if (sortFilter === 'score') {
+    ideasQuery = ideasQuery
+      .order('score_overall', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+  } else {
+    ideasQuery = ideasQuery.order('created_at', { ascending: false });
+  }
+
+  const { data: ideasData, error: ideasError } = await ideasQuery;
 
   if (ideasError) {
     console.error('Failed to load ideas for dashboard:', ideasError.message);
@@ -463,14 +473,14 @@ export default async function DashboardIdeasPage({
       const aScore = a.idea.score_overall;
       const bScore = b.idea.score_overall;
       if (aScore == null && bScore == null) {
-        return (b.producedAtMs || b.createdAtMs) - (a.producedAtMs || a.createdAtMs);
+        return b.createdAtMs - a.createdAtMs;
       }
       if (aScore == null) return 1;
       if (bScore == null) return -1;
       if (bScore !== aScore) return bScore - aScore;
-      return (b.producedAtMs || b.createdAtMs) - (a.producedAtMs || a.createdAtMs);
+      return b.createdAtMs - a.createdAtMs;
     }
-    return (b.producedAtMs || b.createdAtMs) - (a.producedAtMs || a.createdAtMs);
+    return b.createdAtMs - a.createdAtMs;
   });
 
   const notEnrichedCount = ideaList.filter((row) => row.idea.enriched_at == null).length;
@@ -512,8 +522,8 @@ export default async function DashboardIdeasPage({
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Sort</label>
               <AdminSelect name="sort" defaultValue={sortFilter}>
-                <option value="newest">Newest</option>
-                <option value="score">Highest score</option>
+                <option value="new">Newest</option>
+                <option value="score">Score (High -&gt; Low)</option>
               </AdminSelect>
             </div>
             <Button type="submit" size="sm" variant="secondary" className="h-10">
