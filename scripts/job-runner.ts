@@ -10,8 +10,9 @@ import { processSingleTrendsSnapshot } from '../lib/server/processTrendsSnapshot
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const execAsync = promisify(exec);
-const rawPollMs = Number.parseInt(process.env.JOB_RUNNER_POLL_MS ?? '2000', 10);
-const POLL_MS = Number.isFinite(rawPollMs) && rawPollMs >= 200 ? rawPollMs : 200;
+const POLL_INTERVAL_MS = 2000;
+const REAP_INTERVAL_MS = 60_000;
+const STALE_LOCK_MS = 15 * 60_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
 
 type StrategyRow = {
@@ -119,6 +120,78 @@ function compactUpdate<T extends Record<string, unknown>>(input: T): T {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function reapStaleJobs(supabaseClient: typeof supabase, now: Date) {
+  const staleBeforeIso = new Date(now.getTime() - STALE_LOCK_MS).toISOString();
+  const nowIso = now.toISOString();
+
+  const { data: staleJobs, error } = await supabaseClient
+    .from('admin_jobs')
+    .select('id, attempts, max_attempts')
+    .eq('status', 'running')
+    .lt('locked_at', staleBeforeIso);
+
+  if (error) {
+    console.warn('[reap] failed to load stale jobs:', error.message);
+    return;
+  }
+
+  if (!staleJobs || staleJobs.length === 0) {
+    return;
+  }
+
+  let requeued = 0;
+  let failed = 0;
+
+  for (const job of staleJobs as Array<{ id: string; attempts?: number | null; max_attempts?: number | null }>) {
+    const attempts = job.attempts ?? 0;
+    const maxAttempts = job.max_attempts ?? 3;
+    const nextAttempts = attempts + 1;
+    const baseUpdate = {
+      attempts: nextAttempts,
+      locked_at: null,
+      locked_by: null,
+      updated_at: nowIso,
+      error: `stale lock reclaimed at ${nowIso}`,
+    };
+
+    if (nextAttempts < maxAttempts) {
+      const { error: updateError } = await supabaseClient
+        .from('admin_jobs')
+        .update({
+          ...baseUpdate,
+          status: 'queued',
+          next_run_at: nowIso,
+        })
+        .eq('id', job.id);
+
+      if (updateError) {
+        console.warn('[reap] failed to requeue stale job:', updateError.message);
+      } else {
+        requeued += 1;
+      }
+    } else {
+      const { error: updateError } = await supabaseClient
+        .from('admin_jobs')
+        .update({
+          ...baseUpdate,
+          status: 'error',
+          finished_at: nowIso,
+        })
+        .eq('id', job.id);
+
+      if (updateError) {
+        console.warn('[reap] failed to mark stale job error:', updateError.message);
+      } else {
+        failed += 1;
+      }
+    }
+  }
+
+  if (requeued > 0 || failed > 0) {
+    console.log(`[reap] requeued=${requeued} failed=${failed}`);
+  }
 }
 
 async function heartbeat(worker: string) {
@@ -856,6 +929,7 @@ async function main() {
   let processed = 0;
   let idleLoops = 0;
   let lastIdleKey = '';
+  let lastReapAt = 0;
 
   console.log(`Job runner started. worker=${worker}, max=${maxJobs}`);
   await heartbeat(worker);
@@ -865,6 +939,12 @@ async function main() {
   await printQueuedSummary();
 
   while (processed < maxJobs) {
+    const now = new Date();
+    if (now.getTime() - lastReapAt > REAP_INTERVAL_MS) {
+      await reapStaleJobs(supabase, now);
+      lastReapAt = now.getTime();
+    }
+
     const job = await claimJob(worker);
     if (!job) {
       idleLoops += 1;
@@ -872,11 +952,11 @@ async function main() {
       const idleKey = `${readyCount}|${runningCount}|${nextFuture ?? 'null'}`;
       if (idleLoops % 10 === 0 || idleKey !== lastIdleKey) {
         console.log(
-          `Idle: readyQueued=${readyCount} running=${runningCount} nextFuture=${nextFuture ?? 'null'} pollMs=${POLL_MS}`,
+          `Idle: readyQueued=${readyCount} running=${runningCount} nextFuture=${nextFuture ?? 'null'} pollMs=${POLL_INTERVAL_MS}`,
         );
         lastIdleKey = idleKey;
       }
-      await sleep(POLL_MS);
+      await sleep(POLL_INTERVAL_MS);
       continue;
     }
     console.log(`Claimed job ${job.id} (${job.job_type})`);
