@@ -20,6 +20,9 @@ type JobRow = {
   attempts: number | null;
   max_attempts: number | null;
   created_at: string | null;
+  next_run_at: string | null;
+  locked_at: string | null;
+  locked_by: string | null;
   started_at: string | null;
   finished_at: string | null;
   payload: Record<string, unknown> | null;
@@ -44,6 +47,39 @@ function formatRelativeTime(value: Date | null) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function getJobHint(job: JobRow, now: Date, runnerOnline: boolean): string | null {
+  if (job.status === 'queued') {
+    if (!runnerOnline) return 'Runner offline';
+    if (job.next_run_at) {
+      const nextRun = new Date(job.next_run_at);
+      if (!Number.isNaN(nextRun.getTime()) && nextRun.getTime() > now.getTime()) {
+        return 'Scheduled';
+      }
+    }
+    if (job.created_at) {
+      const createdAt = new Date(job.created_at);
+      if (!Number.isNaN(createdAt.getTime())) {
+        const queuedForMs = now.getTime() - createdAt.getTime();
+        if (queuedForMs > 2 * 60_000) return 'Waiting in queue';
+      }
+    }
+    return 'Queued';
+  }
+
+  if (job.status === 'running') {
+    if (job.locked_at) {
+      const lockedAt = new Date(job.locked_at);
+      if (!Number.isNaN(lockedAt.getTime())) {
+        const lockAgeMs = now.getTime() - lockedAt.getTime();
+        if (lockAgeMs > 10 * 60_000) return 'May be stuck (stale lock)';
+      }
+    }
+    return 'Running';
+  }
+
+  return null;
 }
 
 export default async function DashboardJobsPage() {
@@ -74,13 +110,13 @@ export default async function DashboardJobsPage() {
 
   const lastSeenRaw = workers?.[0]?.last_seen_at ?? null;
   const lastSeen = lastSeenRaw ? new Date(lastSeenRaw) : null;
-  const online = lastSeen ? Date.now() - lastSeen.getTime() < 30_000 : false;
+  const runnerOnline = lastSeen ? Date.now() - lastSeen.getTime() < 30_000 : false;
   const lastSeenLabel = formatRelativeTime(lastSeen);
 
   const { data, error } = await supabase
     .from('admin_jobs')
     .select(
-      'id, job_type, status, attempts, max_attempts, created_at, started_at, finished_at, payload',
+      'id, job_type, status, created_at, next_run_at, locked_at, locked_by, started_at, finished_at, attempts, max_attempts, payload',
     )
     .eq('created_by', user.id)
     .order('created_at', { ascending: false })
@@ -141,6 +177,8 @@ export default async function DashboardJobsPage() {
   }
   void ideaTitleById;
 
+  const now = new Date();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -157,14 +195,14 @@ export default async function DashboardJobsPage() {
 
       <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={online ? 'secondary' : 'destructive'}>
-            {online ? 'Online' : 'Offline'}
+          <Badge variant={runnerOnline ? 'secondary' : 'destructive'}>
+            {runnerOnline ? 'Online' : 'Offline'}
           </Badge>
           <span className="text-foreground">
-            Runner: {online ? 'Online' : 'Offline'}
+            Runner: {runnerOnline ? 'Online' : 'Offline'}
           </span>
           <span className="text-muted-foreground">
-            {online
+            {runnerOnline
               ? `last seen ${lastSeenLabel ?? 'just now'}`
               : 'start your job runner to process queued jobs'}
           </span>
@@ -185,6 +223,7 @@ export default async function DashboardJobsPage() {
                 <th className="px-3 py-2 font-medium">ID</th>
                 <th className="px-3 py-2 font-medium">Type</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Reason</th>
                 <th className="px-3 py-2 font-medium">Idea</th>
                 <th className="px-3 py-2 font-medium">Ideas</th>
                 <th className="px-3 py-2 font-medium">Attempts</th>
@@ -205,6 +244,24 @@ export default async function DashboardJobsPage() {
                   </td>
                   <td className="px-3 py-2">
                     <StatusBadge status={job.status} />
+                  </td>
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
+                    {(() => {
+                      const hint = getJobHint(job, now, runnerOnline);
+                      if (!hint) return '—';
+                      const scheduledLabel =
+                        hint === 'Scheduled' ? formatDate(job.next_run_at ?? null) : null;
+                      return (
+                        <span
+                          className="text-xs text-muted-foreground"
+                          title={
+                            scheduledLabel ? `Scheduled at ${scheduledLabel}` : undefined
+                          }
+                        >
+                          {hint}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-2 text-sm text-muted-foreground">
                     {job.job_type === IDEA_ENRICH_JOB_TYPE ? (
@@ -261,7 +318,7 @@ export default async function DashboardJobsPage() {
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={10}>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={11}>
                     No jobs yet.
                   </td>
                 </tr>
