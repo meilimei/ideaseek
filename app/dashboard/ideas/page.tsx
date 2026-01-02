@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CardBody, CardHeading, DataTable, GlassCard } from '@/components/admin/primitives';
+import { CardBody, CardHeading, DataTable, GlassCard, AdminSelect } from '@/components/admin/primitives';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
@@ -28,6 +28,14 @@ type IdeaOutputMeta = {
   outputCount: number;
   latestJobId: string;
   latestProducedAt: string | null;
+};
+
+type IdeaListItem = {
+  idea: IdeaRow;
+  meta: IdeaOutputMeta;
+  source: 'reddit' | 'youtube' | 'trends' | 'other';
+  producedAtMs: number;
+  createdAtMs: number;
 };
 
 function formatRelative(isoDate: string | null | undefined) {
@@ -58,7 +66,35 @@ function formatRelative(isoDate: string | null | undefined) {
   return 'just now';
 }
 
-export default async function DashboardIdeasPage() {
+function sourceFromJobType(jobType: string | null | undefined) {
+  if (!jobType) return 'other';
+  const normalized = jobType.toLowerCase().replace(/_/g, '-');
+  if (normalized.includes('reddit')) return 'reddit';
+  if (normalized.includes('youtube')) return 'youtube';
+  if (normalized.includes('trends') || normalized.includes('google-trends')) return 'trends';
+  return 'other';
+}
+
+export default async function DashboardIdeasPage({
+  searchParams,
+}: {
+  searchParams?: { source?: string; enriched?: string; sort?: string };
+}) {
+  const sourceParam =
+    typeof searchParams?.source === 'string' ? searchParams.source : 'all';
+  const enrichedParam =
+    typeof searchParams?.enriched === 'string' ? searchParams.enriched : 'all';
+  const sortParam =
+    typeof searchParams?.sort === 'string' ? searchParams.sort : 'newest';
+
+  const sourceFilter =
+    sourceParam === 'reddit' || sourceParam === 'youtube' || sourceParam === 'trends'
+      ? sourceParam
+      : 'all';
+  const enrichedFilter =
+    enrichedParam === 'yes' || enrichedParam === 'no' ? enrichedParam : 'all';
+  const sortFilter = sortParam === 'score' ? 'score' : 'newest';
+
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -177,6 +213,10 @@ export default async function DashboardIdeasPage() {
     }
   }
 
+  const jobTypeById = new Map<string, string | null>(
+    jobs.map((job) => [String(job.id), job.job_type ?? null]),
+  );
+
   const ideaIds = Array.from(ideaMeta.keys());
 
   const { data: ideasData, error: ideasError } = await supabase
@@ -192,23 +232,50 @@ export default async function DashboardIdeasPage() {
     (ideasData ?? []).map((idea) => [idea.id, idea as IdeaRow]),
   );
 
-  const ideaList = ideaIds
+  const ideaList: IdeaListItem[] = ideaIds
     .map((id) => {
       const idea = ideaById.get(id);
       const meta = ideaMeta.get(id);
       if (!idea || !meta) return null;
-      return { idea, meta };
+      const jobType = jobTypeById.get(meta.latestJobId) ?? null;
+      const producedAtMs = meta.latestProducedAt
+        ? new Date(meta.latestProducedAt).getTime()
+        : 0;
+      const createdAtMs = idea.created_at ? new Date(idea.created_at).getTime() : 0;
+      return {
+        idea,
+        meta,
+        source: sourceFromJobType(jobType),
+        producedAtMs,
+        createdAtMs,
+      };
     })
-    .filter(Boolean)
-    .sort((a, b) => {
-      const aTime = a?.meta.latestProducedAt
-        ? new Date(a.meta.latestProducedAt).getTime()
-        : 0;
-      const bTime = b?.meta.latestProducedAt
-        ? new Date(b.meta.latestProducedAt).getTime()
-        : 0;
-      return bTime - aTime;
-    });
+    .filter(Boolean) as IdeaListItem[];
+
+  let filtered = ideaList;
+  if (sourceFilter !== 'all') {
+    filtered = filtered.filter((row) => row.source === sourceFilter);
+  }
+  if (enrichedFilter === 'yes') {
+    filtered = filtered.filter((row) => row.idea.enriched_at != null);
+  } else if (enrichedFilter === 'no') {
+    filtered = filtered.filter((row) => row.idea.enriched_at == null);
+  }
+
+  filtered.sort((a, b) => {
+    if (sortFilter === 'score') {
+      const aScore = a.idea.score_overall;
+      const bScore = b.idea.score_overall;
+      if (aScore == null && bScore == null) {
+        return (b.producedAtMs || b.createdAtMs) - (a.producedAtMs || a.createdAtMs);
+      }
+      if (aScore == null) return 1;
+      if (bScore == null) return -1;
+      if (bScore !== aScore) return bScore - aScore;
+      return (b.producedAtMs || b.createdAtMs) - (a.producedAtMs || a.createdAtMs);
+    }
+    return (b.producedAtMs || b.createdAtMs) - (a.producedAtMs || a.createdAtMs);
+  });
 
   return (
     <div className="space-y-6">
@@ -223,6 +290,41 @@ export default async function DashboardIdeasPage() {
           <Link href="/dashboard/jobs">Back to Jobs</Link>
         </Button>
       </div>
+
+      <GlassCard>
+        <CardBody className="space-y-3">
+          <form method="get" className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Source</label>
+              <AdminSelect name="source" defaultValue={sourceFilter}>
+                <option value="all">All</option>
+                <option value="reddit">Reddit</option>
+                <option value="youtube">YouTube</option>
+                <option value="trends">Trends</option>
+              </AdminSelect>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Enriched</label>
+              <AdminSelect name="enriched" defaultValue={enrichedFilter}>
+                <option value="all">All</option>
+                <option value="yes">Enriched</option>
+                <option value="no">Not enriched</option>
+              </AdminSelect>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Sort</label>
+              <AdminSelect name="sort" defaultValue={sortFilter}>
+                <option value="newest">Newest</option>
+                <option value="score">Highest score</option>
+              </AdminSelect>
+            </div>
+            <Button type="submit" size="sm" variant="secondary" className="h-10">
+              Apply
+            </Button>
+          </form>
+          <div className="text-xs text-muted-foreground">{filtered.length} results</div>
+        </CardBody>
+      </GlassCard>
 
       <GlassCard>
         <CardHeading
@@ -241,8 +343,7 @@ export default async function DashboardIdeasPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {ideaList.map((row) => {
-                if (!row) return null;
+              {filtered.map((row) => {
                 const { idea, meta } = row;
                 const tags = idea.tags ?? [];
                 const visibleTags = tags.slice(0, 6);
@@ -303,6 +404,13 @@ export default async function DashboardIdeasPage() {
                   </tr>
                 );
               })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={5}>
+                    No ideas match these filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </DataTable>
         </CardBody>
