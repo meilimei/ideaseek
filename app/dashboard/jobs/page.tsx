@@ -55,6 +55,13 @@ function formatQuotaLimit(limit: number) {
   return limit === Infinity ? '∞' : String(limit);
 }
 
+function isLow(used: number, limit: number): boolean {
+  if (!Number.isFinite(limit)) return false;
+  if (limit <= 0) return true;
+  const remaining = Math.max(0, limit - used);
+  return remaining / limit < 0.2;
+}
+
 function getJobHint(job: JobRow, now: Date, runnerOnline: boolean): string | null {
   if (job.status === 'queued') {
     if (!runnerOnline) return 'Runner offline';
@@ -132,6 +139,13 @@ export default async function DashboardJobsPage({
   const enrichDailyLimit = QUOTAS[plan].enrichPerDay;
   const ingestMonthlyLimit = QUOTAS[plan].ingestPerMonth;
   const enrichMonthlyLimit = QUOTAS[plan].enrichPerMonth;
+  const showLowWarnings = plan !== 'admin';
+  const lowDailyIngest = showLowWarnings && isLow(usedIngestDaily, ingestDailyLimit);
+  const lowDailyEnrich = showLowWarnings && isLow(usedEnrichDaily, enrichDailyLimit);
+  const lowMonthlyIngest = showLowWarnings && isLow(usedIngestMonthly, ingestMonthlyLimit);
+  const lowMonthlyEnrich = showLowWarnings && isLow(usedEnrichMonthly, enrichMonthlyLimit);
+  const anyLow =
+    lowDailyIngest || lowDailyEnrich || lowMonthlyIngest || lowMonthlyEnrich;
 
   const { data: workers, error: workersError } = await supabase
     .from('admin_workers')
@@ -271,21 +285,47 @@ export default async function DashboardJobsPage({
       <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
         <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
           <span className="text-foreground">Today usage</span>
-          <span>
+          <span className="inline-flex items-center gap-2">
             Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
+            {lowDailyIngest && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                Low
+              </Badge>
+            )}
           </span>
-          <span>
+          <span className="inline-flex items-center gap-2">
             Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
+            {lowDailyEnrich && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                Low
+              </Badge>
+            )}
           </span>
           <span className="text-foreground">This month</span>
-          <span>
+          <span className="inline-flex items-center gap-2">
             Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
+            {lowMonthlyIngest && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                Low
+              </Badge>
+            )}
           </span>
-          <span>
+          <span className="inline-flex items-center gap-2">
             Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
+            {lowMonthlyEnrich && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                Low
+              </Badge>
+            )}
           </span>
         </div>
       </div>
+
+      {showLowWarnings && anyLow && (
+        <Alert className="border-border/60 bg-card/40 text-muted-foreground">
+          You're running low on quota. Consider spacing runs to avoid hitting limits.
+        </Alert>
+      )}
 
       <RunJobActions canRun={canRun} />
 
