@@ -4,9 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/admin/StatusBadge';
+import { enqueueIdeaEnrich } from '@/lib/enrich';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
+
+const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
 
 type JobRow = {
   id: string | number;
@@ -27,6 +30,14 @@ type RelatedIdea = {
   title: string | null;
   status: string | null;
   tags: string[] | null;
+  score_overall: number | null;
+  enriched_at: string | null;
+};
+
+type TargetIdea = {
+  id: string;
+  title: string | null;
+  status: string | null;
   score_overall: number | null;
   enriched_at: string | null;
 };
@@ -77,6 +88,49 @@ function asIdea(link: RelatedIdeaLink): RelatedIdea | null {
   return null;
 }
 
+function getIdeaIdFromPayload(payload: Record<string, unknown> | null) {
+  if (!payload) return null;
+  const direct = payload['idea_id'];
+  if (typeof direct === 'string' || typeof direct === 'number') {
+    return String(direct);
+  }
+  const alternate = payload['ideaId'];
+  if (typeof alternate === 'string' || typeof alternate === 'number') {
+    return String(alternate);
+  }
+  return null;
+}
+
+async function rerunEnrich(ideaId: string, rerunOf: number) {
+  'use server';
+
+  const result = await enqueueIdeaEnrich({
+    ideaId,
+    force: false,
+    rerunOf,
+    triggeredBy: 'dashboard-rerun',
+  });
+
+  if (!result.ok && result.reason === 'already_pending') {
+    return redirect(`/dashboard/jobs/${result.pendingJobId}`);
+  }
+
+  return redirect(`/dashboard/jobs/${result.jobId}`);
+}
+
+async function forceRerunEnrich(ideaId: string, rerunOf: number) {
+  'use server';
+
+  const result = await enqueueIdeaEnrich({
+    ideaId,
+    force: true,
+    rerunOf,
+    triggeredBy: 'dashboard-force-rerun',
+  });
+
+  return redirect(`/dashboard/jobs/${result.jobId}`);
+}
+
 export default async function DashboardJobDetailPage({
   params,
 }: {
@@ -109,6 +163,22 @@ export default async function DashboardJobDetailPage({
 
   if (jobError || !job) {
     return notFound();
+  }
+
+  let targetIdea: TargetIdea | null = null;
+  const payloadIdeaId = getIdeaIdFromPayload(job.payload ?? null);
+  if (job.job_type === IDEA_ENRICH_JOB_TYPE && payloadIdeaId) {
+    const { data: targetIdeaRow, error: targetIdeaError } = await supabase
+      .from('ideas')
+      .select('id, title, status, score_overall, enriched_at')
+      .eq('id', payloadIdeaId)
+      .maybeSingle();
+
+    if (targetIdeaError) {
+      console.error('Failed to load target idea:', targetIdeaError.message);
+    } else if (targetIdeaRow) {
+      targetIdea = targetIdeaRow as TargetIdea;
+    }
   }
 
   const { data: links, error: linksError } = await supabase
@@ -149,6 +219,64 @@ export default async function DashboardJobDetailPage({
           Attempts: {job.attempts ?? 0} / {job.max_attempts ?? 3}
         </span>
       </div>
+
+      {job.job_type === IDEA_ENRICH_JOB_TYPE && payloadIdeaId && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle>Target Idea</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            {!targetIdea ? (
+              <div>Idea not found.</div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/dashboard/ideas/${targetIdea.id}?job=${job.id}`}
+                    className="block truncate text-sm font-semibold text-foreground hover:underline"
+                    title={targetIdea.title ?? targetIdea.id}
+                  >
+                    {targetIdea.title ?? targetIdea.id.slice(0, 8)}
+                  </Link>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span>
+                      Score:{' '}
+                      {targetIdea.score_overall != null
+                        ? Number(targetIdea.score_overall).toFixed(2)
+                        : '—'}
+                    </span>
+                    <span>Enriched: {formatRelative(targetIdea.enriched_at)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {targetIdea.status && <StatusBadge status={targetIdea.status} />}
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/dashboard/ideas/${targetIdea.id}?job=${job.id}`}>
+                      View idea
+                    </Link>
+                  </Button>
+                  <form action={rerunEnrich.bind(null, payloadIdeaId, jobId)}>
+                    <Button type="submit" variant="outline" size="sm">
+                      Rerun
+                    </Button>
+                  </form>
+                  <form action={forceRerunEnrich.bind(null, payloadIdeaId, jobId)}>
+                    <Button type="submit" variant="destructive" size="sm">
+                      Force rerun
+                    </Button>
+                  </form>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                If an enrichment job is already queued/running for this idea, you'll be taken to it.
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Force rerun creates a new job even if one is already running.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

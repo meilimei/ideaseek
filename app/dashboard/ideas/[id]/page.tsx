@@ -9,6 +9,8 @@ import { getUserPlan } from '@/lib/plan';
 
 export const dynamic = 'force-dynamic';
 
+const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
+
 type IdeaRow = {
   id: string;
   title: string | null;
@@ -29,6 +31,35 @@ type EvidenceRow = {
   excerpt: string | null;
   url: string | null;
   created_at: string | null;
+};
+
+type EnrichSnapshot = {
+  before?: {
+    tags?: string[];
+    score_overall?: number | null;
+    score_detail?: unknown;
+    status?: string | null;
+    enriched_at?: string | null;
+  };
+  after?: {
+    tags?: string[];
+    score_overall?: number | null;
+    score_detail?: unknown;
+    status?: string | null;
+    enriched_at?: string | null;
+  };
+  delta?: {
+    tags_added?: string[];
+    tags_removed?: string[];
+    score_delta?: number | null;
+  };
+};
+
+type EnrichJob = {
+  id: string | number;
+  status: string | null;
+  created_at: string | null;
+  payload: Record<string, unknown> | null;
 };
 
 function formatRelative(isoDate: string | null | undefined) {
@@ -57,6 +88,18 @@ function formatRelative(isoDate: string | null | undefined) {
   }
 
   return 'just now';
+}
+
+function formatScore(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return '—';
+  return Number(value).toFixed(2);
+}
+
+function deltaBadgeClass(delta: number | null | undefined) {
+  if (delta == null) return 'bg-secondary/40 text-foreground border-border/50';
+  if (delta > 0) return 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30';
+  if (delta < 0) return 'bg-rose-500/15 text-rose-200 border-rose-500/30';
+  return 'bg-secondary/40 text-foreground border-border/50';
 }
 
 export default async function DashboardIdeaDetailPage({
@@ -119,6 +162,28 @@ export default async function DashboardIdeaDetailPage({
       return notFound();
     }
   }
+
+  const { data: enrichJobs, error: enrichJobError } = await supabase
+    .from('admin_jobs')
+    .select('id, status, created_at, payload')
+    .eq('created_by', user.id)
+    .eq('job_type', IDEA_ENRICH_JOB_TYPE)
+    .filter('payload->>idea_id', 'eq', id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (enrichJobError) {
+    console.error('Failed to load latest enrich job:', enrichJobError.message);
+  }
+
+  const enrichJob = (enrichJobs ?? [])[0] as EnrichJob | undefined;
+  const enrichSnapshot = (enrichJob?.payload as any)?.enrich as EnrichSnapshot | undefined;
+  const beforeScore = enrichSnapshot?.before?.score_overall ?? null;
+  const afterScore = enrichSnapshot?.after?.score_overall ?? null;
+  const scoreDelta = enrichSnapshot?.delta?.score_delta ?? null;
+  const tagsAdded = enrichSnapshot?.delta?.tags_added ?? [];
+  const tagsRemoved = enrichSnapshot?.delta?.tags_removed ?? [];
+  const hasTagChanges = tagsAdded.length > 0 || tagsRemoved.length > 0;
 
   const { data: evidenceData, error: evidenceError } = await supabase
     .from('idea_evidence')
@@ -183,6 +248,80 @@ export default async function DashboardIdeaDetailPage({
           ))}
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Last enrichment</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          {enrichSnapshot && enrichJob ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={enrichJob.status} />
+                  <Link
+                    href={`/dashboard/jobs/${enrichJob.id}`}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View job
+                  </Link>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {formatRelative(enrichJob.created_at)}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span>
+                  Score: {formatScore(beforeScore)} → {formatScore(afterScore)}
+                </span>
+                <Badge className={deltaBadgeClass(scoreDelta)}>
+                  {scoreDelta != null
+                    ? `${scoreDelta > 0 ? '+' : ''}${scoreDelta.toFixed(2)}`
+                    : '—'}
+                </Badge>
+              </div>
+              {hasTagChanges ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground">Added</div>
+                    <div className="flex flex-wrap gap-1">
+                      {tagsAdded.map((tag) => (
+                        <Badge key={`added-${tag}`} variant="secondary" className="capitalize">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {tagsAdded.length === 0 && (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground">Removed</div>
+                    <div className="flex flex-wrap gap-1">
+                      {tagsRemoved.map((tag) => (
+                        <Badge
+                          key={`removed-${tag}`}
+                          variant="outline"
+                          className="capitalize line-through text-muted-foreground"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                      {tagsRemoved.length === 0 && (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">No tag changes</div>
+              )}
+            </>
+          ) : (
+            <div>No enrichment diff available yet. Run Enrich to generate one.</div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">

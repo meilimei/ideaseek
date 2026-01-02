@@ -664,6 +664,14 @@ async function processJob(job: JobWithStrategy) {
         throw new Error(`Idea not found: ${ideaId}`);
       }
 
+      const before = {
+        tags: idea.tags ?? [],
+        score_overall: idea.score_overall ?? null,
+        score_detail: idea.score_detail ?? null,
+        status: idea.status ?? null,
+        enriched_at: idea.enriched_at ?? null,
+      };
+
       const { data: evidence, error: evidenceError } = await supabase
         .from('idea_evidence')
         .select('*')
@@ -679,11 +687,59 @@ async function processJob(job: JobWithStrategy) {
         evidence: evidence ?? [],
       });
 
+      const nextEnrichedAt = new Date().toISOString();
+      const nextStatus = idea.status !== 'published' ? 'draft' : idea.status ?? null;
+      const after = {
+        tags: result.tags ?? [],
+        score_overall: result.score_overall ?? null,
+        score_detail: result.score_detail ?? null,
+        status: nextStatus,
+        enriched_at: nextEnrichedAt,
+      };
+
+      const beforeTags = (before.tags ?? []).map((tag: string) => tag.toLowerCase());
+      const afterTags = (after.tags ?? []).map((tag: string) => tag.toLowerCase());
+      const tagsAdded = (after.tags ?? []).filter(
+        (tag: string) => !beforeTags.includes(tag.toLowerCase()),
+      );
+      const tagsRemoved = (before.tags ?? []).filter(
+        (tag: string) => !afterTags.includes(tag.toLowerCase()),
+      );
+
+      let scoreDelta: number | null = null;
+      if (typeof before.score_overall === 'number' && typeof after.score_overall === 'number') {
+        scoreDelta = after.score_overall - before.score_overall;
+      }
+
+      const enrichPayload = {
+        before,
+        after,
+        delta: {
+          tags_added: tagsAdded,
+          tags_removed: tagsRemoved,
+          score_delta: scoreDelta,
+        },
+      };
+
+      const basePayload =
+        job.payload && typeof job.payload === 'object' ? job.payload : {};
+      const mergedPayload = {
+        ...(basePayload as Record<string, unknown>),
+        enrich: enrichPayload,
+      };
+      const { error: enrichUpdateError } = await supabase
+        .from('admin_jobs')
+        .update({ payload: mergedPayload })
+        .eq('id', jobId);
+      if (enrichUpdateError) {
+        console.error('Failed to persist enrich snapshot:', enrichUpdateError.message);
+      }
+
       const patch: Record<string, unknown> = {
         tags: result.tags,
         score_overall: result.score_overall,
         score_detail: result.score_detail,
-        enriched_at: new Date().toISOString(),
+        enriched_at: nextEnrichedAt,
       };
       if (idea.status !== 'published') {
         patch.status = 'draft';
