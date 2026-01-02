@@ -11,6 +11,15 @@ export const dynamic = 'force-dynamic';
 
 const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
 
+const DIM_KEYS = [
+  { key: 'pain', label: 'Pain' },
+  { key: 'market', label: 'Market' },
+  { key: 'urgency', label: 'Urgency' },
+  { key: 'willingness_to_pay', label: 'WTP' },
+  { key: 'competition', label: 'Competition' },
+  { key: 'moat', label: 'Moat' },
+];
+
 type IdeaRow = {
   id: string;
   title: string | null;
@@ -20,6 +29,7 @@ type IdeaRow = {
   status: string | null;
   tags: string[] | null;
   score_overall: number | null;
+  score_detail: Record<string, unknown> | null;
   enriched_at: string | null;
   created_at: string | null;
 };
@@ -102,6 +112,18 @@ function deltaBadgeClass(delta: number | null | undefined) {
   return 'bg-secondary/40 text-foreground border-border/50';
 }
 
+function pickScore(detail: Record<string, unknown> | null | undefined, key: string) {
+  const direct = detail?.[key];
+  if (typeof direct === 'number' && Number.isFinite(direct)) {
+    return Math.max(0, Math.min(100, direct));
+  }
+  const nested = (detail as { scores?: Record<string, unknown> } | null | undefined)?.scores?.[key];
+  if (typeof nested === 'number' && Number.isFinite(nested)) {
+    return Math.max(0, Math.min(100, nested));
+  }
+  return null;
+}
+
 export default async function DashboardIdeaDetailPage({
   params,
   searchParams,
@@ -126,7 +148,9 @@ export default async function DashboardIdeaDetailPage({
 
   const { data: idea, error: ideaError } = await supabase
     .from('ideas')
-    .select('id, title, summary, one_liner, description, status, tags, score_overall, enriched_at, created_at')
+    .select(
+      'id, title, summary, one_liner, description, status, tags, score_overall, score_detail, enriched_at, created_at',
+    )
     .eq('id', id)
     .maybeSingle();
 
@@ -198,6 +222,11 @@ export default async function DashboardIdeaDetailPage({
 
   const evidence = (evidenceData ?? []) as EvidenceRow[];
   const tags = idea.tags ?? [];
+  const scoreDetail = idea.score_detail ?? null;
+  const scoreItems = DIM_KEYS.map((dim) => ({
+    ...dim,
+    value: pickScore(scoreDetail, dim.key),
+  })).filter((dim) => dim.value != null);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -319,6 +348,34 @@ export default async function DashboardIdeaDetailPage({
             </>
           ) : (
             <div>No enrichment diff available yet. Run Enrich to generate one.</div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Scorecard</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          {scoreItems.length === 0 ? (
+            <div>No score detail yet.</div>
+          ) : (
+            scoreItems.map((item) => (
+              <div key={item.key} className="flex items-center gap-3">
+                <div className="w-24 text-xs font-semibold text-muted-foreground">
+                  {item.label}
+                </div>
+                <div className="h-2.5 flex-1 rounded-full bg-secondary/40">
+                  <div
+                    className="h-2.5 rounded-full bg-emerald-400/70"
+                    style={{ width: `${item.value ?? 0}%` }}
+                  />
+                </div>
+                <div className="w-10 text-right text-xs text-muted-foreground">
+                  {item.value?.toFixed(0)}
+                </div>
+              </div>
+            ))
           )}
         </CardContent>
       </Card>
