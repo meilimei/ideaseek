@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { assertPlan, getUserPlan } from '@/lib/plan';
 import {
   createStrategy,
   getStrategyById,
@@ -34,9 +36,23 @@ export async function createStrategyAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const auth = await requireAdmin();
-  if (auth.status !== 'ok') {
-    return { error: 'Not authorized' };
+  const supabase = await createServerSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error('Failed to get user for strategy create:', userError.message);
+  }
+
+  const user = userData?.user ?? null;
+  if (!user) {
+    return { error: 'Unauthorized' };
+  }
+
+  const plan = await getUserPlan({ supabase, userId: user.id });
+  try {
+    assertPlan(plan, 'pro', 'Upgrade to Pro to create strategies.');
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Plan denied' };
   }
 
   const name = String(formData.get('name') ?? '').trim();
@@ -58,7 +74,7 @@ export async function createStrategyAction(
       is_active: isActive,
       config: parsedConfig.value,
       cron_expr: cronExpr ? String(cronExpr) : undefined,
-      created_by: auth.user.id,
+      created_by: user.id,
     });
     revalidatePath('/admin/strategies');
     return { success: true };

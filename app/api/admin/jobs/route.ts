@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import {
   createAdminJob,
   listAdminJobs,
@@ -7,6 +8,7 @@ import {
   type AdminJobType,
 } from '@/lib/server/adminJobs';
 import { supabaseServiceClient as supabase } from '@/lib/supabaseServiceClient';
+import { assertPlan, getUserPlan, planDeniedResponse } from '@/lib/plan';
 
 export async function GET() {
   const auth = await requireAdmin();
@@ -106,12 +108,23 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdmin();
-  if (auth.status === 'unauthenticated') {
+  const supabase = await createServerSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error('Failed to get user for job enqueue:', userError.message);
+  }
+
+  const user = userData?.user ?? null;
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (auth.status === 'forbidden') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const plan = await getUserPlan({ supabase, userId: user.id });
+  try {
+    assertPlan(plan, 'pro', 'Upgrade to Pro to run ingestion jobs.');
+  } catch (err) {
+    return planDeniedResponse(err instanceof Error ? err.message : 'Plan denied');
   }
 
   try {
@@ -139,7 +152,7 @@ export async function POST(request: Request) {
       payload,
       strategyId: strategyId ?? null,
       source,
-      createdBy: auth.user.id,
+      createdBy: user.id,
     });
 
     return NextResponse.json({ ok: true, jobId });

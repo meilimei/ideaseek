@@ -11,7 +11,9 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
 const adminJobId =
   adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : adminJobIdRaw;
+const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
 console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
+console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);
@@ -172,9 +174,13 @@ async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
     return [];
   }
 
+  const rowsToInsert = ownerId
+    ? uniqueIdeas.map((idea) => ({ ...idea, created_by: ownerId }))
+    : uniqueIdeas;
+
   const { data, error } = await supabaseServiceClient
     .from('ideas')
-    .insert(uniqueIdeas)
+    .insert(rowsToInsert)
     .select('id, title');
 
   if (error) {

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/requireAdmin';
 import { normalizeAdminJobType, createAdminJob } from '@/lib/server/adminJobs';
 import { getStrategyById } from '@/lib/server/adminStrategies';
+import { supabaseServiceClient as supabase } from '@/lib/supabaseServiceClient';
+import { assertPlan, getUserPlan, planDeniedResponse } from '@/lib/plan';
 
 export async function POST(
   _req: Request,
@@ -13,6 +15,13 @@ export async function POST(
   }
   if (auth.status === 'forbidden') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const plan = await getUserPlan({ supabase, userId: auth.user.id });
+  try {
+    assertPlan(plan, 'pro', 'Upgrade to Pro to run ingestion jobs.');
+  } catch (err) {
+    return planDeniedResponse(err instanceof Error ? err.message : 'Plan denied');
   }
 
   const { id } = await context.params;

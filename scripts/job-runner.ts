@@ -24,6 +24,7 @@ type StrategyRow = {
 type JobWithStrategy = AdminJobRow & {
   strategy_id?: string | null;
   source?: string | null;
+  created_by?: string | null;
 };
 
 type EvidenceRow = {
@@ -63,7 +64,7 @@ async function claimJob(worker: string): Promise<JobWithStrategy | null> {
   const { data: fullRow, error: fetchError } = await supabase
     .from('admin_jobs')
     .select(
-      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at, attempts, max_attempts, strategy_id, source',
+      'id, job_type, status, payload, error, log, created_at, started_at, finished_at, next_run_at, attempts, max_attempts, strategy_id, source, created_by',
     )
     .eq('id', `${claimedId}`)
     .maybeSingle();
@@ -161,6 +162,7 @@ async function runCommand(
   jobType: AdminJobType | string,
   strategy?: StrategyRow | null,
   payload?: Record<string, any>,
+  jobCreatedBy?: string | null,
 ): Promise<string> {
   let command: string;
   const normalizedType = typeof jobType === 'string' ? jobType.replace(/_/g, '-') : jobType;
@@ -181,14 +183,11 @@ async function runCommand(
       throw new Error(`Unknown job type: ${jobType}`);
   }
 
-  const env = { ...process.env };
-  if (
-    normalizedType === 'reddit-ingest' ||
-    normalizedType === 'youtube-ingest' ||
-    command.includes('ingest:reddit')
-  ) {
-    env.ADMIN_JOB_ID = String(jobId);
-  }
+  const env = {
+    ...process.env,
+    ADMIN_JOB_ID: String(jobId),
+    ADMIN_JOB_CREATED_BY: jobCreatedBy ?? '',
+  };
   if (strategy) {
     env.INGEST_STRATEGY_ID = strategy.id;
     env.INGEST_STRATEGY_SOURCE = strategy.source;
@@ -741,7 +740,13 @@ async function processJob(job: JobWithStrategy) {
     }
 
     try {
-      commandLog = await runCommand(jobId, commandType, strategy, payload);
+      commandLog = await runCommand(
+        jobId,
+        commandType,
+        strategy,
+        payload,
+        job.created_by ?? null,
+      );
     } catch (err) {
       const isTrendsCommand =
         commandType === 'trends-ingest' || commandType === 'google-trends-ingest';

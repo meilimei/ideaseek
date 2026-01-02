@@ -8,6 +8,9 @@ import OpenAI from 'openai';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
+const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
+console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
+
 class TransientError extends Error {
   constructor(message: string) {
     super(message);
@@ -163,9 +166,13 @@ export async function insertIdeas(ideas: IdeaForInsert[]): Promise<void> {
     return;
   }
 
+  const rowsToInsert = ownerId
+    ? uniqueIdeas.map((idea) => ({ ...idea, created_by: ownerId }))
+    : uniqueIdeas;
+
   const { data, error } = await supabaseServiceClient
     .from('ideas')
-    .insert(uniqueIdeas)
+    .insert(rowsToInsert)
     .select('id, title, source_url');
 
   if (error) {
