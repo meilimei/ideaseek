@@ -2,7 +2,12 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { assertPlan, getUserPlan } from '@/lib/plan';
-import { assertDailyQuota, getDailyUsageCount, recordUsageEvent } from '@/lib/quota';
+import {
+  assertQuota,
+  getDailyUsageCount,
+  getMonthlyUsageCount,
+  recordUsageEvent,
+} from '@/lib/quota';
 
 const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
 
@@ -18,7 +23,8 @@ export async function enqueueIdeaEnrich(
 ): Promise<
   | { ok: true; jobId: number }
   | { ok: false; reason: 'already_pending'; pendingJobId: number }
-  | { ok: false; reason: 'quota_exceeded' }
+  | { ok: false; reason: 'quota_exceeded_daily' }
+  | { ok: false; reason: 'quota_exceeded_monthly' }
 > {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -76,13 +82,18 @@ export async function enqueueIdeaEnrich(
 
   if (plan !== 'admin') {
     try {
-      const used = await getDailyUsageCount(supabase, user.id, 'enrich');
-      assertDailyQuota(plan, 'enrich', used);
+      const [usedDaily, usedMonthly] = await Promise.all([
+        getDailyUsageCount(supabase, user.id, 'enrich'),
+        getMonthlyUsageCount(supabase, user.id, 'enrich'),
+      ]);
+      assertQuota(plan, 'enrich', usedDaily, usedMonthly);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
       const code = (err as { code?: string }).code;
-      if (code === 'quota_exceeded' || message === 'quota_exceeded') {
-        return { ok: false, reason: 'quota_exceeded' };
+      if (code === 'quota_exceeded_daily') {
+        return { ok: false, reason: 'quota_exceeded_daily' };
+      }
+      if (code === 'quota_exceeded_monthly') {
+        return { ok: false, reason: 'quota_exceeded_monthly' };
       }
       throw err;
     }

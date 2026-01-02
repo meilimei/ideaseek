@@ -9,7 +9,12 @@ import {
 } from '@/lib/server/adminJobs';
 import { supabaseServiceClient as supabase } from '@/lib/supabaseServiceClient';
 import { assertPlan, getUserPlan, planDeniedResponse } from '@/lib/plan';
-import { assertDailyQuota, getDailyUsageCount, recordUsageEvent } from '@/lib/quota';
+import {
+  assertQuota,
+  getDailyUsageCount,
+  getMonthlyUsageCount,
+  recordUsageEvent,
+} from '@/lib/quota';
 
 const INGEST_JOB_TYPES = new Set<AdminJobType>([
   'reddit-ingest',
@@ -158,14 +163,22 @@ export async function POST(request: Request) {
 
     if (plan !== 'admin' && jobType && INGEST_JOB_TYPES.has(jobType)) {
       try {
-        const used = await getDailyUsageCount(supabase, user.id, 'ingest');
-        assertDailyQuota(plan, 'ingest', used);
+        const [usedDaily, usedMonthly] = await Promise.all([
+          getDailyUsageCount(supabase, user.id, 'ingest'),
+          getMonthlyUsageCount(supabase, user.id, 'ingest'),
+        ]);
+        assertQuota(plan, 'ingest', usedDaily, usedMonthly);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
         const code = (err as { code?: string }).code;
-        if (code === 'quota_exceeded' || message === 'quota_exceeded') {
+        if (code === 'quota_exceeded_daily') {
           return NextResponse.json(
-            { error: 'quota_exceeded', message: 'Daily ingest quota exceeded.' },
+            { error: 'quota_exceeded_daily', message: 'Daily ingest quota exceeded.' },
+            { status: 403 },
+          );
+        }
+        if (code === 'quota_exceeded_monthly') {
+          return NextResponse.json(
+            { error: 'quota_exceeded_monthly', message: 'Monthly ingest quota exceeded.' },
             { status: 403 },
           );
         }

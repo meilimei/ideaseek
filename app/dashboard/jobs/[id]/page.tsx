@@ -114,8 +114,11 @@ async function rerunEnrich(ideaId: string, rerunOf: number) {
   if (!result.ok && result.reason === 'already_pending') {
     return redirect(`/dashboard/jobs/${result.pendingJobId}`);
   }
-  if (!result.ok && result.reason === 'quota_exceeded') {
-    return redirect('/dashboard/ideas?error=quota_enrich');
+  if (!result.ok && result.reason === 'quota_exceeded_daily') {
+    return redirect('/dashboard/jobs?error=quota_enrich');
+  }
+  if (!result.ok && result.reason === 'quota_exceeded_monthly') {
+    return redirect('/dashboard/jobs?error=quota_enrich_month');
   }
 
   return redirect(`/dashboard/jobs/${result.jobId}`);
@@ -131,8 +134,11 @@ async function forceRerunEnrich(ideaId: string, rerunOf: number) {
     triggeredBy: 'dashboard-force-rerun',
   });
 
-  if (!result.ok && result.reason === 'quota_exceeded') {
-    return redirect('/dashboard/ideas?error=quota_enrich');
+  if (!result.ok && result.reason === 'quota_exceeded_daily') {
+    return redirect('/dashboard/jobs?error=quota_enrich');
+  }
+  if (!result.ok && result.reason === 'quota_exceeded_monthly') {
+    return redirect('/dashboard/jobs?error=quota_enrich_month');
   }
 
   return redirect(`/dashboard/jobs/${result.jobId}`);

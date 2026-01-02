@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { CardBody, CardHeading, DataTable, GlassCard } from '@/components/admin/primitives';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { getUserPlan } from '@/lib/plan';
-import { QUOTAS, getDailyUsageCount } from '@/lib/quota';
+import { QUOTAS, getDailyUsageCount, getMonthlyUsageCount } from '@/lib/quota';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import RunJobActions from './RunJobActions';
 
@@ -108,19 +108,30 @@ export default async function DashboardJobsPage({
   const plan = await getUserPlan({ supabase, userId: user.id });
   const canRun = plan === 'pro' || plan === 'admin';
 
-  let usedIngest = 0;
-  let usedEnrich = 0;
+  let usedIngestDaily = 0;
+  let usedEnrichDaily = 0;
+  let usedIngestMonthly = 0;
+  let usedEnrichMonthly = 0;
   try {
-    [usedIngest, usedEnrich] = await Promise.all([
+    [
+      usedIngestDaily,
+      usedEnrichDaily,
+      usedIngestMonthly,
+      usedEnrichMonthly,
+    ] = await Promise.all([
       getDailyUsageCount(supabase, user.id, 'ingest'),
       getDailyUsageCount(supabase, user.id, 'enrich'),
+      getMonthlyUsageCount(supabase, user.id, 'ingest'),
+      getMonthlyUsageCount(supabase, user.id, 'enrich'),
     ]);
   } catch (err) {
     console.error('Failed to load quota usage:', err);
   }
 
-  const ingestLimit = QUOTAS[plan].ingestPerDay;
-  const enrichLimit = QUOTAS[plan].enrichPerDay;
+  const ingestDailyLimit = QUOTAS[plan].ingestPerDay;
+  const enrichDailyLimit = QUOTAS[plan].enrichPerDay;
+  const ingestMonthlyLimit = QUOTAS[plan].ingestPerMonth;
+  const enrichMonthlyLimit = QUOTAS[plan].enrichPerMonth;
 
   const { data: workers, error: workersError } = await supabase
     .from('admin_workers')
@@ -225,9 +236,19 @@ export default async function DashboardJobsPage({
           Daily ingest quota reached.
         </Alert>
       )}
+      {errorValue === 'quota_ingest_month' && (
+        <Alert variant="destructive">
+          Monthly ingest quota reached.
+        </Alert>
+      )}
       {errorValue === 'quota_enrich' && (
         <Alert variant="destructive">
           Daily enrich quota reached.
+        </Alert>
+      )}
+      {errorValue === 'quota_enrich_month' && (
+        <Alert variant="destructive">
+          Monthly enrich quota reached.
         </Alert>
       )}
 
@@ -251,10 +272,17 @@ export default async function DashboardJobsPage({
         <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
           <span className="text-foreground">Today usage</span>
           <span>
-            Ingest: {usedIngest}/{formatQuotaLimit(ingestLimit)}
+            Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
           </span>
           <span>
-            Enrich: {usedEnrich}/{formatQuotaLimit(enrichLimit)}
+            Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
+          </span>
+          <span className="text-foreground">This month</span>
+          <span>
+            Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
+          </span>
+          <span>
+            Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
           </span>
         </div>
       </div>
