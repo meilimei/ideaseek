@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CardBody, CardHeading, DataTable, GlassCard } from '@/components/admin/primitives';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { getUserPlan } from '@/lib/plan';
+import { QUOTAS, getDailyUsageCount } from '@/lib/quota';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import RunJobActions from './RunJobActions';
 
@@ -49,6 +51,10 @@ function formatRelativeTime(value: Date | null) {
   return `${days}d ago`;
 }
 
+function formatQuotaLimit(limit: number) {
+  return limit === Infinity ? '∞' : String(limit);
+}
+
 function getJobHint(job: JobRow, now: Date, runnerOnline: boolean): string | null {
   if (job.status === 'queued') {
     if (!runnerOnline) return 'Runner offline';
@@ -82,7 +88,11 @@ function getJobHint(job: JobRow, now: Date, runnerOnline: boolean): string | nul
   return null;
 }
 
-export default async function DashboardJobsPage() {
+export default async function DashboardJobsPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -97,6 +107,20 @@ export default async function DashboardJobsPage() {
 
   const plan = await getUserPlan({ supabase, userId: user.id });
   const canRun = plan === 'pro' || plan === 'admin';
+
+  let usedIngest = 0;
+  let usedEnrich = 0;
+  try {
+    [usedIngest, usedEnrich] = await Promise.all([
+      getDailyUsageCount(supabase, user.id, 'ingest'),
+      getDailyUsageCount(supabase, user.id, 'enrich'),
+    ]);
+  } catch (err) {
+    console.error('Failed to load quota usage:', err);
+  }
+
+  const ingestLimit = QUOTAS[plan].ingestPerDay;
+  const enrichLimit = QUOTAS[plan].enrichPerDay;
 
   const { data: workers, error: workersError } = await supabase
     .from('admin_workers')
@@ -179,6 +203,9 @@ export default async function DashboardJobsPage() {
 
   const now = new Date();
 
+  const errorParam = searchParams?.error;
+  const errorValue = Array.isArray(errorParam) ? errorParam[0] : errorParam;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -193,6 +220,17 @@ export default async function DashboardJobsPage() {
         </Button>
       </div>
 
+      {errorValue === 'quota_ingest' && (
+        <Alert variant="destructive">
+          Daily ingest quota reached.
+        </Alert>
+      )}
+      {errorValue === 'quota_enrich' && (
+        <Alert variant="destructive">
+          Daily enrich quota reached.
+        </Alert>
+      )}
+
       <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={runnerOnline ? 'secondary' : 'destructive'}>
@@ -205,6 +243,18 @@ export default async function DashboardJobsPage() {
             {runnerOnline
               ? `last seen ${lastSeenLabel ?? 'just now'}`
               : 'start your job runner to process queued jobs'}
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+          <span className="text-foreground">Today usage</span>
+          <span>
+            Ingest: {usedIngest}/{formatQuotaLimit(ingestLimit)}
+          </span>
+          <span>
+            Enrich: {usedEnrich}/{formatQuotaLimit(enrichLimit)}
           </span>
         </div>
       </div>
