@@ -9,6 +9,14 @@ import {
 } from '@/lib/server/adminJobs';
 import { supabaseServiceClient as supabase } from '@/lib/supabaseServiceClient';
 import { assertPlan, getUserPlan, planDeniedResponse } from '@/lib/plan';
+import { assertDailyQuota, getDailyUsageCount, recordUsageEvent } from '@/lib/quota';
+
+const INGEST_JOB_TYPES = new Set<AdminJobType>([
+  'reddit-ingest',
+  'youtube-ingest',
+  'trends-ingest',
+  'google-trends-ingest',
+]);
 
 export async function GET() {
   const auth = await requireAdmin();
@@ -148,12 +156,41 @@ export async function POST(request: Request) {
       );
     }
 
+    if (plan !== 'admin' && jobType && INGEST_JOB_TYPES.has(jobType)) {
+      try {
+        const used = await getDailyUsageCount(supabase, user.id, 'ingest');
+        assertDailyQuota(plan, 'ingest', used);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const code = (err as { code?: string }).code;
+        if (code === 'quota_exceeded' || message === 'quota_exceeded') {
+          return NextResponse.json(
+            { error: 'quota_exceeded', message: 'Daily ingest quota exceeded.' },
+            { status: 403 },
+          );
+        }
+        throw err;
+      }
+    }
+
     const jobId = await createAdminJob(jobType, {
       payload,
       strategyId: strategyId ?? null,
       source,
       createdBy: user.id,
     });
+
+    if (jobType && INGEST_JOB_TYPES.has(jobType)) {
+      await recordUsageEvent(supabase, {
+        userId: user.id,
+        eventType: 'ingest',
+        jobId: typeof jobId === 'number' ? jobId : Number.parseInt(String(jobId), 10),
+        meta: {
+          job_type: jobType,
+          triggeredBy: payload?.triggeredBy ?? 'dashboard',
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true, jobId });
   } catch (err) {

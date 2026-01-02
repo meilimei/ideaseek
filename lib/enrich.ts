@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { assertPlan, getUserPlan } from '@/lib/plan';
+import { assertDailyQuota, getDailyUsageCount, recordUsageEvent } from '@/lib/quota';
 
 const IDEA_ENRICH_JOB_TYPE = 'idea_enrich';
 
@@ -17,6 +18,7 @@ export async function enqueueIdeaEnrich(
 ): Promise<
   | { ok: true; jobId: number }
   | { ok: false; reason: 'already_pending'; pendingJobId: number }
+  | { ok: false; reason: 'quota_exceeded' }
 > {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -72,6 +74,20 @@ export async function enqueueIdeaEnrich(
     }
   }
 
+  if (plan !== 'admin') {
+    try {
+      const used = await getDailyUsageCount(supabase, user.id, 'enrich');
+      assertDailyQuota(plan, 'enrich', used);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const code = (err as { code?: string }).code;
+      if (code === 'quota_exceeded' || message === 'quota_exceeded') {
+        return { ok: false, reason: 'quota_exceeded' };
+      }
+      throw err;
+    }
+  }
+
   const payload = {
     idea_id: ideaId,
     triggeredBy: input.triggeredBy ?? 'dashboard-rerun',
@@ -102,6 +118,17 @@ export async function enqueueIdeaEnrich(
   if (!Number.isFinite(jobId)) {
     throw new Error('Failed to enqueue idea_enrich job');
   }
+
+  await recordUsageEvent(supabase, {
+    userId: user.id,
+    eventType: 'enrich',
+    jobId,
+    meta: {
+      idea_id: ideaId,
+      force: Boolean(input.force),
+      triggeredBy: input.triggeredBy ?? 'dashboard-rerun',
+    },
+  });
 
   return { ok: true, jobId };
 }
