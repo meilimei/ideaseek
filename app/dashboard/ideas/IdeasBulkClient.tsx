@@ -141,13 +141,32 @@ export default function IdeasBulkClient({
   return (
     <div className="space-y-3">
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background p-3">
-          <span className="text-xs text-muted-foreground">
-            {selectedIds.size} selected
-          </span>
+        <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/95 p-3 shadow-sm backdrop-blur">
+          <div className="space-y-0.5">
+            <div className="text-sm font-semibold text-foreground">
+              {selectedIds.size} selected
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Selection applies to visible rows only.
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" onClick={() => handleBulk("reviewed")} disabled={isPending}>
-              Mark reviewed
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => handleBulk("reviewed")}
+              disabled={isPending}
+            >
+              {isPending ? "Updating..." : "Mark reviewed"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => handleBulk("new")}
+              disabled={isPending}
+            >
+              Restore
             </Button>
             <Button
               type="button"
@@ -161,13 +180,10 @@ export default function IdeasBulkClient({
             <Button
               type="button"
               size="sm"
-              variant="secondary"
-              onClick={() => handleBulk("new")}
+              variant="ghost"
+              onClick={clearSelection}
               disabled={isPending}
             >
-              Restore
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={clearSelection} disabled={isPending}>
               Clear
             </Button>
           </div>
@@ -192,25 +208,34 @@ export default function IdeasBulkClient({
             <th className="px-3 py-2 font-medium">Idea</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 font-medium">Enrich</th>
-            <th className="px-3 py-2 font-medium">Score</th>
+            <th className="px-3 py-2 text-right font-medium">Score</th>
             <th className="px-3 py-2 font-medium">Tags</th>
             <th className="px-3 py-2 font-medium">Produced</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/30">
           {ideas.map((idea) => {
-            const tags = idea.tags ?? [];
-            const visibleTags = tags.slice(0, 6);
-            const overflowCount = Math.max(0, tags.length - visibleTags.length);
+            const tags = Array.isArray(idea.tags) ? idea.tags : [];
+            const visibleTags = tags.slice(0, 4);
+            const hiddenTags = tags.slice(4);
+            const hiddenCount = hiddenTags.length;
             const enrichBadge = enrichBadgeFor(idea.enriched_at, idea.enrich_job_status ?? null);
             const ideaHref = idea.latest_job_id
               ? `/dashboard/ideas/${idea.id}?job=${idea.latest_job_id}`
               : `/dashboard/ideas/${idea.id}`;
             const jobHref = idea.latest_job_id ? `/dashboard/jobs/${idea.latest_job_id}` : "/dashboard/jobs";
             const enrichJobId = idea.enrich_job_id != null ? String(idea.enrich_job_id) : null;
+            const reviewLabel =
+              idea.review_state === "reviewed"
+                ? "Reviewed"
+                : idea.review_state === "archived"
+                  ? "Archived"
+                  : idea.review_state === "new"
+                    ? "New"
+                    : "—";
             return (
-              <tr key={idea.id} className="align-top">
-                <td className="px-3 py-3">
+              <tr key={idea.id} className="align-top cursor-pointer hover:bg-muted/50">
+                <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={selectedIds.has(idea.id)}
@@ -223,22 +248,39 @@ export default function IdeasBulkClient({
                     className="h-4 w-4"
                   />
                 </td>
-                <td className="px-3 py-3">
-                  <Link
-                    href={ideaHref}
-                    className="text-sm font-semibold text-foreground hover:underline"
-                  >
-                    {idea.title}
-                  </Link>
+                <td className="px-3 py-2.5">
+                  <div>
+                    <Link
+                      href={ideaHref}
+                      className="text-sm font-semibold text-foreground hover:underline"
+                    >
+                      {idea.title}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <Badge
+                        variant={reviewLabel === "New" ? "secondary" : "outline"}
+                        className={`px-2 py-0.5 text-[10px] ${
+                          reviewLabel === "Archived" ? "text-muted-foreground" : ""
+                        }`}
+                      >
+                        {reviewLabel}
+                      </Badge>
+                      {idea.enriched_at && (
+                        <Badge variant="secondary" className="px-2 py-0.5 text-[10px]">
+                          Enriched
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-2.5">
                   {idea.status ? (
                     <StatusBadge status={idea.status} />
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-2.5">
                   {enrichJobId ? (
                     <Link href={`/dashboard/jobs/${enrichJobId}`} className="hover:underline">
                       <Badge className={enrichBadge.className}>{enrichBadge.label}</Badge>
@@ -247,36 +289,41 @@ export default function IdeasBulkClient({
                     <Badge className={enrichBadge.className}>{enrichBadge.label}</Badge>
                   )}
                 </td>
-                <td className="px-3 py-3 text-sm text-muted-foreground">
+                <td className="px-3 py-2.5 text-right text-sm text-muted-foreground tabular-nums">
                   {idea.score_overall != null ? Number(idea.score_overall).toFixed(2) : "—"}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {visibleTags.map((tag) => (
                       <Badge key={tag} variant="secondary" className="capitalize">
                         {tag}
                       </Badge>
                     ))}
-                    {overflowCount > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        +{overflowCount}
-                      </span>
+                    {hiddenCount > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0"
+                        title={hiddenTags.join(", ")}
+                      >
+                        +{hiddenCount}
+                      </Badge>
                     )}
                     {tags.length === 0 && (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-sm text-muted-foreground static">
-                  <div className="flex flex-col gap-1">
+                <td className="px-3 py-2.5 text-sm text-muted-foreground static">
+                  <div className="max-w-[180px] truncate text-xs">
                     <Link
                       href={jobHref}
-                      className="text-xs text-primary hover:underline"
+                      className="text-primary hover:underline"
                     >
-                      Produced by Job #{idea.latest_job_id}
+                      Job #{idea.latest_job_id}
                     </Link>
-                    <span className="text-xs text-muted-foreground">
-                      Produced {formatRelative(idea.latest_produced_at)}
+                    <span className="text-muted-foreground tabular-nums whitespace-nowrap">
+                      {" · "}
+                      {formatRelative(idea.latest_produced_at)}
                     </span>
                   </div>
                 </td>
@@ -285,7 +332,7 @@ export default function IdeasBulkClient({
           })}
           {ideas.length === 0 && (
             <tr>
-              <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={7}>
+              <td className="px-3 py-3 text-sm text-muted-foreground" colSpan={7}>
                 No ideas match these filters.
               </td>
             </tr>

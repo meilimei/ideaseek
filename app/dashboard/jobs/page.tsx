@@ -45,6 +45,13 @@ function formatDate(value: string | null) {
   return date.toLocaleString();
 }
 
+function formatRelativeTimestamp(value: string | null) {
+  if (!value) return { label: '—', title: null };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { label: '—', title: null };
+  return { label: formatRelativeTime(date) ?? '—', title: date.toLocaleString() };
+}
+
 function formatDuration(startedAt: string | null, finishedAt: string | null) {
   if (!startedAt || !finishedAt) return '—';
   const startMs = new Date(startedAt).getTime();
@@ -253,8 +260,8 @@ export default async function DashboardJobsPage({
   const errorValue = Array.isArray(errorParam) ? errorParam[0] : errorParam;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold text-foreground">My Jobs</h1>
           <p className="text-sm text-muted-foreground">
@@ -271,94 +278,98 @@ export default async function DashboardJobsPage({
           <CardTitle>Controls</CardTitle>
           <CardDescription>Runner status and quick actions.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge variant={runnerOnline ? 'secondary' : 'destructive'}>
-              {runnerOnline ? 'Online' : 'Offline'}
-            </Badge>
-            <span className="text-foreground">
-              Runner:{' '}
-              {runnerOnline
-                ? 'Online'
-                : "Offline — queued jobs won't start until runner is running."}
-            </span>
+        <CardContent className="grid gap-6 text-sm lg:grid-cols-2">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant={runnerOnline ? 'secondary' : 'destructive'}>
+                {runnerOnline ? 'Online' : 'Offline'}
+              </Badge>
+              <span className="text-foreground">
+                Runner:{' '}
+                {runnerOnline
+                  ? 'Online'
+                  : "Offline — queued jobs won't start until runner is running."}
+              </span>
             {!runnerOnline && (
-              <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
                 <span className="inline-flex items-center rounded-full border border-border/60 bg-secondary/30 px-2 py-1 font-mono text-[11px] text-foreground">
                   npx tsx scripts/job-runner.ts --max=3
                 </span>
-                <CopyButton text="npx tsx scripts/job-runner.ts --max=3" />
-              </span>
+                <CopyButton text="npx tsx scripts/job-runner.ts --max=3" className="shrink-0" />
+              </div>
             )}
           </div>
 
-          {errorValue === 'quota_ingest' && (
-            <Alert variant="destructive">
-              Daily ingest quota reached.
-            </Alert>
-          )}
-          {errorValue === 'quota_ingest_month' && (
-            <Alert variant="destructive">
-              Monthly ingest quota reached.
-            </Alert>
-          )}
-          {errorValue === 'quota_enrich' && (
-            <Alert variant="destructive">
-              Daily enrich quota reached.
-            </Alert>
-          )}
-          {errorValue === 'quota_enrich_month' && (
-            <Alert variant="destructive">
-              Monthly enrich quota reached.
-            </Alert>
-          )}
+            {errorValue === 'quota_ingest' && (
+              <Alert variant="destructive">
+                Daily ingest quota reached.
+              </Alert>
+            )}
+            {errorValue === 'quota_ingest_month' && (
+              <Alert variant="destructive">
+                Monthly ingest quota reached.
+              </Alert>
+            )}
+            {errorValue === 'quota_enrich' && (
+              <Alert variant="destructive">
+                Daily enrich quota reached.
+              </Alert>
+            )}
+            {errorValue === 'quota_enrich_month' && (
+              <Alert variant="destructive">
+                Monthly enrich quota reached.
+              </Alert>
+            )}
 
-          <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
-            <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
-              <span className="text-foreground">Today usage</span>
-              <span className="inline-flex items-center gap-2">
-                Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
-                {lowDailyIngest && (
-                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                    Low
-                  </Badge>
-                )}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
-                {lowDailyEnrich && (
-                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                    Low
-                  </Badge>
-                )}
-              </span>
-              <span className="text-foreground">This month</span>
-              <span className="inline-flex items-center gap-2">
-                Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
-                {lowMonthlyIngest && (
-                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                    Low
-                  </Badge>
-                )}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
-                {lowMonthlyEnrich && (
-                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                    Low
-                  </Badge>
-                )}
-              </span>
+            <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+                <span className="text-foreground">Today usage</span>
+                <span className="inline-flex items-center gap-2">
+                  Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
+                  {lowDailyIngest && (
+                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                      Low
+                    </Badge>
+                  )}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
+                  {lowDailyEnrich && (
+                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                      Low
+                    </Badge>
+                  )}
+                </span>
+                <span className="text-foreground">This month</span>
+                <span className="inline-flex items-center gap-2">
+                  Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
+                  {lowMonthlyIngest && (
+                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                      Low
+                    </Badge>
+                  )}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
+                  {lowMonthlyEnrich && (
+                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                      Low
+                    </Badge>
+                  )}
+                </span>
+              </div>
             </div>
+
+            {showLowWarnings && anyLow && (
+              <Alert className="border-border/60 bg-card/40 text-muted-foreground">
+                You're running low on quota. Consider spacing runs to avoid hitting limits.
+              </Alert>
+            )}
           </div>
 
-          {showLowWarnings && anyLow && (
-            <Alert className="border-border/60 bg-card/40 text-muted-foreground">
-              You're running low on quota. Consider spacing runs to avoid hitting limits.
-            </Alert>
-          )}
-
-          <RunJobActions canRun={canRun} />
+          <div className="flex h-full flex-col">
+            <RunJobActions canRun={canRun} variant="inline" />
+          </div>
         </CardContent>
       </Card>
 
@@ -421,14 +432,26 @@ export default async function DashboardJobsPage({
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground">
                       {job.attempts ?? 0} / {job.max_attempts ?? 3}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
-                      {formatDate(job.created_at)}
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                      {(() => {
+                        const value = formatRelativeTimestamp(job.created_at);
+                        if (!value.title) return '—';
+                        return <span title={value.title}>{value.label}</span>;
+                      })()}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
-                      {formatDate(job.started_at)}
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                      {(() => {
+                        const value = formatRelativeTimestamp(job.started_at);
+                        if (!value.title) return '—';
+                        return <span title={value.title}>{value.label}</span>;
+                      })()}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
-                      {formatDate(job.finished_at)}
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                      {(() => {
+                        const value = formatRelativeTimestamp(job.finished_at);
+                        if (!value.title) return '—';
+                        return <span title={value.title}>{value.label}</span>;
+                      })()}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
                       {formatDuration(job.started_at, job.finished_at)}

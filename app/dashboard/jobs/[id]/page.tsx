@@ -222,15 +222,36 @@ export default async function DashboardJobDetailPage({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-foreground">Job #{job.id}</h1>
-        <Badge variant="secondary" className="uppercase text-[11px] tracking-wide">
-          {job.job_type ?? 'unknown'}
-        </Badge>
-        <StatusBadge status={job.status} />
-        <span className="text-xs text-muted-foreground">
-          Attempts: {job.attempts ?? 0} / {job.max_attempts ?? 3}
-        </span>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold text-foreground">Job #{job.id}</h1>
+          <Badge variant="secondary" className="uppercase text-[11px] tracking-wide">
+            {job.job_type ?? 'unknown'}
+          </Badge>
+          <StatusBadge status={job.status} />
+          <span className="text-xs text-muted-foreground">
+            Attempts: {job.attempts ?? 0} / {job.max_attempts ?? 3}
+          </span>
+        </div>
+        {job.job_type === IDEA_ENRICH_JOB_TYPE && payloadIdeaId && (
+          <div className="flex flex-col gap-2 lg:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <form action={rerunEnrich.bind(null, payloadIdeaId, jobId)}>
+                <Button type="submit" size="sm">
+                  Re-run job
+                </Button>
+              </form>
+              <form action={forceRerunEnrich.bind(null, payloadIdeaId, jobId)}>
+                <Button type="submit" variant="outline" size="sm">
+                  Force re-run
+                </Button>
+              </form>
+            </div>
+            <div className="text-xs text-muted-foreground lg:text-right">
+              Re-run prevents duplicates if a queued/running job already exists. Force re-run always enqueues a new job for audit.
+            </div>
+          </div>
+        )}
       </div>
 
       {job.job_type === IDEA_ENRICH_JOB_TYPE && payloadIdeaId && (
@@ -269,23 +290,7 @@ export default async function DashboardJobDetailPage({
                         View idea
                       </Link>
                     </Button>
-                    <form action={rerunEnrich.bind(null, payloadIdeaId, jobId)}>
-                      <Button type="submit" variant="outline" size="sm">
-                        Rerun
-                      </Button>
-                    </form>
-                    <form action={forceRerunEnrich.bind(null, payloadIdeaId, jobId)}>
-                      <Button type="submit" variant="destructive" size="sm">
-                        Force rerun
-                      </Button>
-                    </form>
                   </div>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  If an enrichment job is already queued/running for this idea, you'll be taken to it.
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Force rerun creates a new job even if one is already running.
                 </div>
               </div>
             )}

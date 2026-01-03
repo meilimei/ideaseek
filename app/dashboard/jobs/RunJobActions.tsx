@@ -13,7 +13,13 @@ const JOBS: { type: JobType; label: string }[] = [
   { type: 'trends-ingest', label: 'Run Google Trends ingest' },
 ];
 
-export default function RunJobActions({ canRun }: { canRun: boolean }) {
+export default function RunJobActions({
+  canRun,
+  variant = 'card',
+}: {
+  canRun: boolean;
+  variant?: 'card' | 'inline';
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState<JobType | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,34 +52,52 @@ export default function RunJobActions({ canRun }: { canRun: boolean }) {
     }
   };
 
+  const actions = (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {JOBS.map((job) => (
+          <Button
+            key={job.type}
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => createJob(job.type)}
+            disabled={!canRun || loading !== null}
+          >
+            {loading === job.type ? 'Queuing…' : job.label}
+          </Button>
+        ))}
+      </div>
+      {!canRun && (
+        <div className="text-xs text-muted-foreground">
+          Upgrade to Pro to run ingestion jobs.
+        </div>
+      )}
+      {error && <div className="text-xs text-destructive">{error}</div>}
+    </>
+  );
+
+  if (variant === 'inline') {
+    return (
+      <div className="space-y-3 rounded-lg border border-border bg-card/40 p-4">
+        <div className="space-y-1">
+          <div className="text-sm font-semibold text-foreground">Run ingestion</div>
+          <div className="text-xs text-muted-foreground">
+            Queue an ingestion run for your account.
+          </div>
+        </div>
+        {actions}
+      </div>
+    );
+  }
+
   return (
     <GlassCard>
       <CardHeading
         title="Run ingestion"
         description="Queue an ingestion run for your account."
       />
-      <CardBody className="space-y-3 pt-0">
-        <div className="flex flex-wrap gap-2">
-          {JOBS.map((job) => (
-            <Button
-              key={job.type}
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => createJob(job.type)}
-              disabled={!canRun || loading !== null}
-            >
-              {loading === job.type ? 'Queuing…' : job.label}
-            </Button>
-          ))}
-        </div>
-        {!canRun && (
-          <div className="text-xs text-muted-foreground">
-            Upgrade to Pro to run ingestion jobs.
-          </div>
-        )}
-        {error && <div className="text-xs text-destructive">{error}</div>}
-      </CardBody>
+      <CardBody className="space-y-3 pt-0">{actions}</CardBody>
     </GlassCard>
   );
 }

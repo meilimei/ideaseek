@@ -24,6 +24,7 @@ export function CopyButton({ text, label = "Copy", className }: CopyButtonProps)
   }, []);
 
   const handleCopy = async () => {
+    if (status !== "idle") return;
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -47,6 +48,7 @@ export function CopyButton({ text, label = "Copy", className }: CopyButtonProps)
       variant="ghost"
       size="sm"
       onClick={handleCopy}
+      disabled={status !== "idle"}
       className={className}
     >
       {buttonLabel}
