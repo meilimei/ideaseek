@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { revalidatePath } from 'next/cache';
 import { notFound, redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,9 @@ type IdeaRow = {
   one_liner: string | null;
   description: string | null;
   status: string | null;
+  review_state: string | null;
+  reviewed_at: string | null;
+  archived_at: string | null;
   tags: string[] | null;
   score_overall: number | null;
   score_detail: Record<string, unknown> | null;
@@ -143,6 +147,112 @@ function pickScore(detail: Record<string, unknown> | null | undefined, key: stri
   return null;
 }
 
+async function markReviewed(formData: FormData) {
+  'use server';
+
+  const ideaId = String(formData.get('idea_id') ?? '').trim();
+  const jobId = String(formData.get('job_id') ?? '').trim();
+  if (!ideaId) return;
+
+  const supabase = await createServerSupabaseClient();
+  const { data: actionUser, error: actionUserError } = await supabase.auth.getUser();
+
+  if (actionUserError) {
+    console.error('Failed to get user for idea review update:', actionUserError.message);
+  }
+
+  if (!actionUser?.user) {
+    return redirect('/login');
+  }
+
+  const { error } = await supabase
+    .from('ideas')
+    .update({
+      review_state: 'reviewed',
+      reviewed_at: new Date().toISOString(),
+      archived_at: null,
+    })
+    .eq('id', ideaId)
+    .eq('created_by', actionUser.user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/dashboard/ideas/${ideaId}`);
+  return redirect(`/dashboard/ideas/${ideaId}${jobId ? `?job=${jobId}` : ''}`);
+}
+
+async function archiveIdea(formData: FormData) {
+  'use server';
+
+  const ideaId = String(formData.get('idea_id') ?? '').trim();
+  const jobId = String(formData.get('job_id') ?? '').trim();
+  if (!ideaId) return;
+
+  const supabase = await createServerSupabaseClient();
+  const { data: actionUser, error: actionUserError } = await supabase.auth.getUser();
+
+  if (actionUserError) {
+    console.error('Failed to get user for idea archive:', actionUserError.message);
+  }
+
+  if (!actionUser?.user) {
+    return redirect('/login');
+  }
+
+  const { error } = await supabase
+    .from('ideas')
+    .update({
+      review_state: 'archived',
+      archived_at: new Date().toISOString(),
+    })
+    .eq('id', ideaId)
+    .eq('created_by', actionUser.user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/dashboard/ideas/${ideaId}`);
+  return redirect(`/dashboard/ideas/${ideaId}${jobId ? `?job=${jobId}` : ''}`);
+}
+
+async function restoreIdea(formData: FormData) {
+  'use server';
+
+  const ideaId = String(formData.get('idea_id') ?? '').trim();
+  const jobId = String(formData.get('job_id') ?? '').trim();
+  if (!ideaId) return;
+
+  const supabase = await createServerSupabaseClient();
+  const { data: actionUser, error: actionUserError } = await supabase.auth.getUser();
+
+  if (actionUserError) {
+    console.error('Failed to get user for idea restore:', actionUserError.message);
+  }
+
+  if (!actionUser?.user) {
+    return redirect('/login');
+  }
+
+  const { error } = await supabase
+    .from('ideas')
+    .update({
+      review_state: 'new',
+      archived_at: null,
+    })
+    .eq('id', ideaId)
+    .eq('created_by', actionUser.user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/dashboard/ideas/${ideaId}`);
+  return redirect(`/dashboard/ideas/${ideaId}${jobId ? `?job=${jobId}` : ''}`);
+}
+
 export default async function DashboardIdeaDetailPage({
   params,
   searchParams,
@@ -168,7 +278,7 @@ export default async function DashboardIdeaDetailPage({
   const { data: idea, error: ideaError } = await supabase
     .from('ideas')
     .select(
-      'id, title, summary, one_liner, description, status, tags, score_overall, score_detail, enriched_at, created_at',
+      'id, title, summary, one_liner, description, status, review_state, reviewed_at, archived_at, tags, score_overall, score_detail, enriched_at, created_at',
     )
     .eq('id', id)
     .maybeSingle();
@@ -246,6 +356,7 @@ export default async function DashboardIdeaDetailPage({
     ...dim,
     value: pickScore(scoreDetail, dim.key),
   })).filter((dim) => dim.value != null);
+  const reviewState = idea.review_state ?? 'new';
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -277,10 +388,66 @@ export default async function DashboardIdeaDetailPage({
           <h1 className="text-3xl font-semibold text-foreground">
             {idea.title ?? 'Untitled idea'}
           </h1>
+          <Badge variant="secondary" className="capitalize">
+            {idea.review_state === 'new'
+              ? 'New'
+              : idea.review_state === 'reviewed'
+                ? 'Reviewed'
+                : idea.review_state === 'archived'
+                  ? 'Archived'
+                  : '—'}
+          </Badge>
           {idea.status ? (
             <StatusBadge status={idea.status} />
           ) : (
             <Badge variant="secondary">unknown</Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {reviewState === 'new' && (
+            <>
+              <form action={markReviewed}>
+                <input type="hidden" name="idea_id" value={idea.id} />
+                {jobId && <input type="hidden" name="job_id" value={jobId} />}
+                <Button type="submit" size="sm">
+                  Mark reviewed
+                </Button>
+              </form>
+              <form action={archiveIdea}>
+                <input type="hidden" name="idea_id" value={idea.id} />
+                {jobId && <input type="hidden" name="job_id" value={jobId} />}
+                <Button type="submit" variant="destructive" size="sm">
+                  Archive
+                </Button>
+              </form>
+            </>
+          )}
+          {reviewState === 'reviewed' && (
+            <>
+              <form action={archiveIdea}>
+                <input type="hidden" name="idea_id" value={idea.id} />
+                {jobId && <input type="hidden" name="job_id" value={jobId} />}
+                <Button type="submit" variant="destructive" size="sm">
+                  Archive
+                </Button>
+              </form>
+              <form action={restoreIdea}>
+                <input type="hidden" name="idea_id" value={idea.id} />
+                {jobId && <input type="hidden" name="job_id" value={jobId} />}
+                <Button type="submit" variant="secondary" size="sm">
+                  Mark as new
+                </Button>
+              </form>
+            </>
+          )}
+          {reviewState === 'archived' && (
+            <form action={restoreIdea}>
+              <input type="hidden" name="idea_id" value={idea.id} />
+              {jobId && <input type="hidden" name="job_id" value={jobId} />}
+              <Button type="submit" size="sm">
+                Restore
+              </Button>
+            </form>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
