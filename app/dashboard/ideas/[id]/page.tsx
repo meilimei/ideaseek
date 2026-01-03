@@ -72,6 +72,25 @@ type EnrichJob = {
   payload: Record<string, unknown> | null;
 };
 
+const ArrowLeft = ({ className }: { className?: string }) => (
+  <svg
+    aria-hidden="true"
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M19 12H5" />
+    <path d="M12 19l-7-7 7-7" />
+  </svg>
+);
+
 function formatRelative(isoDate: string | null | undefined) {
   if (!isoDate) return '—';
   const date = new Date(isoDate);
@@ -129,10 +148,10 @@ export default async function DashboardIdeaDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: { job?: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const { id } = await params;
-  const jobParam = typeof searchParams?.job === 'string' ? searchParams.job : null;
+  const jobId = typeof searchParams?.job === 'string' ? searchParams.job : null;
 
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -230,19 +249,23 @@ export default async function DashboardIdeaDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/ideas">Back to Ideas</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/jobs">Back to Jobs</Link>
-          </Button>
-          {jobParam && (
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/dashboard/jobs/${jobParam}`}>Back to Job #{jobParam}</Link>
-            </Button>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {jobId && (
+            <Link
+              href={`/dashboard/jobs/${jobId}`}
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Job #{jobId}
+            </Link>
           )}
+          <Link
+            href="/dashboard/ideas"
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            Back to Ideas
+          </Link>
         </div>
         <Button asChild variant="secondary" size="sm">
           <Link href={`/ideas/${idea.id}`}>Open full idea report</Link>
