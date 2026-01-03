@@ -251,7 +251,7 @@ async function enqueueEnrichNext(_: FormData) {
 export default async function DashboardIdeasPage({
   searchParams,
 }: {
-  searchParams?: { source?: string; enriched?: string; sort?: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const sourceParam =
     typeof searchParams?.source === 'string' ? searchParams.source : 'all';
@@ -259,6 +259,8 @@ export default async function DashboardIdeasPage({
     typeof searchParams?.enriched === 'string' ? searchParams.enriched : 'all';
   const sortParam =
     typeof searchParams?.sort === 'string' ? searchParams.sort : 'new';
+  const stateRaw =
+    typeof searchParams?.state === 'string' ? searchParams.state : 'all';
 
   const sourceFilter =
     sourceParam === 'reddit' || sourceParam === 'youtube' || sourceParam === 'trends'
@@ -267,6 +269,28 @@ export default async function DashboardIdeasPage({
   const enrichedFilter =
     enrichedParam === 'yes' || enrichedParam === 'no' ? enrichedParam : 'all';
   const sortFilter = sortParam === 'score' ? 'score' : 'new';
+  const stateFilter = ['all', 'new', 'reviewed', 'archived'].includes(stateRaw)
+    ? stateRaw
+    : 'all';
+
+  const preservedParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams ?? {})) {
+    if (typeof value === 'string') {
+      preservedParams.set(key, value);
+    } else if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === 'string') {
+          preservedParams.append(key, entry);
+        }
+      }
+    }
+  }
+  const stateOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'new', label: 'New' },
+    { value: 'reviewed', label: 'Reviewed' },
+    { value: 'archived', label: 'Archived' },
+  ];
 
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -396,7 +420,12 @@ export default async function DashboardIdeasPage({
   let ideasQuery = supabase
     .from('ideas')
     .select('id, title, status, tags, score_overall, enriched_at, created_at')
-    .in('id', ideaIds);
+    .in('id', ideaIds)
+    .eq('created_by', user.id);
+
+  if (stateFilter !== 'all') {
+    ideasQuery = ideasQuery.eq('review_state', stateFilter);
+  }
 
   if (sortFilter === 'score') {
     ideasQuery = ideasQuery
@@ -526,10 +555,33 @@ export default async function DashboardIdeasPage({
                 <option value="score">Score (High -&gt; Low)</option>
               </AdminSelect>
             </div>
+            <input type="hidden" name="state" value={stateFilter} />
             <Button type="submit" size="sm" variant="secondary" className="h-10">
               Apply
             </Button>
           </form>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground">Status</span>
+            <div className="flex flex-wrap gap-2">
+              {stateOptions.map((option) => {
+                const params = new URLSearchParams(preservedParams);
+                params.set('state', option.value);
+                const query = params.toString();
+                const href = query ? `?${query}` : '';
+                const isActive = stateFilter === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    asChild
+                    size="sm"
+                    variant={isActive ? 'secondary' : 'ghost'}
+                  >
+                    <Link href={href}>{option.label}</Link>
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>{filtered.length} results</span>
             <div className="flex flex-wrap items-center gap-3">
