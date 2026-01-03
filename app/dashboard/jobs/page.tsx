@@ -321,42 +321,56 @@ export default async function DashboardJobsPage({
               </Alert>
             )}
 
-            <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
-              <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
-                <span className="text-foreground">Today usage</span>
-                <span className="inline-flex items-center gap-2">
-                  Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
-                  {lowDailyIngest && (
-                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                      Low
-                    </Badge>
-                  )}
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
-                  {lowDailyEnrich && (
-                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                      Low
-                    </Badge>
-                  )}
-                </span>
-                <span className="text-foreground">This month</span>
-                <span className="inline-flex items-center gap-2">
-                  Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
-                  {lowMonthlyIngest && (
-                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                      Low
-                    </Badge>
-                  )}
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
-                  {lowMonthlyEnrich && (
-                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                      Low
-                    </Badge>
-                  )}
-                </span>
+            <div className="rounded-xl border border-border bg-background/5 p-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="text-foreground">Usage</span>
+                <span>Today / This month</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-border bg-background/5 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">Today · Ingest</div>
+                  <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold tabular-nums whitespace-nowrap">
+                    {usedIngestDaily} / {formatQuotaLimit(ingestDailyLimit)}
+                    {lowDailyIngest && (
+                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                        Low
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-background/5 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">Today · Enrich</div>
+                  <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold tabular-nums whitespace-nowrap">
+                    {usedEnrichDaily} / {formatQuotaLimit(enrichDailyLimit)}
+                    {lowDailyEnrich && (
+                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                        Low
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-background/5 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">This month · Ingest</div>
+                  <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold tabular-nums whitespace-nowrap">
+                    {usedIngestMonthly} / {formatQuotaLimit(ingestMonthlyLimit)}
+                    {lowMonthlyIngest && (
+                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                        Low
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border bg-background/5 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">This month · Enrich</div>
+                  <div className="mt-1 inline-flex items-center gap-2 text-sm font-semibold tabular-nums whitespace-nowrap">
+                    {usedEnrichMonthly} / {formatQuotaLimit(enrichMonthlyLimit)}
+                    {lowMonthlyEnrich && (
+                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                        Low
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
