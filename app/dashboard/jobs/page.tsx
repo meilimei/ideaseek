@@ -3,6 +3,14 @@ import { redirect } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { CardBody, CardHeading, DataTable, GlassCard } from '@/components/admin/primitives';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { getUserPlan } from '@/lib/plan';
@@ -35,6 +43,20 @@ function formatDate(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString();
+}
+
+function formatDuration(startedAt: string | null, finishedAt: string | null) {
+  if (!startedAt || !finishedAt) return '—';
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(finishedAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return '—';
+  const diffMs = endMs - startMs;
+  if (diffMs < 0) return '—';
+  if (diffMs < 60_000) return `${Math.round(diffMs / 1000)}s`;
+  const minutes = Math.floor(diffMs / 60_000);
+  const seconds = Math.round((diffMs % 60_000) / 1000);
+  if (seconds === 60) return `${minutes + 1}m 0s`;
+  return `${minutes}m ${seconds}s`;
 }
 
 function formatRelativeTime(value: Date | null) {
@@ -160,7 +182,6 @@ export default async function DashboardJobsPage({
   const lastSeenRaw = workers?.[0]?.last_seen_at ?? null;
   const lastSeen = lastSeenRaw ? new Date(lastSeenRaw) : null;
   const runnerOnline = lastSeen ? Date.now() - lastSeen.getTime() < 30_000 : false;
-  const lastSeenLabel = formatRelativeTime(lastSeen);
 
   const { data, error } = await supabase
     .from('admin_jobs')
@@ -245,89 +266,101 @@ export default async function DashboardJobsPage({
         </Button>
       </div>
 
-      {errorValue === 'quota_ingest' && (
-        <Alert variant="destructive">
-          Daily ingest quota reached.
-        </Alert>
-      )}
-      {errorValue === 'quota_ingest_month' && (
-        <Alert variant="destructive">
-          Monthly ingest quota reached.
-        </Alert>
-      )}
-      {errorValue === 'quota_enrich' && (
-        <Alert variant="destructive">
-          Daily enrich quota reached.
-        </Alert>
-      )}
-      {errorValue === 'quota_enrich_month' && (
-        <Alert variant="destructive">
-          Monthly enrich quota reached.
-        </Alert>
-      )}
-
-      <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={runnerOnline ? 'secondary' : 'destructive'}>
-            {runnerOnline ? 'Online' : 'Offline'}
-          </Badge>
-          <span className="text-foreground">
-            Runner: {runnerOnline ? 'Online' : 'Offline'}
-          </span>
-          <span className="text-muted-foreground">
-            {runnerOnline
-              ? `last seen ${lastSeenLabel ?? 'just now'}`
-              : 'start your job runner to process queued jobs'}
-          </span>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
-        <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
-          <span className="text-foreground">Today usage</span>
-          <span className="inline-flex items-center gap-2">
-            Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
-            {lowDailyIngest && (
-              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                Low
-              </Badge>
+      <Card>
+        <CardHeader>
+          <CardTitle>Controls</CardTitle>
+          <CardDescription>Runner status and quick actions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant={runnerOnline ? 'secondary' : 'destructive'}>
+              {runnerOnline ? 'Online' : 'Offline'}
+            </Badge>
+            <span className="text-foreground">
+              Runner:{' '}
+              {runnerOnline
+                ? 'Online'
+                : "Offline — queued jobs won't start until runner is running."}
+            </span>
+            {!runnerOnline && (
+              <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                <span className="inline-flex items-center rounded-full border border-border/60 bg-secondary/30 px-2 py-1 font-mono text-[11px] text-foreground">
+                  npx tsx scripts/job-runner.ts --max=3
+                </span>
+                <CopyButton text="npx tsx scripts/job-runner.ts --max=3" />
+              </span>
             )}
-          </span>
-          <span className="inline-flex items-center gap-2">
-            Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
-            {lowDailyEnrich && (
-              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                Low
-              </Badge>
-            )}
-          </span>
-          <span className="text-foreground">This month</span>
-          <span className="inline-flex items-center gap-2">
-            Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
-            {lowMonthlyIngest && (
-              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                Low
-              </Badge>
-            )}
-          </span>
-          <span className="inline-flex items-center gap-2">
-            Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
-            {lowMonthlyEnrich && (
-              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                Low
-              </Badge>
-            )}
-          </span>
-        </div>
-      </div>
+          </div>
 
-      {showLowWarnings && anyLow && (
-        <Alert className="border-border/60 bg-card/40 text-muted-foreground">
-          You're running low on quota. Consider spacing runs to avoid hitting limits.
-        </Alert>
-      )}
+          {errorValue === 'quota_ingest' && (
+            <Alert variant="destructive">
+              Daily ingest quota reached.
+            </Alert>
+          )}
+          {errorValue === 'quota_ingest_month' && (
+            <Alert variant="destructive">
+              Monthly ingest quota reached.
+            </Alert>
+          )}
+          {errorValue === 'quota_enrich' && (
+            <Alert variant="destructive">
+              Daily enrich quota reached.
+            </Alert>
+          )}
+          {errorValue === 'quota_enrich_month' && (
+            <Alert variant="destructive">
+              Monthly enrich quota reached.
+            </Alert>
+          )}
 
-      <RunJobActions canRun={canRun} />
+          <div className="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
+              <span className="text-foreground">Today usage</span>
+              <span className="inline-flex items-center gap-2">
+                Ingest: {usedIngestDaily}/{formatQuotaLimit(ingestDailyLimit)}
+                {lowDailyIngest && (
+                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                    Low
+                  </Badge>
+                )}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                Enrich: {usedEnrichDaily}/{formatQuotaLimit(enrichDailyLimit)}
+                {lowDailyEnrich && (
+                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                    Low
+                  </Badge>
+                )}
+              </span>
+              <span className="text-foreground">This month</span>
+              <span className="inline-flex items-center gap-2">
+                Ingest: {usedIngestMonthly}/{formatQuotaLimit(ingestMonthlyLimit)}
+                {lowMonthlyIngest && (
+                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                    Low
+                  </Badge>
+                )}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                Enrich: {usedEnrichMonthly}/{formatQuotaLimit(enrichMonthlyLimit)}
+                {lowMonthlyEnrich && (
+                  <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                    Low
+                  </Badge>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {showLowWarnings && anyLow && (
+            <Alert className="border-border/60 bg-card/40 text-muted-foreground">
+              You're running low on quota. Consider spacing runs to avoid hitting limits.
+            </Alert>
+          )}
+
+          <RunJobActions canRun={canRun} />
+        </CardContent>
+      </Card>
 
       <GlassCard>
         <CardHeading
@@ -335,114 +368,122 @@ export default async function DashboardJobsPage({
           description="Only jobs created by you are listed here."
         />
         <CardBody className="pt-0">
-          <DataTable>
-            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">ID</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Reason</th>
-                <th className="px-3 py-2 font-medium">Idea</th>
-                <th className="px-3 py-2 font-medium">Ideas</th>
-                <th className="px-3 py-2 font-medium">Attempts</th>
-                <th className="px-3 py-2 font-medium">Created</th>
-                <th className="px-3 py-2 font-medium">Started</th>
-                <th className="px-3 py-2 font-medium">Finished</th>
-                <th className="px-3 py-2 text-right font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {jobs.map((job) => (
-                <tr key={String(job.id)} className="align-top">
-                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                    {String(job.id)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-foreground">
-                    {job.job_type ?? '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <StatusBadge status={job.status} />
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {(() => {
-                      const hint = getJobHint(job, now, runnerOnline);
-                      if (!hint) return '—';
-                      const scheduledLabel =
-                        hint === 'Scheduled' ? formatDate(job.next_run_at ?? null) : null;
-                      return (
-                        <span
-                          className="text-xs text-muted-foreground"
-                          title={
-                            scheduledLabel ? `Scheduled at ${scheduledLabel}` : undefined
-                          }
-                        >
-                          {hint}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {job.job_type === IDEA_ENRICH_JOB_TYPE ? (
-                      (() => {
-                        const ideaId = String(
-                          (job as { payload?: Record<string, unknown> | null }).payload?.idea_id ?? '',
-                        );
-                        if (!ideaId) return '—';
-                        const title = ideaTitleById.get(ideaId) || ideaId.slice(0, 8);
-                        return (
-                          <Link
-                            href={`/dashboard/ideas/${ideaId}?job=${job.id}`}
-                            className="block max-w-[260px] truncate text-foreground hover:underline"
-                            title={title}
-                          >
-                            {title}
-                          </Link>
-                        );
-                      })()
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {job.job_type && INGEST_JOB_TYPES.has(job.job_type) ? (
-                      <Link
-                        href={`/dashboard/jobs/${job.id}`}
-                        className="text-foreground hover:underline"
-                      >
-                        {outputCountByJobId.get(Number(job.id)) ?? 0}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {job.attempts ?? 0} / {job.max_attempts ?? 3}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {formatDate(job.created_at)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {formatDate(job.started_at)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground">
-                    {formatDate(job.finished_at)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Button asChild variant="ghost" size="sm">
-                      <Link href={`/dashboard/jobs/${job.id}`}>View</Link>
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {jobs.length === 0 && (
+          <div className="overflow-x-auto">
+            <DataTable className="min-w-[1100px]">
+              <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={11}>
-                    No jobs yet.
-                  </td>
+                  <th className="px-3 py-2 text-right font-medium">ID</th>
+                  <th className="px-3 py-2 font-medium">Type</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Reason</th>
+                  <th className="px-3 py-2 text-right font-medium">Attempts</th>
+                  <th className="px-3 py-2 text-right font-medium">Created</th>
+                  <th className="px-3 py-2 text-right font-medium">Started</th>
+                  <th className="px-3 py-2 text-right font-medium">Finished</th>
+                  <th className="px-3 py-2 text-right font-medium">Dur</th>
+                  <th className="px-3 py-2 font-medium">Idea</th>
+                  <th className="px-3 py-2 text-right font-medium">Ideas</th>
+                  <th className="px-3 py-2 text-right font-medium">Action</th>
                 </tr>
-              )}
-            </tbody>
-          </DataTable>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {jobs.map((job) => (
+                  <tr key={String(job.id)} className="align-top hover:bg-muted/50">
+                    <td className="px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
+                      {String(job.id)}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-foreground">
+                      <span className="block max-w-[140px] truncate">
+                        {job.job_type ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={job.status} />
+                    </td>
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
+                      {(() => {
+                        const hint = getJobHint(job, now, runnerOnline);
+                        if (!hint) return '—';
+                        const scheduledLabel =
+                          hint === 'Scheduled' ? formatDate(job.next_run_at ?? null) : null;
+                        return (
+                          <span
+                            className="block max-w-[160px] truncate text-xs text-muted-foreground"
+                            title={
+                              scheduledLabel ? `Scheduled at ${scheduledLabel}` : undefined
+                            }
+                          >
+                            {hint}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground">
+                      {job.attempts ?? 0} / {job.max_attempts ?? 3}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDate(job.created_at)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDate(job.started_at)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDate(job.finished_at)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDuration(job.started_at, job.finished_at)}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
+                      {job.job_type === IDEA_ENRICH_JOB_TYPE ? (
+                        (() => {
+                          const ideaId = String(
+                            (job as { payload?: Record<string, unknown> | null }).payload?.idea_id ?? '',
+                          );
+                          if (!ideaId) return '—';
+                          const title = ideaTitleById.get(ideaId) || ideaId.slice(0, 8);
+                          return (
+                            <Link
+                              href={`/dashboard/ideas/${ideaId}?job=${job.id}`}
+                              className="block max-w-[220px] truncate text-foreground hover:underline"
+                              title={title}
+                            >
+                              {title}
+                            </Link>
+                          );
+                        })()
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground">
+                      {job.job_type && INGEST_JOB_TYPES.has(job.job_type) ? (
+                        <Link
+                          href={`/dashboard/jobs/${job.id}`}
+                          className="text-foreground hover:underline"
+                        >
+                          {outputCountByJobId.get(Number(job.id)) ?? 0}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/dashboard/jobs/${job.id}`}>View</Link>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {jobs.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={12}>
+                      No jobs yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </DataTable>
+          </div>
         </CardBody>
       </GlassCard>
     </div>
