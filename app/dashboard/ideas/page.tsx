@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { CardBody, CardHeading, DataTable, GlassCard, AdminSelect } from '@/comp
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { assertPlan, getUserPlan } from '@/lib/plan';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import IdeasBulkClient from './IdeasBulkClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,7 @@ type IdeaRow = {
   id: string;
   title: string | null;
   status: string | null;
+  review_state: string | null;
   tags: string[] | null;
   score_overall: number | null;
   enriched_at: string | null;
@@ -248,6 +251,61 @@ async function enqueueEnrichNext(_: FormData) {
   return redirect(`/dashboard/jobs?enrichQueued=${queuedCount}`);
 }
 
+async function bulkUpdateIdeaState(input: { ids: string[]; to: 'new' | 'reviewed' | 'archived' }) {
+  'use server';
+
+  const supabase = await createServerSupabaseClient();
+  const { data: actionUser, error: actionUserError } = await supabase.auth.getUser();
+
+  if (actionUserError) {
+    console.error('Failed to get user for bulk idea update:', actionUserError.message);
+  }
+
+  if (!actionUser?.user) {
+    return redirect('/login');
+  }
+
+  const rawIds = Array.isArray(input?.ids) ? input.ids : [];
+  const ids = Array.from(
+    new Set(
+      rawIds
+        .map((id) => String(id).trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (ids.length < 1 || ids.length > 200) {
+    return { ok: false, updated: 0 };
+  }
+
+  const nowIso = new Date().toISOString();
+  let patch: Record<string, string | null> = {};
+
+  if (input.to === 'reviewed') {
+    patch = { review_state: 'reviewed', reviewed_at: nowIso, archived_at: null };
+  } else if (input.to === 'archived') {
+    patch = { review_state: 'archived', archived_at: nowIso };
+  } else if (input.to === 'new') {
+    patch = { review_state: 'new', archived_at: null };
+  } else {
+    return { ok: false, updated: 0 };
+  }
+
+  const { data, error } = await supabase
+    .from('ideas')
+    .update(patch)
+    .in('id', ids)
+    .eq('created_by', actionUser.user.id)
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath('/dashboard/ideas');
+  return { ok: true, updated: data?.length ?? 0 };
+}
+
 export default async function DashboardIdeasPage({
   searchParams,
 }: {
@@ -419,7 +477,7 @@ export default async function DashboardIdeasPage({
 
   let ideasQuery = supabase
     .from('ideas')
-    .select('id, title, status, tags, score_overall, enriched_at, created_at')
+    .select('id, title, status, review_state, tags, score_overall, enriched_at, created_at')
     .in('id', ideaIds)
     .eq('created_by', user.id);
 
@@ -511,6 +569,14 @@ export default async function DashboardIdeasPage({
     }
     return b.createdAtMs - a.createdAtMs;
   });
+
+  const bulkIdeas = filtered.map((row) => ({
+    id: row.idea.id,
+    title: row.idea.title?.trim() || row.idea.id.slice(0, 8),
+    review_state: row.idea.review_state ?? 'new',
+    score_overall: row.idea.score_overall ?? null,
+    created_at: row.idea.created_at ?? undefined,
+  }));
 
   const notEnrichedCount = ideaList.filter((row) => row.idea.enriched_at == null).length;
 
@@ -610,99 +676,131 @@ export default async function DashboardIdeasPage({
           description="Ideas linked to your recent ingestion runs."
         />
         <CardBody className="pt-0">
-          <DataTable>
-            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Idea</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Enrich</th>
-                <th className="px-3 py-2 font-medium">Score</th>
-                <th className="px-3 py-2 font-medium">Tags</th>
-                <th className="px-3 py-2 font-medium">Produced</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {filtered.map((row) => {
-                const { idea, meta } = row;
-                const tags = idea.tags ?? [];
-                const visibleTags = tags.slice(0, 6);
-                const overflowCount = Math.max(0, tags.length - visibleTags.length);
-                const title = idea.title?.trim() || idea.id.slice(0, 8);
-                const enrichJob = latestEnrichJobByIdeaId.get(idea.id) ?? null;
-                const enrichBadge = enrichBadgeFor(idea, enrichJob);
-                return (
-                  <tr key={idea.id} className="align-top">
-                    <td className="px-3 py-3">
-                      <Link
-                        href={`/dashboard/ideas/${idea.id}?job=${meta.latestJobId}`}
-                        className="text-sm font-semibold text-foreground hover:underline"
-                      >
-                        {title}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      {idea.status ? (
-                        <StatusBadge status={idea.status} />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      {enrichJob ? (
-                        <Link href={`/dashboard/jobs/${enrichJob.id}`} className="hover:underline">
-                          <Badge className={enrichBadge.className}>{enrichBadge.label}</Badge>
-                        </Link>
-                      ) : (
-                        <Badge className={enrichBadge.className}>{enrichBadge.label}</Badge>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-muted-foreground">
-                      {idea.score_overall != null
-                        ? Number(idea.score_overall).toFixed(2)
-                        : '—'}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {visibleTags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="capitalize">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {overflowCount > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            +{overflowCount}
-                          </span>
-                        )}
-                        {tags.length === 0 && (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-muted-foreground">
-                      <div className="flex flex-col gap-1">
-                        <Link
-                          href={`/dashboard/jobs/${meta.latestJobId}`}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          Produced by Job #{meta.latestJobId}
-                        </Link>
-                        <span className="text-xs text-muted-foreground">
-                          Produced {formatRelative(meta.latestProducedAt)}
-                        </span>
-                      </div>
-                    </td>
+          <IdeasBulkClient
+            ideas={bulkIdeas}
+            onBulkUpdate={bulkUpdateIdeaState}
+            renderTable={({ selectedIds, toggleOne, toggleAllVisible, allVisibleSelected }) => (
+              <DataTable>
+                <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={(event) => {
+                          event.stopPropagation();
+                          toggleAllVisible();
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label="Select all"
+                        className="h-4 w-4"
+                      />
+                    </th>
+                    <th className="px-3 py-2 font-medium">Idea</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">Enrich</th>
+                    <th className="px-3 py-2 font-medium">Score</th>
+                    <th className="px-3 py-2 font-medium">Tags</th>
+                    <th className="px-3 py-2 font-medium">Produced</th>
                   </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={6}>
-                    No ideas match these filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </DataTable>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {filtered.map((row) => {
+                    const { idea, meta } = row;
+                    const tags = idea.tags ?? [];
+                    const visibleTags = tags.slice(0, 6);
+                    const overflowCount = Math.max(0, tags.length - visibleTags.length);
+                    const title = idea.title?.trim() || idea.id.slice(0, 8);
+                    const enrichJob = latestEnrichJobByIdeaId.get(idea.id) ?? null;
+                    const enrichBadge = enrichBadgeFor(idea, enrichJob);
+                    return (
+                      <tr key={idea.id} className="align-top">
+                        <td className="px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(idea.id)}
+                            onChange={(event) => {
+                              event.stopPropagation();
+                              toggleOne(idea.id);
+                            }}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Select ${title}`}
+                            className="h-4 w-4"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <Link
+                            href={`/dashboard/ideas/${idea.id}?job=${meta.latestJobId}`}
+                            className="text-sm font-semibold text-foreground hover:underline"
+                          >
+                            {title}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-3">
+                          {idea.status ? (
+                            <StatusBadge status={idea.status} />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          {enrichJob ? (
+                            <Link href={`/dashboard/jobs/${enrichJob.id}`} className="hover:underline">
+                              <Badge className={enrichBadge.className}>{enrichBadge.label}</Badge>
+                            </Link>
+                          ) : (
+                            <Badge className={enrichBadge.className}>{enrichBadge.label}</Badge>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-muted-foreground">
+                          {idea.score_overall != null
+                            ? Number(idea.score_overall).toFixed(2)
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {visibleTags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="capitalize">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {overflowCount > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{overflowCount}
+                              </span>
+                            )}
+                            {tags.length === 0 && (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-sm text-muted-foreground">
+                          <div className="flex flex-col gap-1">
+                            <Link
+                              href={`/dashboard/jobs/${meta.latestJobId}`}
+                              className="text-xs text-primary hover:underline"
+                            >
+                              Produced by Job #{meta.latestJobId}
+                            </Link>
+                            <span className="text-xs text-muted-foreground">
+                              Produced {formatRelative(meta.latestProducedAt)}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={7}>
+                        No ideas match these filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </DataTable>
+            )}
+          />
         </CardBody>
       </GlassCard>
     </div>
