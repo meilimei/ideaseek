@@ -4,6 +4,7 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { ChevronDown } from '@/components/ui/icons';
 import {
   Card,
   CardContent,
@@ -393,39 +394,48 @@ export default async function DashboardJobsPage({
           description="Only jobs created by you are listed here."
         />
         <CardBody className="pt-0">
-          <div className="overflow-x-auto">
-            <DataTable className="min-w-[1100px]">
-              <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+          <div className="relative max-h-[520px] overflow-auto rounded-2xl border border-border/40">
+            <div className="overflow-x-auto">
+              <DataTable className="min-w-[900px] w-full">
+              <thead className="sticky top-0 z-10 border-b border-border/40 bg-background/80 text-left text-xs uppercase tracking-wide text-muted-foreground backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <tr>
-                  <th className="px-3 py-2 text-right font-medium">ID</th>
+                  <th className="px-3 py-2 text-right font-medium hidden lg:table-cell">ID</th>
                   <th className="px-3 py-2 font-medium">Type</th>
                   <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Reason</th>
-                  <th className="px-3 py-2 text-right font-medium">Attempts</th>
+                  <th className="px-3 py-2 font-medium hidden lg:table-cell">Reason</th>
+                  <th className="px-3 py-2 text-right font-medium hidden lg:table-cell">Attempts</th>
                   <th className="px-3 py-2 text-right font-medium">Created</th>
-                  <th className="px-3 py-2 text-right font-medium">Started</th>
-                  <th className="px-3 py-2 text-right font-medium">Finished</th>
-                  <th className="px-3 py-2 text-right font-medium">Dur</th>
+                  <th className="px-3 py-2 text-right font-medium hidden md:table-cell">Started</th>
+                  <th className="px-3 py-2 text-right font-medium hidden lg:table-cell">Finished</th>
+                  <th className="px-3 py-2 text-right font-medium hidden lg:table-cell">Dur</th>
                   <th className="px-3 py-2 font-medium">Idea</th>
-                  <th className="px-3 py-2 text-right font-medium">Ideas</th>
+                  <th className="px-3 py-2 text-right font-medium hidden md:table-cell">Ideas</th>
                   <th className="px-3 py-2 text-right font-medium">Action</th>
+                  <th className="px-2 py-2 text-right font-medium w-8">
+                    <span className="sr-only">Open</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {jobs.map((job) => (
-                  <tr key={String(job.id)} className="align-top hover:bg-muted/50">
-                    <td className="px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
+                  <tr
+                    key={String(job.id)}
+                    className="group cursor-pointer align-top even:bg-background/5 hover:bg-muted/50"
+                  >
+                    <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground hidden lg:table-cell">
                       {String(job.id)}
                     </td>
                     <td className="px-3 py-2 text-sm text-foreground">
-                      <span className="block max-w-[140px] truncate">
+                      <span className="block max-w-[140px] truncate whitespace-nowrap">
                         {job.job_type ?? '—'}
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <StatusBadge status={job.status} />
+                      <div className="[&>div]:px-2 [&>div]:py-0.5 [&>div]:text-[11px]">
+                        <StatusBadge status={job.status} />
+                      </div>
                     </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
+                    <td className="px-3 py-2 text-sm text-muted-foreground hidden lg:table-cell">
                       {(() => {
                         const hint = getJobHint(job, now, runnerOnline);
                         if (!hint) return '—';
@@ -443,7 +453,7 @@ export default async function DashboardJobsPage({
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground">
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground font-mono tabular-nums whitespace-nowrap hidden lg:table-cell">
                       {job.attempts ?? 0} / {job.max_attempts ?? 3}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
@@ -453,21 +463,21 @@ export default async function DashboardJobsPage({
                         return <span title={value.title}>{value.label}</span>;
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums hidden md:table-cell">
                       {(() => {
                         const value = formatRelativeTimestamp(job.started_at);
                         if (!value.title) return '—';
                         return <span title={value.title}>{value.label}</span>;
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums hidden lg:table-cell">
                       {(() => {
                         const value = formatRelativeTimestamp(job.finished_at);
                         if (!value.title) return '—';
                         return <span title={value.title}>{value.label}</span>;
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap">
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground font-mono tabular-nums whitespace-nowrap hidden lg:table-cell">
                       {formatDuration(job.started_at, job.finished_at)}
                     </td>
                     <td className="px-3 py-2 text-sm text-muted-foreground">
@@ -481,7 +491,7 @@ export default async function DashboardJobsPage({
                           return (
                             <Link
                               href={`/dashboard/ideas/${ideaId}?job=${job.id}`}
-                              className="block max-w-[220px] truncate text-foreground hover:underline"
+                              className="block max-w-[180px] truncate text-foreground hover:underline md:max-w-[320px]"
                               title={title}
                             >
                               {title}
@@ -492,7 +502,7 @@ export default async function DashboardJobsPage({
                         '—'
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right text-sm text-muted-foreground">
+                    <td className="px-3 py-2 text-right text-sm text-muted-foreground hidden md:table-cell">
                       {job.job_type && INGEST_JOB_TYPES.has(job.job_type) ? (
                         <Link
                           href={`/dashboard/jobs/${job.id}`}
@@ -509,17 +519,27 @@ export default async function DashboardJobsPage({
                         <Link href={`/dashboard/jobs/${job.id}`}>View</Link>
                       </Button>
                     </td>
+                    <td className="px-2 py-2 text-right">
+                      <Link
+                        href={`/dashboard/jobs/${job.id}`}
+                        className="inline-flex items-center justify-end text-muted-foreground transition-colors group-hover:text-foreground"
+                        aria-label={`Open job ${job.id}`}
+                      >
+                        <ChevronDown className="h-4 w-4 -rotate-90" />
+                      </Link>
+                    </td>
                   </tr>
                 ))}
                 {jobs.length === 0 && (
                   <tr>
-                    <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={12}>
+                    <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={13}>
                       No jobs yet.
                     </td>
                   </tr>
                 )}
               </tbody>
             </DataTable>
+            </div>
           </div>
         </CardBody>
       </GlassCard>
