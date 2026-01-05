@@ -45,6 +45,7 @@ type RedditPost = {
   num_comments: number;
   url: string;
   subreddit: string;
+  created_utc?: number;
 };
 
 type RedditListingChild = {
@@ -56,6 +57,7 @@ type RedditListingChild = {
     num_comments?: number;
     permalink?: string;
     subreddit: string;
+    created_utc?: number;
   };
 };
 
@@ -75,6 +77,7 @@ type PullpushPost = {
   full_link?: string;
   url?: string;
   subreddit?: string;
+  created_utc?: number;
 };
 
 type PullpushResponse = {
@@ -237,6 +240,82 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type RedditSignals = {
+  minUpvotes: number;
+  minComments: number;
+  maxAgeDays: number;
+};
+
+type SignalsBreakdown = {
+  total: number;
+  kept: number;
+  dropped_total: number;
+  dropped_low_upvotes: number;
+  dropped_low_comments: number;
+  dropped_too_old: number;
+  dropped_missing_time: number;
+};
+
+function parseSignals(config: Record<string, unknown> | null | undefined): RedditSignals {
+  const rawSignals = (config?.signals ?? {}) as Record<string, unknown>;
+  const minUpvotes = Number(rawSignals.minUpvotes);
+  const minComments = Number(rawSignals.minComments);
+  const maxAgeDays = Number(rawSignals.maxAgeDays);
+  return {
+    minUpvotes: Number.isFinite(minUpvotes) ? minUpvotes : 10,
+    minComments: Number.isFinite(minComments) ? minComments : 5,
+    maxAgeDays: Number.isFinite(maxAgeDays) ? maxAgeDays : 7,
+  };
+}
+
+function applySignalsFilter(
+  posts: RedditPost[],
+  signals: RedditSignals,
+): { filtered: RedditPost[]; breakdown: SignalsBreakdown } {
+  const nowSeconds = Date.now() / 1000;
+  const filtered: RedditPost[] = [];
+  const breakdown: SignalsBreakdown = {
+    total: posts.length,
+    kept: 0,
+    dropped_total: 0,
+    dropped_low_upvotes: 0,
+    dropped_low_comments: 0,
+    dropped_too_old: 0,
+    dropped_missing_time: 0,
+  };
+
+  for (const post of posts) {
+    const score = post.score ?? 0;
+    const comments = post.num_comments ?? 0;
+    const createdUtc = Number(post.created_utc);
+    if (!Number.isFinite(createdUtc) || createdUtc <= 0) {
+      breakdown.dropped_missing_time += 1;
+      breakdown.dropped_total += 1;
+      continue;
+    }
+    const ageDays = (nowSeconds - createdUtc) / 86400;
+    if (ageDays > signals.maxAgeDays) {
+      breakdown.dropped_too_old += 1;
+      breakdown.dropped_total += 1;
+      continue;
+    }
+    if (score < signals.minUpvotes) {
+      breakdown.dropped_low_upvotes += 1;
+      breakdown.dropped_total += 1;
+      continue;
+    }
+    if (comments < signals.minComments) {
+      breakdown.dropped_low_comments += 1;
+      breakdown.dropped_total += 1;
+      continue;
+    }
+    filtered.push(post);
+  }
+
+  breakdown.kept = filtered.length;
+  return { filtered, breakdown };
+}
+
 async function fetchJsonWithRetry<T = unknown>(
   url: string,
   options: RequestInit = {},
@@ -307,6 +386,7 @@ async function fetchRedditPosts(
           num_comments: d.num_comments ?? 0,
           url: `https://www.reddit.com${d.permalink}`,
           subreddit: d.subreddit,
+          created_utc: d.created_utc,
         };
         all.push(post);
       }
@@ -335,6 +415,7 @@ async function fetchRedditPosts(
             ? `https://www.reddit.com${d.permalink}`
             : d.full_link ?? d.url ?? '',
           subreddit: d.subreddit ?? sub,
+          created_utc: d.created_utc,
         };
         all.push(post);
       }
@@ -486,11 +567,37 @@ async function main() {
 
   ensureEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
 
-  const posts = await fetchRedditPosts();
-  console.log(`Fetched ${posts.length} posts.`);
+  let strategyConfig: Record<string, unknown> | null = null;
+  const strategyConfigRaw = process.env.INGEST_STRATEGY_CONFIG;
+  if (strategyConfigRaw) {
+    try {
+      strategyConfig = JSON.parse(strategyConfigRaw) as Record<string, unknown>;
+    } catch (err) {
+      console.warn(
+        'Failed to parse INGEST_STRATEGY_CONFIG, using defaults:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
 
-  const filtered = filterPainfulPosts(posts);
-  console.log(`Filtered to ${filtered.length} potentially painful posts.`);
+  const signals = parseSignals(strategyConfig);
+  console.log(
+    `Signals: minUpvotes=${signals.minUpvotes} minComments=${signals.minComments} maxAgeDays=${signals.maxAgeDays}`,
+  );
+
+  const posts = await fetchRedditPosts();
+  console.log(`Fetched ${posts.length} posts`);
+
+  const { filtered: signalFiltered, breakdown } = applySignalsFilter(posts, signals);
+  console.log(`After signals filter: ${signalFiltered.length}`);
+  console.log(
+    `Signals breakdown (exclusive): total=${breakdown.total} kept=${breakdown.kept} dropped=${breakdown.dropped_total} ` +
+      `[missing_time=${breakdown.dropped_missing_time} too_old=${breakdown.dropped_too_old} ` +
+      `low_upvotes=${breakdown.dropped_low_upvotes} low_comments=${breakdown.dropped_low_comments}]`,
+  );
+
+  const filtered = filterPainfulPosts(signalFiltered);
+  console.log(`After pain filter: ${filtered.length}`);
 
   if (filtered.length === 0) {
     console.log('No qualified posts found, exit.');
