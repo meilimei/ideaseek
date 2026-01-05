@@ -12,6 +12,7 @@ import {
   GlassCard,
 } from '@/components/admin/primitives';
 import { createStrategy } from './actions';
+import { STRATEGY_TRACKS } from '@/lib/strategyTracks';
 
 const DEFAULT_CRON = '0 */6 * * *';
 const DEFAULT_CONFIG = '{}';
@@ -67,6 +68,9 @@ export default function CreateStrategyCard() {
   const [simpleTimeRange, setSimpleTimeRange] = useState<'day' | 'week' | 'month'>('day');
   const [simpleLimit, setSimpleLimit] = useState<number>(25);
   const [simpleNotes, setSimpleNotes] = useState('');
+  const [trackId, setTrackId] = useState<string>(
+    STRATEGY_TRACKS[0]?.id ?? 'personal_finance',
+  );
   const [configError, setConfigError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -91,7 +95,11 @@ export default function CreateStrategyCard() {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  const selectedTrack =
+    STRATEGY_TRACKS.find((track) => track.id === trackId) ?? STRATEGY_TRACKS[0];
+
   const simpleConfig = {
+    track: trackId,
     subreddits: simpleSubreddits,
     keywords: simpleKeywords,
     sort: simpleSort,
@@ -265,6 +273,35 @@ export default function CreateStrategyCard() {
               </>
             ) : source === 'reddit' ? (
               <div className="space-y-4 rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Track</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AdminSelect
+                      value={trackId}
+                      onChange={(event) => setTrackId(event.target.value)}
+                    >
+                      {STRATEGY_TRACKS.map((track) => (
+                        <option key={track.id} value={track.id}>
+                          {track.title_zh} · {track.title}
+                        </option>
+                      ))}
+                    </AdminSelect>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSimpleSubreddits(selectedTrack.reddit.subreddits);
+                        setSimpleKeywordsText(selectedTrack.reddit.keywordsText);
+                      }}
+                    >
+                      Use track defaults
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    This will replace your current subreddits and keywords.
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">Subreddits</label>
                   <div className="text-xs text-muted-foreground">
