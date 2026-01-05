@@ -28,6 +28,17 @@ function parseConfig(raw: string) {
   }
 }
 
+type StrategyUpdatePatch = {
+  name?: string;
+  description?: string | null;
+  cronExpr?: string;
+  cron?: string;
+  isActive?: boolean;
+  source?: string;
+  config?: unknown;
+  configText?: string;
+};
+
 export async function createStrategy(input: {
   name: string;
   source: string;
@@ -93,6 +104,89 @@ export async function createStrategy(input: {
   return { ok: true };
 }
 
+export async function updateStrategy(strategyId: string, patch: StrategyUpdatePatch) {
+  const supabase = await createServerSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error('Failed to get user for strategy update:', userError.message);
+  }
+
+  const user = userData?.user ?? null;
+  if (!user) {
+    return redirect('/login');
+  }
+
+  const update: Record<string, unknown> = {};
+
+  if (typeof patch.name === 'string') {
+    const name = patch.name.trim();
+    if (!name) {
+      return { ok: false, error: 'Name is required' };
+    }
+    update.name = name;
+  }
+
+  if (patch.description !== undefined) {
+    if (patch.description === null) {
+      update.description = null;
+    } else {
+      const description = patch.description.trim();
+      update.description = description ? description : null;
+    }
+  }
+
+  const cronExpr = (patch.cronExpr ?? patch.cron)?.trim();
+  if (cronExpr !== undefined) {
+    if (!cronExpr) {
+      return { ok: false, error: 'Cron expression is required' };
+    }
+    update.cron_expr = cronExpr;
+  }
+
+  if (typeof patch.isActive === 'boolean') {
+    update.is_active = patch.isActive;
+  }
+
+  if (typeof patch.source === 'string') {
+    const source = normalizeSource(patch.source);
+    if (!source) {
+      return { ok: false, error: 'Invalid source' };
+    }
+    update.source = source;
+  }
+
+  if (patch.config !== undefined || typeof patch.configText === 'string') {
+    if (patch.config !== undefined) {
+      update.config = patch.config;
+    } else if (typeof patch.configText === 'string') {
+      const parsed = parseConfig(patch.configText);
+      if (!parsed.ok) {
+        return { ok: false, error: `Config JSON error: ${parsed.error}` };
+      }
+      update.config = parsed.value;
+    }
+  }
+
+  if (Object.keys(update).length === 0) {
+    return { ok: false, error: 'No updates provided' };
+  }
+
+  const { error } = await supabase
+    .from('ingest_strategies')
+    .update(update)
+    .eq('id', strategyId)
+    .eq('created_by', user.id);
+
+  if (error) {
+    console.error('Failed to update strategy:', error.message);
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath('/dashboard/strategies');
+  return { ok: true };
+}
+
 export async function toggleStrategyActive(id: string, currentActive: boolean | null) {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -119,4 +213,32 @@ export async function toggleStrategyActive(id: string, currentActive: boolean | 
   }
 
   revalidatePath('/dashboard/strategies');
+}
+
+export async function deleteStrategy(strategyId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error('Failed to get user for strategy delete:', userError.message);
+  }
+
+  const user = userData?.user ?? null;
+  if (!user) {
+    return redirect('/login');
+  }
+
+  const { error } = await supabase
+    .from('ingest_strategies')
+    .update({ deleted_at: new Date().toISOString(), is_active: false })
+    .eq('id', strategyId)
+    .eq('created_by', user.id);
+
+  if (error) {
+    console.error('Failed to delete strategy:', error.message);
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath('/dashboard/strategies');
+  return { ok: true };
 }

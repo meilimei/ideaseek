@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import RunNowButton from './RunNowButton';
 import CreateStrategyCard from './CreateStrategyCard';
 import { toggleStrategyActive } from './actions';
+import DeleteStrategyButton from './DeleteStrategyButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,11 @@ function formatDate(value: string | null) {
   return date.toLocaleString();
 }
 
-export default async function DashboardStrategiesPage() {
+export default async function DashboardStrategiesPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -49,6 +54,7 @@ export default async function DashboardStrategiesPage() {
       'id, name, source, description, is_active, cron_expr, created_at, last_run_at, last_run_status, last_error',
     )
     .eq('created_by', user.id)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -56,6 +62,7 @@ export default async function DashboardStrategiesPage() {
   }
 
   const strategies = (data ?? []) as StrategyRow[];
+  const toast = typeof searchParams?.toast === 'string' ? searchParams.toast : null;
 
   return (
     <div className="space-y-6">
@@ -65,6 +72,9 @@ export default async function DashboardStrategiesPage() {
           <p className="text-sm text-muted-foreground">
             Only strategies created by you are listed here.
           </p>
+          {toast === 'updated' && (
+            <span className="text-sm text-emerald-400">Changes saved.</span>
+          )}
         </div>
         <Button asChild variant="ghost" size="sm">
           <Link href="/dashboard/jobs">Back to Dashboard</Link>
@@ -146,7 +156,16 @@ export default async function DashboardStrategiesPage() {
                           {strategy.is_active ? 'Deactivate' : 'Activate'}
                         </Button>
                       </form>
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                      >
+                        <Link href={`/dashboard/strategies/${strategy.id}/edit`}>Edit</Link>
+                      </Button>
                       <RunNowButton strategyId={strategy.id} />
+                      <DeleteStrategyButton strategyId={strategy.id} />
                     </div>
                   </td>
                 </tr>

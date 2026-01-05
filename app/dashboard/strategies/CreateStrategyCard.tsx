@@ -13,7 +13,7 @@ import {
   CardHeading,
   GlassCard,
 } from '@/components/admin/primitives';
-import { createStrategy } from './actions';
+import { createStrategy, updateStrategy } from './actions';
 import { STRATEGY_TRACKS } from '@/lib/strategyTracks';
 
 const DEFAULT_CRON = '0 0 * * 0';
@@ -63,44 +63,165 @@ const SCHEDULE_OPTIONS = [
   { id: 'custom', label: 'Custom', cron: '' },
 ];
 
-export default function CreateStrategyCard() {
+const SOURCE_OPTIONS = ['reddit', 'youtube', 'google_trends'] as const;
+type StrategySource = (typeof SOURCE_OPTIONS)[number];
+
+type StrategyFormMode = 'create' | 'edit';
+
+type StrategyFormDefaults = {
+  id: string;
+  name: string;
+  source: string | null;
+  description: string | null;
+  is_active: boolean | null;
+  cron_expr: string | null;
+  config: Record<string, unknown> | null;
+};
+
+type CreateStrategyCardProps = {
+  mode?: StrategyFormMode;
+  initialStrategy?: StrategyFormDefaults | null;
+};
+
+function normalizeSubredditInput(value: string) {
+  return value.trim().replace(/^r\//i, '').replace(/\s+/g, '');
+}
+
+function normalizeKeywordInput(value: string) {
+  return value.trim();
+}
+
+function resolveSource(value: string | null | undefined): StrategySource {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === 'trends') return 'google_trends';
+  if (normalized && SOURCE_OPTIONS.includes(normalized as StrategySource)) {
+    return normalized as StrategySource;
+  }
+  return 'reddit';
+}
+
+function coerceRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function coerceStringArray(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+  const items = value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean);
+  return items.length > 0 ? items : fallback;
+}
+
+function coerceNumber(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function resolveSchedule(cronExpr: string) {
+  const match = SCHEDULE_OPTIONS.find((option) => option.cron === cronExpr);
+  return match?.id ?? 'custom';
+}
+
+export default function CreateStrategyCard({
+  mode = 'create',
+  initialStrategy = null,
+}: CreateStrategyCardProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [name, setName] = useState('');
-  const [source, setSource] = useState<'reddit' | 'youtube' | 'google_trends'>('reddit');
-  const [description, setDescription] = useState('');
-  const [isActive, setIsActive] = useState(true);
-  const [cronExpr, setCronExpr] = useState(DEFAULT_CRON);
-  const [schedule, setSchedule] = useState<string>(() => {
-    const match = SCHEDULE_OPTIONS.find((option) => option.cron === DEFAULT_CRON);
-    return match?.id ?? 'custom';
-  });
-  const [configText, setConfigText] = useState(DEFAULT_CONFIG);
-  const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
-  const [simpleSubreddits, setSimpleSubreddits] = useState<string[]>(DEFAULT_SUBREDDITS);
-  const [simpleKeywords, setSimpleKeywords] = useState<string[]>(
+  const isEdit = mode === 'edit';
+  const initialConfig = coerceRecord(initialStrategy?.config);
+  const initialSource = resolveSource(initialStrategy?.source);
+  const initialCron = initialStrategy?.cron_expr?.trim() || DEFAULT_CRON;
+  const initialSchedule = resolveSchedule(initialCron);
+  const initialTrack =
+    typeof initialConfig.track === 'string' && initialConfig.track.trim()
+      ? initialConfig.track.trim()
+      : STRATEGY_TRACKS[0]?.title ?? 'Personal Finance';
+  const initialSubreddits = coerceStringArray(
+    initialConfig.subreddits,
+    DEFAULT_SUBREDDITS,
+  )
+    .map((subreddit) => normalizeSubredditInput(subreddit))
+    .filter(Boolean);
+  const initialKeywords = coerceStringArray(
+    initialConfig.keywords,
     DEFAULT_KEYWORDS_TEXT.split('\n').map((line) => line.trim()).filter(Boolean),
+  )
+    .map((keyword) => normalizeKeywordInput(keyword))
+    .filter(Boolean);
+  const initialSort = ['top', 'hot', 'new'].includes(String(initialConfig.sort))
+    ? (initialConfig.sort as 'top' | 'hot' | 'new')
+    : 'top';
+  const initialTimeRange = ['day', 'week', 'month'].includes(
+    String(initialConfig.timeRange),
+  )
+    ? (initialConfig.timeRange as 'day' | 'week' | 'month')
+    : 'day';
+  const initialLimit = clampNumber(
+    coerceNumber(initialConfig.limit, 25),
+    10,
+    100,
   );
-  const [simpleSort, setSimpleSort] = useState<'top' | 'hot' | 'new'>('top');
-  const [simpleTimeRange, setSimpleTimeRange] = useState<'day' | 'week' | 'month'>('day');
-  const [simpleLimit, setSimpleLimit] = useState<number>(25);
-  const [minUpvotes, setMinUpvotes] = useState<number>(10);
-  const [minComments, setMinComments] = useState<number>(5);
-  const [maxAgeDays, setMaxAgeDays] = useState<number>(7);
+  const initialSignals = coerceRecord(initialConfig.signals);
+  const initialMinUpvotes = clampNumber(
+    coerceNumber(initialSignals.minUpvotes, 10),
+    0,
+    5000,
+  );
+  const initialMinComments = clampNumber(
+    coerceNumber(initialSignals.minComments, 5),
+    0,
+    5000,
+  );
+  const initialMaxAgeDays = clampNumber(
+    coerceNumber(initialSignals.maxAgeDays, 7),
+    1,
+    30,
+  );
+  const initialConfigText = isEdit
+    ? JSON.stringify(initialConfig, null, 2)
+    : DEFAULT_CONFIG;
+  const initialMode = isEdit ? (initialSource === 'reddit' ? 'simple' : 'advanced') : 'simple';
+  const [isPending, startTransition] = useTransition();
+  const [name, setName] = useState(initialStrategy?.name ?? '');
+  const [source, setSource] = useState<StrategySource>(initialSource);
+  const [description, setDescription] = useState(initialStrategy?.description ?? '');
+  const [isActive, setIsActive] = useState(initialStrategy?.is_active ?? true);
+  const [cronExpr, setCronExpr] = useState(initialCron);
+  const [schedule, setSchedule] = useState<string>(initialSchedule);
+  const [configText, setConfigText] = useState(initialConfigText);
+  const [mode, setMode] = useState<'simple' | 'advanced'>(initialMode);
+  const [simpleSubreddits, setSimpleSubreddits] = useState<string[]>(
+    initialSubreddits,
+  );
+  const [simpleKeywords, setSimpleKeywords] = useState<string[]>(initialKeywords);
+  const [simpleSort, setSimpleSort] = useState<'top' | 'hot' | 'new'>(initialSort);
+  const [simpleTimeRange, setSimpleTimeRange] = useState<'day' | 'week' | 'month'>(
+    initialTimeRange,
+  );
+  const [simpleLimit, setSimpleLimit] = useState<number>(initialLimit);
+  const [minUpvotes, setMinUpvotes] = useState<number>(initialMinUpvotes);
+  const [minComments, setMinComments] = useState<number>(initialMinComments);
+  const [maxAgeDays, setMaxAgeDays] = useState<number>(initialMaxAgeDays);
   const [simpleNotes, setSimpleNotes] = useState('');
   const [newSubreddit, setNewSubreddit] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
   const [recFilter, setRecFilter] = useState('');
-  const [trackId, setTrackId] = useState<string>(
-    STRATEGY_TRACKS[0]?.title ?? 'Personal Finance',
-  );
+  const [trackId, setTrackId] = useState<string>(initialTrack);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const normalizeSubreddit = (value: string) =>
-    value.trim().replace(/^r\//i, '').replace(/\s+/g, '');
+  const normalizeSubreddit = normalizeSubredditInput;
 
   const addSubreddit = (value: string) => {
     const normalized = normalizeSubreddit(value);
@@ -119,7 +240,7 @@ export default function CreateStrategyCard() {
     );
   };
 
-  const normalizeKeyword = (value: string) => value.trim();
+  const normalizeKeyword = normalizeKeywordInput;
 
   const mergeUnique = (current: string[], incoming: string[], keyFn: (value: string) => string) => {
     const seen = new Set(current.map((value) => keyFn(value).toLowerCase()));
@@ -191,6 +312,10 @@ export default function CreateStrategyCard() {
     },
   };
   const previewJson = JSON.stringify(simpleConfig, null, 2);
+  const headingTitle = isEdit ? 'Edit strategy' : 'Create strategy';
+  const headingDescription = isEdit
+    ? 'Update your strategy details and schedule.'
+    : 'Add a new ingestion strategy using a JSON config.';
 
   const resetForm = () => {
     setName('');
@@ -214,6 +339,7 @@ export default function CreateStrategyCard() {
     setNewSubreddit('');
     setNewKeyword('');
     setRecFilter('');
+    setTrackId(STRATEGY_TRACKS[0]?.title ?? 'Personal Finance');
     setPreviewOpen(false);
   };
 
@@ -226,6 +352,10 @@ export default function CreateStrategyCard() {
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError('Name is required');
+      return;
+    }
+    if (isEdit && !initialStrategy?.id) {
+      setError('Strategy ID is missing');
       return;
     }
 
@@ -249,21 +379,37 @@ export default function CreateStrategyCard() {
     }
 
     startTransition(async () => {
-      const result = await createStrategy({
-        name: trimmedName,
-        source,
-        description,
-        isActive,
-        cronExpr,
-        configText: configPayloadText,
-      });
+      const result = isEdit
+        ? await updateStrategy(initialStrategy?.id ?? '', {
+            name: trimmedName,
+            source,
+            description,
+            isActive,
+            cronExpr,
+            configText: configPayloadText,
+          })
+        : await createStrategy({
+            name: trimmedName,
+            source,
+            description,
+            isActive,
+            cronExpr,
+            configText: configPayloadText,
+          });
 
       if (!result || !result.ok) {
-        setError(result?.error || 'Failed to create strategy');
+        setError(
+          result?.error || (isEdit ? 'Failed to update strategy' : 'Failed to create strategy'),
+        );
         return;
       }
 
       setConfigError(null);
+      if (isEdit) {
+        router.push('/dashboard/strategies?toast=updated');
+        return;
+      }
+
       resetForm();
       setToast('Strategy created');
       router.refresh();
@@ -272,10 +418,7 @@ export default function CreateStrategyCard() {
 
   return (
     <GlassCard>
-      <CardHeading
-        title="Create strategy"
-        description="Add a new ingestion strategy using a JSON config."
-      />
+      <CardHeading title={headingTitle} description={headingDescription} />
       <CardBody className="pt-0">
         <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2 text-sm">
@@ -793,7 +936,13 @@ export default function CreateStrategyCard() {
           </div>
           <div className="md:col-span-2 flex flex-wrap items-center gap-3">
             <Button type="submit" size="sm" disabled={isPending}>
-              {isPending ? 'Creating...' : 'Create strategy'}
+              {isPending
+                ? isEdit
+                  ? 'Saving...'
+                  : 'Creating...'
+                : isEdit
+                  ? 'Save changes'
+                  : 'Create strategy'}
             </Button>
             {error && <span className="text-sm text-destructive">{error}</span>}
             {toast && <span className="text-sm text-emerald-400">{toast}</span>}
