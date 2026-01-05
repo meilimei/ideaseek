@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -68,6 +69,8 @@ export default function CreateStrategyCard() {
   const [simpleTimeRange, setSimpleTimeRange] = useState<'day' | 'week' | 'month'>('day');
   const [simpleLimit, setSimpleLimit] = useState<number>(25);
   const [simpleNotes, setSimpleNotes] = useState('');
+  const [newSubreddit, setNewSubreddit] = useState('');
+  const [recFilter, setRecFilter] = useState('');
   const [trackId, setTrackId] = useState<string>(
     STRATEGY_TRACKS[0]?.id ?? 'personal_finance',
   );
@@ -75,20 +78,42 @@ export default function CreateStrategyCard() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const parseLinesToList = (value: string) => {
-    const lines = value.split('\n');
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const line of lines) {
-      const trimmed = line.trim().replace(/^r\//i, '');
-      if (!trimmed) continue;
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(trimmed);
-    }
-    return result;
+  const normalizeSubreddit = (value: string) =>
+    value.trim().replace(/^r\//i, '').replace(/\s+/g, '');
+
+  const addSubreddit = (value: string) => {
+    const normalized = normalizeSubreddit(value);
+    if (!normalized) return;
+    const exists = simpleSubreddits.some(
+      (subreddit) => subreddit.toLowerCase() === normalized.toLowerCase(),
+    );
+    if (exists) return;
+    setSimpleSubreddits((prev) => [...prev, normalized]);
   };
+
+  const removeSubreddit = (value: string) => {
+    const normalized = value.toLowerCase();
+    setSimpleSubreddits((prev) =>
+      prev.filter((subreddit) => subreddit.toLowerCase() !== normalized),
+    );
+  };
+
+  const recommendedSubreddits = selectedTrack?.reddit?.subreddits ?? [];
+  const selectedSet = new Set(simpleSubreddits.map((subreddit) => subreddit.toLowerCase()));
+  const recFilterLower = recFilter.trim().toLowerCase();
+  const recommendedList = recommendedSubreddits
+    .map((subreddit) => normalizeSubreddit(subreddit))
+    .filter(Boolean)
+    .filter((subreddit, index, arr) => arr.indexOf(subreddit) === index)
+    .sort((a, b) => {
+      const aSelected = selectedSet.has(a.toLowerCase());
+      const bSelected = selectedSet.has(b.toLowerCase());
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+      return a.localeCompare(b);
+    })
+    .filter((subreddit) =>
+      recFilterLower ? subreddit.toLowerCase().includes(recFilterLower) : true,
+    );
 
   const simpleKeywords = simpleKeywordsText
     .split('\n')
@@ -305,16 +330,88 @@ export default function CreateStrategyCard() {
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">Subreddits</label>
                   <div className="text-xs text-muted-foreground">
-                    One per line (without r/)
+                    Add and press Enter (without r/)
                   </div>
-                  <textarea
-                    value={simpleSubreddits.join('\n')}
-                    onChange={(event) =>
-                      setSimpleSubreddits(parseLinesToList(event.target.value))
-                    }
-                    rows={4}
-                    className="w-full rounded-xl border border-border/50 bg-card/60 px-3 py-2 text-xs text-foreground shadow-soft transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  />
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-border/50 bg-card/60 p-3">
+                    {simpleSubreddits.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        No subreddits yet.
+                      </span>
+                    ) : (
+                      simpleSubreddits.map((subreddit) => (
+                        <Badge key={subreddit} variant="secondary" className="gap-1 pr-1">
+                          <span>{subreddit}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSubreddit(subreddit)}
+                            className="rounded-full px-1 text-[10px] text-muted-foreground hover:text-foreground"
+                            aria-label={`Remove ${subreddit}`}
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AdminInput
+                      value={newSubreddit}
+                      onChange={(event) => setNewSubreddit(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return;
+                        event.preventDefault();
+                        addSubreddit(newSubreddit);
+                        setNewSubreddit('');
+                      }}
+                      placeholder="Add subreddit (e.g. startups) and press Enter"
+                    />
+                    {simpleSubreddits.length > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setSimpleSubreddits([])}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground">
+                      Recommended
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Click to toggle. Selected ones are highlighted.
+                    </div>
+                    <AdminInput
+                      value={recFilter}
+                      onChange={(event) => setRecFilter(event.target.value)}
+                      placeholder="Search recommended…"
+                      className="h-8"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {recommendedList.map((subreddit) => {
+                        const isSelected = simpleSubreddits.some(
+                          (item) => item.toLowerCase() === subreddit.toLowerCase(),
+                        );
+                        return (
+                          <Badge
+                            key={subreddit}
+                            variant={isSelected ? 'secondary' : 'outline'}
+                            className="cursor-pointer"
+                            onClick={() =>
+                              isSelected ? removeSubreddit(subreddit) : addSubreddit(subreddit)
+                            }
+                          >
+                            {subreddit}
+                          </Badge>
+                        );
+                      })}
+                      {recommendedList.length === 0 && (
+                        <span className="text-xs text-muted-foreground">No matches.</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">
