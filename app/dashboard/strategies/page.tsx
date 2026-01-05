@@ -76,12 +76,22 @@ export default async function DashboardStrategiesPage({
             <span className="text-sm text-emerald-400">Changes saved.</span>
           )}
         </div>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/dashboard/jobs">Back to Dashboard</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm">
+            <Link href="/dashboard/strategies/new/step-1">New strategy (guided)</Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="#advanced-create">Advanced</Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/dashboard/jobs">Back to Dashboard</Link>
+          </Button>
+        </div>
       </div>
 
-      <CreateStrategyCard />
+      <div id="advanced-create">
+        <CreateStrategyCard />
+      </div>
 
       <GlassCard>
         <CardHeading

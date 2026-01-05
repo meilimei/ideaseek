@@ -132,11 +132,11 @@ function resolveSchedule(cronExpr: string) {
 }
 
 export default function CreateStrategyCard({
-  mode = 'create',
+  mode: formMode = 'create',
   initialStrategy = null,
 }: CreateStrategyCardProps) {
   const router = useRouter();
-  const isEdit = mode === 'edit';
+  const isEdit = formMode === 'edit';
   const initialConfig = coerceRecord(initialStrategy?.config);
   const initialSource = resolveSource(initialStrategy?.source);
   const initialCron = initialStrategy?.cron_expr?.trim() || DEFAULT_CRON;
