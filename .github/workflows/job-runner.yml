@@ -12,6 +12,8 @@ concurrency:
 jobs:
   run-job-runner:
     runs-on: ubuntu-latest
+    env:
+      REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
