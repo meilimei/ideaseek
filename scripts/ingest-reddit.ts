@@ -13,7 +13,8 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
 const jobId = adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : null;
 const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
-console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
+const sha = process.env.GITHUB_SHA?.slice(0, 7) ?? '-';
+console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'} sha=${sha}`);
 console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
 console.log(`[reddit][debug] marker=ingest-reddit.ts loaded ${new Date().toISOString()}`);
 const RUN_FILE =
@@ -864,17 +865,20 @@ async function main() {
   }
 
   const jobPayload = jobId ? await loadJobPayload(jobId) : null;
-  const jobConfig =
+  const payloadCfgCandidate =
     parseMaybeJson<Record<string, unknown>>((jobPayload as any)?.config) ??
-    (jobPayload as any)?.config ??
-    null;
+    (jobPayload as any)?.config;
+  const jobConfig =
+    payloadCfgCandidate && typeof payloadCfgCandidate === 'object' && !Array.isArray(payloadCfgCandidate)
+      ? (payloadCfgCandidate as Record<string, unknown>)
+      : ((jobPayload as any) ?? null);
   const payloadStrategyId =
     (typeof (jobPayload as any)?.strategyId === 'string'
       ? (jobPayload as any)?.strategyId
-      : typeof (jobPayload as any)?.strategy_id === 'string'
-        ? (jobPayload as any)?.strategy_id
-        : typeof (jobPayload as any)?.strategyKey === 'string'
-          ? (jobPayload as any)?.strategyKey
+      : typeof (jobPayload as any)?.strategyKey === 'string'
+        ? (jobPayload as any)?.strategyKey
+        : typeof (jobPayload as any)?.strategy_id === 'string'
+          ? (jobPayload as any)?.strategy_id
           : typeof (jobPayload as any)?.strategy_key === 'string'
             ? (jobPayload as any)?.strategy_key
             : '')?.trim() || '';
@@ -970,8 +974,8 @@ async function main() {
   const signals = parseSignals(cfg);
   console.log(
     `Signals: minUpvotes=${signals.minUpvotes} minComments=${signals.minComments} maxAgeDays=${signals.maxAgeDays}` +
-      ` | strategyId=${strategyId || '-'} | configSource=${configSourceLabel}` +
-      ` | subredditsSource=${subredditsSource} subs=${subreddits.join(',')}`,
+      ` | strategyId=${strategyId || '-'} | cfgSubs=${explicitSubreddits.join(',') || '-'}` +
+      ` | subsUsed=${subreddits.join(',') || '-'} | subredditsSource=${subredditsSource} | source=${configSourceLabel}`,
   );
 
   const { posts, errors } = await fetchRedditPosts(

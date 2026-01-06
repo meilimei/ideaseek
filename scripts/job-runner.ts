@@ -14,6 +14,8 @@ const POLL_INTERVAL_MS = 2000;
 const REAP_INTERVAL_MS = 60_000;
 const STALE_LOCK_MS = 15 * 60_000;
 const HEARTBEAT_INTERVAL_MS = 10_000;
+const jobLogBuffers = new Map<string, string>();
+console.log('[job-runner] logging: capture=all maxChars=80000');
 
 type StrategyRow = {
   id: string;
@@ -93,17 +95,17 @@ async function claimJob(worker: string): Promise<JobWithStrategy | null> {
 }
 
 async function appendLog(jobId: string, message: string) {
+  const MAX_JOB_LOG_CHARS = 80_000;
+  const existing = jobLogBuffers.get(jobId) ?? '';
+  let next = `${existing}${message}`;
+  if (next.length > MAX_JOB_LOG_CHARS) {
+    next = `[log truncated]\n${next.slice(next.length - MAX_JOB_LOG_CHARS)}`;
+  }
+  jobLogBuffers.set(jobId, next);
   await supabase
     .from('admin_jobs')
     .update({
-      log: supabase.rpc('coalesce', { args: ['log', ''] }), // placeholder; Supabase doesn't support this directly
-    })
-    .eq('id', jobId);
-  // Simpler: overwrite log each time (safe enough for local runner)
-  await supabase
-    .from('admin_jobs')
-    .update({
-      log: message,
+      log: next,
     })
     .eq('id', jobId);
 }
