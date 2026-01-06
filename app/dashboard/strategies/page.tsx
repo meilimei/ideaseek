@@ -34,8 +34,11 @@ function formatDate(value: string | null) {
 export default async function DashboardStrategiesPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined };
+  searchParams?:
+    | { [key: string]: string | string[] | undefined }
+    | Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -62,7 +65,8 @@ export default async function DashboardStrategiesPage({
   }
 
   const strategies = (data ?? []) as StrategyRow[];
-  const toast = typeof searchParams?.toast === 'string' ? searchParams.toast : null;
+  const toast =
+    typeof resolvedSearchParams?.toast === 'string' ? resolvedSearchParams.toast : null;
 
   return (
     <div className="space-y-6">

@@ -21,6 +21,16 @@ export default async function EditStrategyPage({
 }: {
   params: { id: string };
 }) {
+  const strategyId = params?.id;
+  const isUuid =
+    typeof strategyId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      strategyId,
+    );
+  if (!isUuid) {
+    return notFound();
+  }
+
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -36,7 +46,7 @@ export default async function EditStrategyPage({
   const { data, error } = await supabase
     .from('ingest_strategies')
     .select('id, name, source, description, is_active, cron_expr, config')
-    .eq('id', params.id)
+    .eq('id', strategyId)
     .eq('created_by', user.id)
     .is('deleted_at', null)
     .maybeSingle();

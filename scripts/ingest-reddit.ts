@@ -46,6 +46,7 @@ type RedditPost = {
   url: string;
   subreddit: string;
   created_utc?: number;
+  created_at_ms?: number | null;
 };
 
 type RedditListingChild = {
@@ -58,6 +59,7 @@ type RedditListingChild = {
     permalink?: string;
     subreddit: string;
     created_utc?: number;
+    created?: number;
   };
 };
 
@@ -78,6 +80,7 @@ type PullpushPost = {
   url?: string;
   subreddit?: string;
   created_utc?: number;
+  created?: number;
 };
 
 type PullpushResponse = {
@@ -220,6 +223,7 @@ const PAIN_KEYWORDS = [
   'pain',
   'can’t figure out',
 ];
+const DEFAULT_KEYWORDS = PAIN_KEYWORDS;
 
 const DEFAULT_SUBREDDITS = [
   'startups',
@@ -228,16 +232,121 @@ const DEFAULT_SUBREDDITS = [
   'SaaS',
 ];
 
-const REDDIT_HEADERS = {
-  'User-Agent': 'ideasignal-bot/0.1 by meilimei',
-  Accept: 'application/json',
+type RedditSort = 'top' | 'hot' | 'new';
+type RedditTimeRange = 'day' | 'week' | 'month';
+
+const REDDIT_BASE_URLS = [
+  'https://api.reddit.com',
+  'https://old.reddit.com',
+  'https://www.reddit.com',
+];
+
+type SubredditFetchError = {
+  subreddit: string;
+  status?: number;
+  message: string;
 };
+
+function getErrorStatus(err: unknown): number | undefined {
+  return typeof err === 'object' && err && 'status' in err
+    ? (err as { status?: number }).status
+    : undefined;
+}
+
+async function markAdminJobFailed(message: string) {
+  if (!jobId) return;
+  const nowIso = new Date().toISOString();
+  const { error } = await supabaseServiceClient
+    .from('admin_jobs')
+    .update({ status: 'error', error: message, log: message, finished_at: nowIso })
+    .eq('id', jobId);
+  if (error) {
+    console.error('Failed to update admin_jobs status:', error.message);
+  }
+}
+
+async function loadStrategyConfig(strategyId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabaseServiceClient
+    .from('ingest_strategies')
+    .select('config')
+    .eq('id', strategyId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to load strategy config:', error.message);
+    return null;
+  }
+
+  const config = data?.config;
+  if (config && typeof config === 'object' && !Array.isArray(config)) {
+    return config as Record<string, unknown>;
+  }
+
+  return null;
+}
+
+async function fetchRedditListingJson(
+  sub: string,
+  sort: RedditSort,
+  perSubreddit: number,
+  timeRange: RedditTimeRange,
+): Promise<{ json: RedditListingResponse; baseUrl: string }> {
+  let lastError: unknown;
+  for (const baseUrl of REDDIT_BASE_URLS) {
+    const url = `${baseUrl}/r/${sub}/${sort}.json?limit=${perSubreddit}&raw_json=1&t=${timeRange}`;
+    try {
+      const json = await fetchJsonWithRetry<RedditListingResponse>(url);
+      console.log(`Using ${baseUrl} for r/${sub}`);
+      return { json, baseUrl };
+    } catch (err) {
+      lastError = err;
+      const status = getErrorStatus(err);
+      const shouldFallback =
+        status === 403 || status === 429 || (typeof status === 'number' && status >= 500);
+      if (!shouldFallback) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to fetch listing for r/${sub}`);
+}
 
 const FETCH_TIMEOUT_MS = 15_000;
 const FETCH_RETRIES = 2;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+let cachedRedditHeaders: Record<string, string> | null = null;
+let warnedMissingUserAgent = false;
+
+function buildRedditHeaders() {
+  if (cachedRedditHeaders) return cachedRedditHeaders;
+  const userAgent = process.env.REDDIT_USER_AGENT?.trim();
+  if (!userAgent) {
+    if (!warnedMissingUserAgent) {
+      console.warn(
+        'Missing REDDIT_USER_AGENT. Set it to avoid 403 and anonymous blocks.',
+      );
+      warnedMissingUserAgent = true;
+    }
+    throw new Error('Missing REDDIT_USER_AGENT');
+  }
+  cachedRedditHeaders = {
+    'User-Agent': userAgent,
+    Accept: 'application/json',
+    'Accept-Language': 'en-US,en;q=0.9',
+  };
+  return cachedRedditHeaders;
+}
+
+function toEpochMs(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(parsed)) return null;
+  return parsed < 1e12 ? parsed * 1000 : parsed;
 }
 
 type RedditSignals = {
@@ -272,7 +381,7 @@ function applySignalsFilter(
   posts: RedditPost[],
   signals: RedditSignals,
 ): { filtered: RedditPost[]; breakdown: SignalsBreakdown } {
-  const nowSeconds = Date.now() / 1000;
+  const nowMs = Date.now();
   const filtered: RedditPost[] = [];
   const breakdown: SignalsBreakdown = {
     total: posts.length,
@@ -287,13 +396,13 @@ function applySignalsFilter(
   for (const post of posts) {
     const score = post.score ?? 0;
     const comments = post.num_comments ?? 0;
-    const createdUtc = Number(post.created_utc);
-    if (!Number.isFinite(createdUtc) || createdUtc <= 0) {
+    const createdAtMs = post.created_at_ms ?? toEpochMs(post.created_utc);
+    if (!createdAtMs || !Number.isFinite(createdAtMs) || createdAtMs <= 0) {
       breakdown.dropped_missing_time += 1;
       breakdown.dropped_total += 1;
       continue;
     }
-    const ageDays = (nowSeconds - createdUtc) / 86400;
+    const ageDays = (nowMs - createdAtMs) / 86400000;
     if (ageDays > signals.maxAgeDays) {
       breakdown.dropped_too_old += 1;
       breakdown.dropped_total += 1;
@@ -322,6 +431,7 @@ async function fetchJsonWithRetry<T = unknown>(
   retries = FETCH_RETRIES,
 ): Promise<T> {
   let lastError: unknown;
+  const headers = buildRedditHeaders();
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -331,7 +441,7 @@ async function fetchJsonWithRetry<T = unknown>(
         ...options,
         signal: controller.signal,
         headers: {
-          ...REDDIT_HEADERS,
+          ...headers,
           ...(options.headers ?? {}),
         },
       });
@@ -339,7 +449,9 @@ async function fetchJsonWithRetry<T = unknown>(
       clearTimeout(timeout);
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const error = new Error(`HTTP ${res.status}`);
+        (error as Error & { status?: number }).status = res.status;
+        throw error;
       }
 
       return (await res.json()) as T;
@@ -352,7 +464,15 @@ async function fetchJsonWithRetry<T = unknown>(
         err instanceof Error ? err.message : err,
       );
       if (!isLastAttempt) {
-        await sleep(500 * (attempt + 1));
+        const status = getErrorStatus(err);
+        if (status === 403) {
+          const delays = [2000, 5000, 10000];
+          await sleep(delays[attempt] ?? 10000);
+        } else {
+          const baseDelay = 500 * (attempt + 1);
+          const extraDelay = status === 429 ? 400 * attempt : 0;
+          await sleep(baseDelay + extraDelay);
+        }
       }
     }
   }
@@ -364,20 +484,22 @@ async function fetchJsonWithRetry<T = unknown>(
 
 async function fetchRedditPosts(
   subreddits = DEFAULT_SUBREDDITS,
-  perSubreddit = 25
-): Promise<RedditPost[]> {
-  const all: RedditPost[] = [];
-
-  for (const sub of subreddits) {
-    const redditUrl = `https://www.reddit.com/r/${sub}/top.json?limit=${perSubreddit}&t=day&raw_json=1`;
-    console.log(`Fetching ${redditUrl}`);
-
+  perSubreddit = 25,
+  sort: RedditSort = 'top',
+  timeRange: RedditTimeRange = 'day',
+  timeRangeSeconds = 86400,
+): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
+  const fetchOneSubreddit = async (sub: string) => {
+    const posts: RedditPost[] = [];
+    let listingStatus: number | undefined;
+    let listingMessage = '';
     try {
-      const json = await fetchJsonWithRetry<RedditListingResponse>(redditUrl);
+      const { json } = await fetchRedditListingJson(sub, sort, perSubreddit, timeRange);
       const children: RedditListingChild[] = json.data?.children ?? [];
 
       for (const child of children) {
         const d = child.data;
+        const createdAtMs = toEpochMs(d.created_utc ?? d.created);
         const post: RedditPost = {
           id: d.id,
           title: d.title,
@@ -387,24 +509,31 @@ async function fetchRedditPosts(
           url: `https://www.reddit.com${d.permalink}`,
           subreddit: d.subreddit,
           created_utc: d.created_utc,
+          created_at_ms: createdAtMs,
         };
-        all.push(post);
+        posts.push(post);
       }
-      continue;
+      return { posts };
     } catch (err) {
       console.warn(
-        `Primary Reddit fetch failed for r/${sub}, trying fallback:`,
+        `Reddit listing fetch failed for r/${sub}, trying fallback:`,
         err instanceof Error ? err.message : err,
       );
+      listingStatus = getErrorStatus(err);
+      listingMessage = err instanceof Error ? err.message : String(err);
     }
 
     // Fallback: use Pushshift mirror (api.pullpush.io) when direct Reddit fetch fails/blocked
-    const fallbackUrl = `https://api.pullpush.io/reddit/search/submission/?subreddit=${encodeURIComponent(sub)}&sort=desc&sort_type=score&t=day&size=${perSubreddit}`;
+    const fallbackSortType = sort === 'new' ? 'created_utc' : 'score';
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const after = Math.max(0, nowSeconds - timeRangeSeconds);
+    const fallbackUrl = `https://api.pullpush.io/reddit/search/submission/?subreddit=${encodeURIComponent(sub)}&sort=desc&sort_type=${fallbackSortType}&after=${after}&before=${nowSeconds}&size=${perSubreddit}`;
     try {
       const json = await fetchJsonWithRetry<PullpushResponse>(fallbackUrl);
       const data: PullpushPost[] = Array.isArray(json.data) ? json.data : [];
 
       for (const d of data) {
+        const createdAtMs = toEpochMs(d.created_utc ?? d.created);
         const post: RedditPost = {
           id: d.id,
           title: d.title ?? '',
@@ -416,28 +545,66 @@ async function fetchRedditPosts(
             : d.full_link ?? d.url ?? '',
           subreddit: d.subreddit ?? sub,
           created_utc: d.created_utc,
+          created_at_ms: createdAtMs,
         };
-        all.push(post);
+        posts.push(post);
       }
     } catch (fallbackErr) {
+      const fallbackMessage =
+        fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      const status = getErrorStatus(fallbackErr) ?? listingStatus;
       console.error(
         `Fallback fetch failed for r/${sub}:`,
-        fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
+        fallbackMessage,
       );
+      return {
+        posts: [],
+        error: {
+          subreddit: sub,
+          status,
+          message: fallbackMessage || listingMessage,
+        },
+      };
+    }
+
+    return { posts };
+  };
+
+  const all: RedditPost[] = [];
+  const errors: SubredditFetchError[] = [];
+  for (let i = 0; i < subreddits.length; i += 1) {
+    const sub = subreddits[i];
+    try {
+      const result = await fetchOneSubreddit(sub);
+      all.push(...result.posts);
+      if (result.error) {
+        errors.push(result.error);
+      }
+    } catch (err) {
+      console.error('Subreddit fetch failed:', err instanceof Error ? err.message : err);
+      errors.push({
+        subreddit: sub,
+        status: getErrorStatus(err),
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+    if (i < subreddits.length - 1) {
+      const jitterMs = 600 + Math.floor(Math.random() * 601);
+      await sleep(jitterMs);
     }
   }
 
-  return all;
+  return { posts: all, errors };
 }
 
 // 简单过滤：分数 + 关键词
-function filterPainfulPosts(posts: RedditPost[]): RedditPost[] {
+function filterPainfulPosts(posts: RedditPost[], keywords: string[]): RedditPost[] {
   const minScore = 10; // 可以调
   return posts.filter((p) => {
     const text = (p.title + ' ' + p.selftext).toLowerCase();
     if (p.score < minScore) return false;
 
-    return PAIN_KEYWORDS.some((kw) => text.includes(kw));
+    return keywords.some((kw) => text.includes(kw));
   });
 }
 
@@ -567,11 +734,21 @@ async function main() {
 
   ensureEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
 
-  let strategyConfig: Record<string, unknown> | null = null;
+  let envStrategyConfig: Record<string, unknown> | null = null;
   const strategyConfigRaw = process.env.INGEST_STRATEGY_CONFIG;
   if (strategyConfigRaw) {
     try {
-      strategyConfig = JSON.parse(strategyConfigRaw) as Record<string, unknown>;
+      let parsed: unknown = JSON.parse(strategyConfigRaw);
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // keep string as-is
+        }
+      }
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        envStrategyConfig = parsed as Record<string, unknown>;
+      }
     } catch (err) {
       console.warn(
         'Failed to parse INGEST_STRATEGY_CONFIG, using defaults:',
@@ -580,13 +757,104 @@ async function main() {
     }
   }
 
+  const strategyId = process.env.INGEST_STRATEGY_ID?.trim() || '';
+  const dbStrategyConfig = strategyId ? await loadStrategyConfig(strategyId) : null;
+  const strategyConfig = {
+    ...(dbStrategyConfig ?? {}),
+    ...(envStrategyConfig ?? {}),
+  } as Record<string, unknown>;
+  if (strategyId && !dbStrategyConfig) {
+    console.warn(`No strategy config found in DB for ${strategyId}, using env/defaults.`);
+  }
+
+  const cfg = strategyConfig;
+  const cfgTrack = typeof cfg.track === 'string' ? cfg.track.trim() : '';
+  const cfgSubreddits = Array.isArray(cfg.subreddits)
+    ? cfg.subreddits
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter(Boolean)
+    : null;
+  const cfgKeywords = Array.isArray(cfg.keywords)
+    ? cfg.keywords
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter(Boolean)
+    : null;
+  const cfgSortRaw = typeof cfg.sort === 'string' ? cfg.sort.toLowerCase() : '';
+  const cfgSort: RedditSort =
+    cfgSortRaw === 'top' || cfgSortRaw === 'hot' || cfgSortRaw === 'new'
+      ? cfgSortRaw
+      : 'top';
+  const cfgTimeRangeRaw =
+    typeof cfg.timeRange === 'string' ? cfg.timeRange.toLowerCase() : '';
+  const cfgTimeRange: RedditTimeRange =
+    cfgTimeRangeRaw === 'day' || cfgTimeRangeRaw === 'week' || cfgTimeRangeRaw === 'month'
+      ? cfgTimeRangeRaw
+      : 'day';
+  const cfgLimitRaw = Number(cfg.limit);
+  const cfgLimit = Number.isFinite(cfgLimitRaw) ? cfgLimitRaw : 25;
+  const timeRangeSeconds =
+    cfgTimeRange === 'day'
+      ? 86400
+      : cfgTimeRange === 'week'
+        ? 7 * 86400
+        : 30 * 86400;
+  const subreddits = cfgSubreddits?.length ? cfgSubreddits : DEFAULT_SUBREDDITS;
+  const keywords = (cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS).map((keyword) =>
+    keyword.toLowerCase(),
+  );
+
+  console.log(`Track: ${cfgTrack || '-'}`);
+  console.log(`Subreddits: ${subreddits.join(', ')}`);
+  console.log(`Keywords: ${keywords.length}`);
+  console.log(`Sort: ${cfgSort} timeRange: ${cfgTimeRange} limit: ${cfgLimit}`);
+
   const signals = parseSignals(strategyConfig);
   console.log(
     `Signals: minUpvotes=${signals.minUpvotes} minComments=${signals.minComments} maxAgeDays=${signals.maxAgeDays}`,
   );
 
-  const posts = await fetchRedditPosts();
+  const { posts, errors } = await fetchRedditPosts(
+    subreddits,
+    cfgLimit,
+    cfgSort,
+    cfgTimeRange,
+    timeRangeSeconds,
+  );
   console.log(`Fetched ${posts.length} posts`);
+  if (posts.length === 0 && errors.length > 0) {
+    const summary = errors
+      .map((err) => {
+        const status = err.status ? `HTTP ${err.status}` : 'error';
+        const message = err.message ? ` ${err.message}` : '';
+        return `${err.subreddit}: ${status}${message}`;
+      })
+      .join('; ');
+    console.error(`Fetch failures: ${summary}`);
+    await markAdminJobFailed(`Reddit fetch failed: ${summary}`);
+    process.exit(1);
+    return;
+  }
+  if (posts.length === 0) {
+    console.log(
+      'No posts fetched (likely HTTP 403). Configure REDDIT_USER_AGENT or enable OAuth.',
+    );
+    return;
+  }
+  if (process.env.DEBUG_REDDIT === '1') {
+    let shown = 0;
+    for (const post of posts) {
+      const createdAtMs = post.created_at_ms ?? toEpochMs(post.created_utc);
+      if (!createdAtMs) continue;
+      const ageDays = (Date.now() - createdAtMs) / 86400000;
+      const title =
+        post.title.length > 80 ? `${post.title.slice(0, 77)}...` : post.title;
+      console.log(
+        `DEBUG prefilter: r/${post.subreddit} "${title}" ${new Date(createdAtMs).toISOString()} ageDays=${ageDays.toFixed(1)}`,
+      );
+      shown += 1;
+      if (shown >= 3) break;
+    }
+  }
 
   const { filtered: signalFiltered, breakdown } = applySignalsFilter(posts, signals);
   console.log(`After signals filter: ${signalFiltered.length}`);
@@ -596,7 +864,7 @@ async function main() {
       `low_upvotes=${breakdown.dropped_low_upvotes} low_comments=${breakdown.dropped_low_comments}]`,
   );
 
-  const filtered = filterPainfulPosts(signalFiltered);
+  const filtered = filterPainfulPosts(signalFiltered, keywords);
   console.log(`After pain filter: ${filtered.length}`);
 
   if (filtered.length === 0) {
