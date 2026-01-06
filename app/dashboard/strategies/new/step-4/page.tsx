@@ -69,20 +69,24 @@ export default function StrategyStep4Page() {
   }, [draft]);
 
   const configText = useMemo(() => JSON.stringify(configPayload, null, 2), [configPayload]);
+  const mode = searchParams.get('mode') || '';
+  const strategyId = searchParams.get('strategyId') || '';
+  const isEdit =
+    mode === 'edit' ||
+    (pathname ? pathname.startsWith('/dashboard/strategies/edit') : false);
+  const basePath = isEdit ? '/dashboard/strategies/edit' : '/dashboard/strategies/new';
+  const qp = useMemo(() => {
+    const params = new URLSearchParams();
+    if (mode) params.set('mode', mode);
+    if (strategyId) params.set('strategyId', strategyId);
+    return params;
+  }, [mode, strategyId]);
   const backHref = useMemo(() => {
-    const mode = searchParams.get('mode') || '';
-    const strategyId = searchParams.get('strategyId') || '';
-    const isEdit =
-      mode === 'edit' || (pathname ? pathname.startsWith('/dashboard/strategies/edit') : false);
-    const basePath = isEdit ? '/dashboard/strategies/edit' : '/dashboard/strategies/new';
-    const qp = new URLSearchParams();
-    if (mode) qp.set('mode', mode);
-    if (strategyId) qp.set('strategyId', strategyId);
     const query = qp.toString();
     return `${basePath}/step-3${query ? `?${query}` : ''}`;
-  }, [pathname, searchParams]);
+  }, [basePath, qp]);
 
-  const handleCreate = () => {
+  const handleSubmit = () => {
     setError(null);
     const trimmedName = draft.name?.trim() ?? '';
     if (!trimmedName) {
@@ -97,29 +101,58 @@ export default function StrategyStep4Page() {
     const cronExpr = draft.cron?.trim() || weeklyCron;
 
     startTransition(async () => {
-      const result = await createStrategy({
-        name: trimmedName,
-        source: draft.source,
-        description: draft.description?.trim() || null,
-        isActive: draft.active ?? true,
-        cronExpr,
-        configText,
-      });
+      if (isEdit && strategyId) {
+        try {
+          const res = await fetch(`/api/strategies/${encodeURIComponent(strategyId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: trimmedName,
+              source: draft.source,
+              description: draft.description?.trim() || null,
+              isActive: draft.active ?? true,
+              cronExpr,
+              configText,
+            }),
+          });
+          if (!res.ok) {
+            const json = await res.json().catch(() => null);
+            setError(json?.error || 'Failed to update strategy.');
+            return;
+          }
+          resetDraft();
+          router.push('/dashboard/strategies');
+          router.refresh();
+          return;
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to update strategy.');
+          return;
+        }
+      } else {
+        const result = await createStrategy({
+          name: trimmedName,
+          source: draft.source,
+          description: draft.description?.trim() || null,
+          isActive: draft.active ?? true,
+          cronExpr,
+          configText,
+        });
 
-      if (!result || !result.ok) {
-        setError(result?.error || 'Failed to create strategy.');
-        return;
+        if (!result || !result.ok) {
+          setError(result?.error || 'Failed to create strategy.');
+          return;
+        }
+
+        resetDraft();
+        router.push('/dashboard/strategies');
+        router.refresh();
       }
-
-      resetDraft();
-      router.push('/dashboard/strategies');
-      router.refresh();
     });
   };
 
   return (
     <WizardShell
-      title="Create Strategy"
+      title={isEdit ? 'Edit Strategy' : 'Create Strategy'}
       step={4}
       backHref={backHref}
       disableNext
@@ -166,8 +199,14 @@ export default function StrategyStep4Page() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" size="sm" onClick={handleCreate} disabled={isPending}>
-            {isPending ? 'Creating...' : 'Create strategy'}
+          <Button type="button" size="sm" onClick={handleSubmit} disabled={isPending}>
+            {isPending
+              ? isEdit
+                ? 'Updating...'
+                : 'Creating...'
+              : isEdit
+                ? 'Update strategy'
+                : 'Create strategy'}
           </Button>
           {error && <span className="text-sm text-destructive">{error}</span>}
         </div>
