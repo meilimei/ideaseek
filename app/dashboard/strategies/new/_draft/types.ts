@@ -1,4 +1,5 @@
 export type StrategyDraft = {
+  strategyId?: string;
   name?: string;
   source?: 'reddit' | 'youtube' | 'trends';
   track?: string;

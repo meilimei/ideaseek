@@ -332,7 +332,9 @@ function buildRedditHeaders() {
       );
       warnedMissingUserAgent = true;
     }
-    throw new Error('Missing REDDIT_USER_AGENT');
+    throw new Error(
+      'REDDIT_USER_AGENT must be set (e.g. IdeaSeek/0.1 by u/<your_reddit_username>)',
+    );
   }
   cachedRedditHeaders = {
     'User-Agent': userAgent,
@@ -383,6 +385,7 @@ function applySignalsFilter(
 ): { filtered: RedditPost[]; breakdown: SignalsBreakdown } {
   const nowMs = Date.now();
   const filtered: RedditPost[] = [];
+  let debugTimeLogs = 0;
   const breakdown: SignalsBreakdown = {
     total: posts.length,
     kept: 0,
@@ -396,13 +399,20 @@ function applySignalsFilter(
   for (const post of posts) {
     const score = post.score ?? 0;
     const comments = post.num_comments ?? 0;
-    const createdAtMs = post.created_at_ms ?? toEpochMs(post.created_utc);
+    const rawCreated = post.created_utc;
+    const createdAtMs = post.created_at_ms ?? toEpochMs(rawCreated);
     if (!createdAtMs || !Number.isFinite(createdAtMs) || createdAtMs <= 0) {
       breakdown.dropped_missing_time += 1;
       breakdown.dropped_total += 1;
       continue;
     }
     const ageDays = (nowMs - createdAtMs) / 86400000;
+    if (process.env.DEBUG_REDDIT_TIME === '1' && debugTimeLogs < 3) {
+      console.log(
+        `DEBUG time: id=${post.id} raw=${rawCreated ?? 'n/a'} createdMs=${createdAtMs} ageDays=${ageDays.toFixed(2)}`,
+      );
+      debugTimeLogs += 1;
+    }
     if (ageDays > signals.maxAgeDays) {
       breakdown.dropped_too_old += 1;
       breakdown.dropped_total += 1;
@@ -449,8 +459,36 @@ async function fetchJsonWithRetry<T = unknown>(
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const error = new Error(`HTTP ${res.status}`);
-        (error as Error & { status?: number }).status = res.status;
+        const status = res.status;
+        // If 403 on primary host, try old.reddit.com once.
+        if (
+          status === 403 &&
+          typeof url === 'string' &&
+          url.includes('reddit.com') &&
+          !url.includes('old.reddit.com')
+        ) {
+          clearTimeout(timeout);
+          const retryUrl = new URL(url);
+          retryUrl.host = 'old.reddit.com';
+          const resOld = await fetch(retryUrl.toString(), {
+            ...options,
+            signal: controller.signal,
+            headers: {
+              ...headers,
+              ...(options.headers ?? {}),
+            },
+          });
+          if (resOld.ok) {
+            clearTimeout(timeout);
+            return (await resOld.json()) as T;
+          }
+          const errorOld = new Error(`HTTP ${resOld.status}`);
+          (errorOld as Error & { status?: number }).status = resOld.status;
+          throw errorOld;
+        }
+
+        const error = new Error(`HTTP ${status}`);
+        (error as Error & { status?: number }).status = status;
         throw error;
       }
 

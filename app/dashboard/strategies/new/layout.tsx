@@ -1,3 +1,4 @@
+import DraftPrefill from './_components/DraftPrefill';
 import { DraftProvider } from './_draft/context';
 
 export default function StrategyWizardLayout({
@@ -5,5 +6,9 @@ export default function StrategyWizardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DraftProvider>{children}</DraftProvider>;
+  return (
+    <DraftProvider>
+      <DraftPrefill>{children}</DraftPrefill>
+    </DraftProvider>
+  );
 }
