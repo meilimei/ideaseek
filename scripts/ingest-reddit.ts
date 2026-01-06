@@ -875,7 +875,9 @@ async function main() {
         ? (jobPayload as any)?.strategy_id
         : typeof (jobPayload as any)?.strategyKey === 'string'
           ? (jobPayload as any)?.strategyKey
-          : '')?.trim() || '';
+          : typeof (jobPayload as any)?.strategy_key === 'string'
+            ? (jobPayload as any)?.strategy_key
+            : '')?.trim() || '';
 
   const strategyId =
     payloadStrategyId ||
@@ -887,7 +889,7 @@ async function main() {
     (dbStrategyConfigRaw && typeof dbStrategyConfigRaw === 'object' && !Array.isArray(dbStrategyConfigRaw)
       ? (dbStrategyConfigRaw as Record<string, unknown>)
       : null);
-  const strategyConfig = {
+  const cfg = {
     ...(dbStrategyConfig ?? {}),
     ...(envStrategyConfig ?? {}),
     ...(jobConfig ?? {}),
@@ -896,7 +898,6 @@ async function main() {
     console.warn(`No strategy config found in DB for ${strategyId}, using env/defaults.`);
   }
 
-  const cfg = strategyConfig as Record<string, unknown>;
   const cfgTrack = typeof cfg.track === 'string' ? cfg.track.trim() : '';
   const rawSubs = (cfg as any)?.subreddits;
   const explicitSubreddits = coerceStringArray(rawSubs)
@@ -947,10 +948,16 @@ async function main() {
   );
 
   console.log(`Track: ${cfgTrack || '-'}`);
+  const configSourceLabel = jobConfig
+    ? 'job.payload.config'
+    : dbStrategyConfig
+      ? 'strategy.config'
+      : 'none';
   console.log(
-    `[reddit][debug] configSource=${jobConfig ? 'job.payload.config' : dbStrategyConfig ? 'strategy.config' : 'none'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} rawSubs=${JSON.stringify(
-      rawSubs,
-    )} explicitSubs=${explicitSubreddits.join(',')}`,
+    `[reddit][cfg] jobId=${jobId ?? 'none'} strategyId=${strategyId || '-'} payloadStrategyId=${payloadStrategyId || '-'} ` +
+      `jobHasConfig=${jobConfig ? '1' : '0'} dbHasConfig=${dbStrategyConfig ? '1' : '0'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} subs=${explicitSubreddits.join(
+        ',',
+      )}`,
   );
   console.log(
     `[reddit] resolved subreddits source=${subredditsSource} track=${cfgTrack || '-'} subs=${subreddits.join(
@@ -962,13 +969,9 @@ async function main() {
 
   const signals = parseSignals(cfg);
   console.log(
-    `Signals: minUpvotes=${signals.minUpvotes} minComments=${signals.minComments} maxAgeDays=${signals.maxAgeDays}`,
-  );
-  console.log(
-    `[reddit][cfg] jobId=${jobId ?? 'none'} strategyId=${strategyId || '-'} payloadStrategyId=${payloadStrategyId || '-'} ` +
-      `jobHasConfig=${jobConfig ? '1' : '0'} dbHasConfig=${dbStrategyConfig ? '1' : '0'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} subs=${explicitSubreddits.join(
-        ',',
-      )}`,
+    `Signals: minUpvotes=${signals.minUpvotes} minComments=${signals.minComments} maxAgeDays=${signals.maxAgeDays}` +
+      ` | strategyId=${strategyId || '-'} | configSource=${configSourceLabel}` +
+      ` | subredditsSource=${subredditsSource} subs=${subreddits.join(',')}`,
   );
 
   const { posts, errors } = await fetchRedditPosts(
@@ -978,7 +981,14 @@ async function main() {
     cfgTimeRange,
     timeRangeSeconds,
   );
-  console.log(`Fetched ${posts.length} posts`);
+  let timeSample = '';
+  if (posts.length > 0) {
+    const p = posts[0];
+    const createdMs = p.created_at_ms ?? toEpochMs(p.created_utc);
+    const ageDays = createdMs ? (Date.now() - createdMs) / 86400000 : null;
+    timeSample = ` sample(raw=${p.created_utc ?? 'n/a'} createdMs=${createdMs ?? 'n/a'} ageDays=${ageDays !== null ? ageDays.toFixed(2) : 'n/a'})`;
+  }
+  console.log(`Fetched ${posts.length} posts${timeSample}`);
   if (posts.length === 0 && errors.length > 0) {
     const summary = errors
       .map((err) => {
