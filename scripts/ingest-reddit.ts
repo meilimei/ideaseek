@@ -26,6 +26,16 @@ const RUN_FILE =
 console.log(
   `[env] reddit_user_agent_present=${process.env.REDDIT_USER_AGENT ? '1' : '0'} envPath=${envPathUsed} loadedKeys=${loadedCount}`,
 );
+type RedditFetchMode = 'auto' | 'fallback-only';
+const fetchMode: RedditFetchMode =
+  process.env.REDDIT_FETCH_MODE === 'fallback-only'
+    ? 'fallback-only'
+    : process.env.REDDIT_FETCH_MODE === 'auto'
+      ? 'auto'
+      : process.env.GITHUB_ACTIONS === 'true'
+        ? 'fallback-only'
+        : 'auto';
+console.log(`[reddit] fetchMode=${fetchMode}`);
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);
@@ -402,13 +412,15 @@ function buildRedditHeaders() {
   if (!userAgent) {
     if (!warnedMissingUserAgent) {
       console.warn(
-        'Missing REDDIT_USER_AGENT. Set it to avoid 403 and anonymous blocks.',
+        'Missing REDDIT_USER_AGENT. Set it to avoid 403 and anonymous blocks. Continuing without it.',
       );
       warnedMissingUserAgent = true;
     }
-    throw new Error(
-      'REDDIT_USER_AGENT must be set (e.g. IdeaSeek/0.1 by u/<your_reddit_username>)',
-    );
+    cachedRedditHeaders = {
+      Accept: 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
+    return cachedRedditHeaders;
   }
   cachedRedditHeaders = {
     'User-Agent': userAgent,
@@ -614,46 +626,52 @@ async function fetchRedditPosts(
   sort: RedditSort = 'top',
   timeRange: RedditTimeRange = 'day',
   timeRangeSeconds = 86400,
+  maxAgeDays = 7,
+  mode: RedditFetchMode = 'auto',
 ): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
   const fetchOneSubreddit = async (sub: string) => {
     const posts: RedditPost[] = [];
     let listingStatus: number | undefined;
     let listingMessage = '';
-    try {
-      const { json } = await fetchRedditListingJson(sub, sort, perSubreddit, timeRange);
-      const children: RedditListingChild[] = json.data?.children ?? [];
+    if (mode !== 'fallback-only') {
+      try {
+        const { json } = await fetchRedditListingJson(sub, sort, perSubreddit, timeRange);
+        const children: RedditListingChild[] = json.data?.children ?? [];
 
-      for (const child of children) {
-        const d = child.data;
-        const createdAtMs = toEpochMs(d.created_utc ?? d.created);
-        const post: RedditPost = {
-          id: d.id,
-          title: d.title,
-          selftext: d.selftext ?? '',
-          score: d.score ?? 0,
-          num_comments: d.num_comments ?? 0,
-          url: `https://www.reddit.com${d.permalink}`,
-          subreddit: d.subreddit,
-          created_utc: d.created_utc,
-          created_at_ms: createdAtMs,
-        };
-        posts.push(post);
+        for (const child of children) {
+          const d = child.data;
+          const createdAtMs = toEpochMs(d.created_utc ?? d.created);
+          const post: RedditPost = {
+            id: d.id,
+            title: d.title,
+            selftext: d.selftext ?? '',
+            score: d.score ?? 0,
+            num_comments: d.num_comments ?? 0,
+            url: `https://www.reddit.com${d.permalink}`,
+            subreddit: d.subreddit,
+            created_utc: d.created_utc,
+            created_at_ms: createdAtMs,
+          };
+          posts.push(post);
+        }
+        return { posts };
+      } catch (err) {
+        console.warn(
+          `Reddit listing fetch failed for r/${sub}, trying fallback:`,
+          err instanceof Error ? err.message : err,
+        );
+        listingStatus = getErrorStatus(err);
+        listingMessage = err instanceof Error ? err.message : String(err);
       }
-      return { posts };
-    } catch (err) {
-      console.warn(
-        `Reddit listing fetch failed for r/${sub}, trying fallback:`,
-        err instanceof Error ? err.message : err,
-      );
-      listingStatus = getErrorStatus(err);
-      listingMessage = err instanceof Error ? err.message : String(err);
     }
 
     // Fallback: use Pushshift mirror (api.pullpush.io) when direct Reddit fetch fails/blocked
-    const fallbackSortType = sort === 'new' ? 'created_utc' : 'score';
+    const fallbackSortType = 'created_utc';
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const after = Math.max(0, nowSeconds - timeRangeSeconds);
+    const minWindow = Math.max(timeRangeSeconds, maxAgeDays * 86400, 7 * 86400);
+    const after = Math.max(0, nowSeconds - minWindow);
     const fallbackUrl = `https://api.pullpush.io/reddit/search/submission/?subreddit=${encodeURIComponent(sub)}&sort=desc&sort_type=${fallbackSortType}&after=${after}&before=${nowSeconds}&size=${perSubreddit}`;
+    console.log(`Fallback pullpush: r/${sub} after=${after} size=${perSubreddit}`);
     try {
       const json = await fetchJsonWithRetry<PullpushResponse>(fallbackUrl);
       const data: PullpushPost[] = Array.isArray(json.data) ? json.data : [];
@@ -674,6 +692,40 @@ async function fetchRedditPosts(
           created_at_ms: createdAtMs,
         };
         posts.push(post);
+      }
+      if (posts.length === 0) {
+        const after2 = Math.max(0, nowSeconds - 30 * 86400);
+        const fallbackUrl2 = `https://api.pullpush.io/reddit/search/submission/?subreddit=${encodeURIComponent(sub)}&sort=desc&sort_type=${fallbackSortType}&after=${after2}&before=${nowSeconds}&size=${perSubreddit}`;
+        console.log(`Fallback pullpush retry: r/${sub} after=${after2} size=${perSubreddit}`);
+        const json2 = await fetchJsonWithRetry<PullpushResponse>(fallbackUrl2);
+        const data2: PullpushPost[] = Array.isArray(json2.data) ? json2.data : [];
+        for (const d of data2) {
+          const createdAtMs = toEpochMs(d.created_utc ?? d.created);
+          const post: RedditPost = {
+            id: d.id,
+            title: d.title ?? '',
+            selftext: d.selftext ?? '',
+            score: d.score ?? 0,
+            num_comments: d.num_comments ?? 0,
+            url: d.permalink
+              ? `https://www.reddit.com${d.permalink}`
+              : d.full_link ?? d.url ?? '',
+            subreddit: d.subreddit ?? sub,
+            created_utc: d.created_utc,
+            created_at_ms: createdAtMs,
+          };
+          posts.push(post);
+        }
+        if (posts.length === 0) {
+          return {
+            posts,
+            error: {
+              subreddit: sub,
+              status: 0,
+              message: `pullpush returned 0 results (after=${after}, after2=${after2})`,
+            },
+          };
+        }
       }
     } catch (fallbackErr) {
       const fallbackMessage =
@@ -1003,6 +1055,8 @@ async function main() {
     cfgSort,
     cfgTimeRange,
     timeRangeSeconds,
+    signals.maxAgeDays,
+    fetchMode,
   );
   let timeSample = '';
   if (posts.length > 0) {
