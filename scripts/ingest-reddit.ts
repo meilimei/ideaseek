@@ -1,5 +1,6 @@
 // scripts/ingest-reddit.ts
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { supabaseServiceClient } from '../lib/supabaseServiceClient';
@@ -14,6 +15,11 @@ const jobId = adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRa
 const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
 console.log(`ADMIN_JOB_ID: ${adminJobIdRaw ?? 'none'}`);
 console.log(`ADMIN_JOB_CREATED_BY: ${ownerId ?? 'none'}`);
+console.log(`[reddit][debug] marker=ingest-reddit.ts loaded ${new Date().toISOString()}`);
+const RUN_FILE =
+  typeof import.meta !== 'undefined' && import.meta.url
+    ? fileURLToPath(import.meta.url)
+    : '';
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);
@@ -109,6 +115,46 @@ function sanitizeEnglishArray(values: unknown): string[] | undefined {
     .map((v) => sanitizeEnglishText(v))
     .filter((v): v is string => Boolean(v));
   return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function parseMaybeJson<T = any>(value: any): T | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'object' && !Array.isArray(value)) return value as T;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    try {
+      return JSON.parse(trimmed) as T;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function coerceStringArray(input: unknown): string[] {
+  if (Array.isArray(input)) {
+    return input.map((v) => String(v));
+  }
+  if (typeof input === 'string') {
+    const s = input.trim();
+    if (!s) return [];
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed.map((v) => String(v));
+    } catch {
+      // fall through to split
+    }
+    return s
+      .split(/[\n,]+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeSubreddit(value: string) {
+  return value.replace(/^\/?r\//i, '').trim();
 }
 
 type SkipReason = 'source_url' | 'title';
@@ -277,12 +323,26 @@ async function loadStrategyConfig(strategyId: string): Promise<Record<string, un
     return null;
   }
 
-  const config = data?.config;
-  if (config && typeof config === 'object' && !Array.isArray(config)) {
-    return config as Record<string, unknown>;
+  return (data?.config as unknown) ?? null;
+}
+
+async function loadJobPayload(jobId: number): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabaseServiceClient
+    .from('admin_jobs')
+    .select('payload')
+    .eq('id', jobId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to load job payload:', error.message);
+    return null;
   }
 
-  return null;
+  const payload = data?.payload;
+  const parsedPayload = parseMaybeJson<Record<string, unknown>>(payload) ?? payload;
+  return parsedPayload && typeof parsedPayload === 'object' && !Array.isArray(parsedPayload)
+    ? (parsedPayload as Record<string, unknown>)
+    : null;
 }
 
 async function fetchRedditListingJson(
@@ -295,6 +355,13 @@ async function fetchRedditListingJson(
   for (const baseUrl of REDDIT_BASE_URLS) {
     const url = `${baseUrl}/r/${sub}/${sort}.json?limit=${perSubreddit}&raw_json=1&t=${timeRange}`;
     try {
+      if (!fetchMarkerLogged) {
+        console.log(
+          `[reddit][debug] marker=ACTIVE file=${RUN_FILE} cwd=${process.cwd()}`,
+        );
+        fetchMarkerLogged = true;
+      }
+      console.log(`Fetching ${url}`);
       const json = await fetchJsonWithRetry<RedditListingResponse>(url);
       console.log(`Using ${baseUrl} for r/${sub}`);
       return { json, baseUrl };
@@ -321,6 +388,7 @@ function sleep(ms: number) {
 
 let cachedRedditHeaders: Record<string, string> | null = null;
 let warnedMissingUserAgent = false;
+let fetchMarkerLogged = false;
 
 function buildRedditHeaders() {
   if (cachedRedditHeaders) return cachedRedditHeaders;
@@ -795,23 +863,45 @@ async function main() {
     }
   }
 
-  const strategyId = process.env.INGEST_STRATEGY_ID?.trim() || '';
-  const dbStrategyConfig = strategyId ? await loadStrategyConfig(strategyId) : null;
+  const jobPayload = jobId ? await loadJobPayload(jobId) : null;
+  const jobConfig =
+    parseMaybeJson<Record<string, unknown>>((jobPayload as any)?.config) ??
+    (jobPayload as any)?.config ??
+    null;
+  const payloadStrategyId =
+    (typeof (jobPayload as any)?.strategyId === 'string'
+      ? (jobPayload as any)?.strategyId
+      : typeof (jobPayload as any)?.strategy_id === 'string'
+        ? (jobPayload as any)?.strategy_id
+        : typeof (jobPayload as any)?.strategyKey === 'string'
+          ? (jobPayload as any)?.strategyKey
+          : '')?.trim() || '';
+
+  const strategyId =
+    payloadStrategyId ||
+    (process.env.INGEST_STRATEGY_ID?.trim() || '');
+
+  const dbStrategyConfigRaw = strategyId ? await loadStrategyConfig(strategyId) : null;
+  const dbStrategyConfig =
+    parseMaybeJson<Record<string, unknown>>(dbStrategyConfigRaw) ??
+    (dbStrategyConfigRaw && typeof dbStrategyConfigRaw === 'object' && !Array.isArray(dbStrategyConfigRaw)
+      ? (dbStrategyConfigRaw as Record<string, unknown>)
+      : null);
   const strategyConfig = {
     ...(dbStrategyConfig ?? {}),
     ...(envStrategyConfig ?? {}),
+    ...(jobConfig ?? {}),
   } as Record<string, unknown>;
-  if (strategyId && !dbStrategyConfig) {
+  if (strategyId && !dbStrategyConfigRaw) {
     console.warn(`No strategy config found in DB for ${strategyId}, using env/defaults.`);
   }
 
-  const cfg = strategyConfig;
+  const cfg = strategyConfig as Record<string, unknown>;
   const cfgTrack = typeof cfg.track === 'string' ? cfg.track.trim() : '';
-  const cfgSubreddits = Array.isArray(cfg.subreddits)
-    ? cfg.subreddits
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .filter(Boolean)
-    : null;
+  const rawSubs = (cfg as any)?.subreddits;
+  const explicitSubreddits = coerceStringArray(rawSubs)
+    .map(normalizeSubreddit)
+    .filter(Boolean);
   const cfgKeywords = Array.isArray(cfg.keywords)
     ? cfg.keywords
         .map((value) => (typeof value === 'string' ? value.trim() : ''))
@@ -836,19 +926,49 @@ async function main() {
       : cfgTimeRange === 'week'
         ? 7 * 86400
         : 30 * 86400;
-  const subreddits = cfgSubreddits?.length ? cfgSubreddits : DEFAULT_SUBREDDITS;
+  let subredditsSource: 'explicit' | 'track' | 'default' = 'default';
+  let subreddits: string[] = [];
+  if (explicitSubreddits.length > 0) {
+    subreddits = explicitSubreddits;
+    subredditsSource = 'explicit';
+  } else {
+    const trackSubs = coerceStringArray(null); // placeholder if track mapping added later
+    const normalizedTrackSubs = trackSubs.map(normalizeSubreddit).filter(Boolean);
+    if (normalizedTrackSubs.length > 0) {
+      subreddits = normalizedTrackSubs;
+      subredditsSource = 'track';
+    } else {
+      subreddits = DEFAULT_SUBREDDITS;
+      subredditsSource = 'default';
+    }
+  }
   const keywords = (cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS).map((keyword) =>
     keyword.toLowerCase(),
   );
 
   console.log(`Track: ${cfgTrack || '-'}`);
-  console.log(`Subreddits: ${subreddits.join(', ')}`);
+  console.log(
+    `[reddit][debug] configSource=${jobConfig ? 'job.payload.config' : dbStrategyConfig ? 'strategy.config' : 'none'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} rawSubs=${JSON.stringify(
+      rawSubs,
+    )} explicitSubs=${explicitSubreddits.join(',')}`,
+  );
+  console.log(
+    `[reddit] resolved subreddits source=${subredditsSource} track=${cfgTrack || '-'} subs=${subreddits.join(
+      ',',
+    )}`,
+  );
   console.log(`Keywords: ${keywords.length}`);
   console.log(`Sort: ${cfgSort} timeRange: ${cfgTimeRange} limit: ${cfgLimit}`);
 
-  const signals = parseSignals(strategyConfig);
+  const signals = parseSignals(cfg);
   console.log(
     `Signals: minUpvotes=${signals.minUpvotes} minComments=${signals.minComments} maxAgeDays=${signals.maxAgeDays}`,
+  );
+  console.log(
+    `[reddit][cfg] jobId=${jobId ?? 'none'} strategyId=${strategyId || '-'} payloadStrategyId=${payloadStrategyId || '-'} ` +
+      `jobHasConfig=${jobConfig ? '1' : '0'} dbHasConfig=${dbStrategyConfig ? '1' : '0'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} subs=${explicitSubreddits.join(
+        ',',
+      )}`,
   );
 
   const { posts, errors } = await fetchRedditPosts(
