@@ -8,7 +8,9 @@ import { recordJobOutputs } from './lib/jobOutputs';
 import { type IdeaForInsert } from './ingest-utils';
 
 // 1. 加载 .env.local（注意路径）
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+const envPathUsed = path.resolve(process.cwd(), '.env.local');
+const envResult = dotenv.config({ path: envPathUsed });
+const loadedCount = envResult.parsed ? Object.keys(envResult.parsed).length : 0;
 
 const adminJobIdRaw = process.env.ADMIN_JOB_ID?.trim();
 const jobId = adminJobIdRaw && /^\d+$/.test(adminJobIdRaw) ? Number(adminJobIdRaw) : null;
@@ -21,6 +23,9 @@ const RUN_FILE =
   typeof import.meta !== 'undefined' && import.meta.url
     ? fileURLToPath(import.meta.url)
     : '';
+console.log(
+  `[env] reddit_user_agent_present=${process.env.REDDIT_USER_AGENT ? '1' : '0'} envPath=${envPathUsed} loadedKeys=${loadedCount}`,
+);
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);
@@ -420,6 +425,20 @@ function toEpochMs(value: number | string | null | undefined): number | null {
   return parsed < 1e12 ? parsed * 1000 : parsed;
 }
 
+function isRedditUrl(url: string) {
+  try {
+    const host = new URL(url).host;
+    return (
+      host.endsWith('reddit.com') ||
+      host === 'api.reddit.com' ||
+      host === 'old.reddit.com' ||
+      host === 'www.reddit.com'
+    );
+  } catch {
+    return false;
+  }
+}
+
 type RedditSignals = {
   minUpvotes: number;
   minComments: number;
@@ -510,7 +529,7 @@ async function fetchJsonWithRetry<T = unknown>(
   retries = FETCH_RETRIES,
 ): Promise<T> {
   let lastError: unknown;
-  const headers = buildRedditHeaders();
+  const headers = isRedditUrl(url) ? buildRedditHeaders() : {};
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -854,8 +873,8 @@ async function main() {
         }
       }
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        envStrategyConfig = parsed as Record<string, unknown>;
-      }
+    envStrategyConfig = parsed as Record<string, unknown>;
+  }
     } catch (err) {
       console.warn(
         'Failed to parse INGEST_STRATEGY_CONFIG, using defaults:',
