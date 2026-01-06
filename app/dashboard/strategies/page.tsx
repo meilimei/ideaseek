@@ -176,7 +176,11 @@ export default async function DashboardStrategiesPage({
                         variant="ghost"
                         className="rounded-full px-3"
                       >
-                        <Link href={`/dashboard/strategies/${strategy.id}/edit`}>Edit</Link>
+                        <Link
+                          href={`/dashboard/strategies/edit/step-1?mode=edit&strategyId=${strategy.id}`}
+                        >
+                          Edit
+                        </Link>
                       </Button>
                       <RunNowButton strategyId={strategy.id} />
                       <DeleteStrategyButton strategyId={strategy.id} />

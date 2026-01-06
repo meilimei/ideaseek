@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { AdminInput } from '@/components/admin/primitives';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,23 @@ export default function StrategyStep2Page() {
   const subreddits = draft.subreddits ?? [];
   const keywords = draft.keywords ?? [];
   const trackInput = draft.track ?? '';
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { backHref, nextHref } = useMemo(() => {
+    const mode = searchParams.get('mode') || '';
+    const strategyId = searchParams.get('strategyId') || '';
+    const isEdit =
+      mode === 'edit' || (pathname ? pathname.startsWith('/dashboard/strategies/edit') : false);
+    const basePath = isEdit ? '/dashboard/strategies/edit' : '/dashboard/strategies/new';
+    const qp = new URLSearchParams();
+    if (mode) qp.set('mode', mode);
+    if (strategyId) qp.set('strategyId', strategyId);
+    const query = qp.toString();
+    return {
+      backHref: `${basePath}/step-1${query ? `?${query}` : ''}`,
+      nextHref: `${basePath}/step-3${query ? `?${query}` : ''}`,
+    };
+  }, [pathname, searchParams]);
 
   const normalizeSubreddit = (value: string) =>
     value.trim().replace(/^r\//i, '').replace(/\s+/g, '');
@@ -91,8 +109,8 @@ export default function StrategyStep2Page() {
     <WizardShell
       title="Create Strategy"
       step={2}
-      backHref="/dashboard/strategies/new/step-1"
-      nextHref="/dashboard/strategies/new/step-3"
+      backHref={backHref}
+      nextHref={nextHref}
       rightSlot={<SummaryCard />}
     >
       <div className="space-y-6">

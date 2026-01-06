@@ -16,9 +16,14 @@ export async function GET(
       ? await context.params
       : (context as { params: { id: string } }).params;
 
-  const strategyId = params?.id;
-  if (!strategyId) {
-    return NextResponse.json({ error: 'Missing strategy id' }, { status: 400 });
+  const strategyId = params?.id?.trim();
+  const isUuid =
+    typeof strategyId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      strategyId,
+    );
+  if (!strategyId || !isUuid) {
+    return NextResponse.json({ error: 'Invalid strategy id' }, { status: 400 });
   }
 
   const supabase = await createServerSupabaseClient();
@@ -43,7 +48,7 @@ export async function GET(
 
   if (error) {
     console.error('Failed to load strategy for edit:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to load strategy' }, { status: 500 });
   }
 
   if (!data) {

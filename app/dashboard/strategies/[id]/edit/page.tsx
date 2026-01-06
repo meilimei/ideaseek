@@ -7,9 +7,10 @@ export default function EditStrategyPage({
 }: {
   params: { id: string };
 }) {
-  const strategyId = params?.id;
-  const target = `/dashboard/strategies/new/step-1?mode=edit&strategyId=${encodeURIComponent(
-    strategyId,
-  )}`;
-  redirect(target);
+  const strategyId = params?.id ?? '';
+  redirect(
+    `/dashboard/strategies/edit/step-1?mode=edit&strategyId=${encodeURIComponent(
+      strategyId,
+    )}`,
+  );
 }

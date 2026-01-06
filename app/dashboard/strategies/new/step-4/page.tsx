@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AdminInput, AdminSelect } from '@/components/admin/primitives';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +12,8 @@ import WizardShell from '../_components/WizardShell';
 
 export default function StrategyStep4Page() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
   const { draft, updateDraft, resetDraft } = useDraft();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +69,18 @@ export default function StrategyStep4Page() {
   }, [draft]);
 
   const configText = useMemo(() => JSON.stringify(configPayload, null, 2), [configPayload]);
+  const backHref = useMemo(() => {
+    const mode = searchParams.get('mode') || '';
+    const strategyId = searchParams.get('strategyId') || '';
+    const isEdit =
+      mode === 'edit' || (pathname ? pathname.startsWith('/dashboard/strategies/edit') : false);
+    const basePath = isEdit ? '/dashboard/strategies/edit' : '/dashboard/strategies/new';
+    const qp = new URLSearchParams();
+    if (mode) qp.set('mode', mode);
+    if (strategyId) qp.set('strategyId', strategyId);
+    const query = qp.toString();
+    return `${basePath}/step-3${query ? `?${query}` : ''}`;
+  }, [pathname, searchParams]);
 
   const handleCreate = () => {
     setError(null);
@@ -107,7 +121,7 @@ export default function StrategyStep4Page() {
     <WizardShell
       title="Create Strategy"
       step={4}
-      backHref="/dashboard/strategies/new/step-3"
+      backHref={backHref}
       disableNext
       rightSlot={<SummaryCard />}
     >

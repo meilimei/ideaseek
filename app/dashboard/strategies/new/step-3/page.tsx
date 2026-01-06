@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { AdminInput, AdminSelect } from '@/components/admin/primitives';
 import { useDraft } from '../_draft/context';
 import SummaryCard from '../_components/SummaryCard';
@@ -15,6 +16,23 @@ export default function StrategyStep3Page() {
   const minUpvotes = typeof signals.minUpvotes === 'number' ? signals.minUpvotes : 10;
   const minComments = typeof signals.minComments === 'number' ? signals.minComments : 5;
   const maxAgeDays = typeof signals.maxAgeDays === 'number' ? signals.maxAgeDays : 7;
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { backHref, nextHref } = useMemo(() => {
+    const mode = searchParams.get('mode') || '';
+    const strategyId = searchParams.get('strategyId') || '';
+    const isEdit =
+      mode === 'edit' || (pathname ? pathname.startsWith('/dashboard/strategies/edit') : false);
+    const basePath = isEdit ? '/dashboard/strategies/edit' : '/dashboard/strategies/new';
+    const qp = new URLSearchParams();
+    if (mode) qp.set('mode', mode);
+    if (strategyId) qp.set('strategyId', strategyId);
+    const query = qp.toString();
+    return {
+      backHref: `${basePath}/step-2${query ? `?${query}` : ''}`,
+      nextHref: `${basePath}/step-4${query ? `?${query}` : ''}`,
+    };
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     updateDraft({
@@ -34,8 +52,8 @@ export default function StrategyStep3Page() {
     <WizardShell
       title="Create Strategy"
       step={3}
-      backHref="/dashboard/strategies/new/step-2"
-      nextHref="/dashboard/strategies/new/step-4"
+      backHref={backHref}
+      nextHref={nextHref}
       rightSlot={<SummaryCard />}
     >
       <div className="space-y-6">

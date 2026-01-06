@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { AdminInput, AdminSelect } from '@/components/admin/primitives';
 import { STRATEGY_TRACKS } from '@/lib/strategyTracks';
 import { useDraft } from '../_draft/context';
@@ -13,12 +15,26 @@ export default function StrategyStep1Page() {
   const track = draft.track ?? '';
   const description = draft.description ?? '';
   const canProceed = Boolean(name.trim()) && Boolean(source);
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const nextHref = useMemo(() => {
+    const mode = searchParams.get('mode') || '';
+    const strategyId = searchParams.get('strategyId') || '';
+    const isEdit =
+      mode === 'edit' || (pathname ? pathname.startsWith('/dashboard/strategies/edit') : false);
+    const basePath = isEdit ? '/dashboard/strategies/edit' : '/dashboard/strategies/new';
+    const qp = new URLSearchParams();
+    if (mode) qp.set('mode', mode);
+    if (strategyId) qp.set('strategyId', strategyId);
+    const query = qp.toString();
+    return `${basePath}/step-2${query ? `?${query}` : ''}`;
+  }, [pathname, searchParams]);
 
   return (
     <WizardShell
       title="Create Strategy"
       step={1}
-      nextHref="/dashboard/strategies/new/step-2"
+      nextHref={nextHref}
       disableBack
       disableNext={!canProceed}
       rightSlot={<SummaryCard />}
