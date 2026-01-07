@@ -36,9 +36,6 @@ const fetchMode: RedditFetchMode =
         ? 'fallback-only'
         : 'auto';
 console.log(`[reddit] fetchMode=${fetchMode}`);
-if (process.env.INGEST_PROVIDER) {
-  console.log(`[reddit] provider=${process.env.INGEST_PROVIDER}`);
-}
 console.log(
   `[env] apify_token_present=${process.env.APIFY_TOKEN ? '1' : '0'}`,
 );
@@ -648,6 +645,19 @@ async function fetchRedditPostsViaApify(
   sort: RedditSort,
   timeRange: RedditTimeRange,
 ): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
+  const ALLOWED_SORT = new Set(['', 'relevance', 'hot', 'top', 'new', 'rising', 'comments']);
+  const ALLOWED_TIME = new Set(['all', 'hour', 'day', 'week', 'month', 'year']);
+  const normalizeApifySort = (v: unknown): string | undefined => {
+    const value = typeof v === 'string' ? v.toLowerCase() : '';
+    return ALLOWED_SORT.has(value) ? value : undefined;
+  };
+  const normalizeApifyTime = (v: unknown): string | undefined => {
+    const value = typeof v === 'string' ? v.toLowerCase() : '';
+    return ALLOWED_TIME.has(value) ? value : undefined;
+  };
+  const apifySort = normalizeApifySort(sort);
+  const apifyTime = normalizeApifyTime(timeRange);
+
   const token = process.env.APIFY_TOKEN?.trim();
   if (!token) {
     return {
@@ -666,22 +676,29 @@ async function fetchRedditPostsViaApify(
     token,
   )}&format=json&clean=1`;
 
-  const apifySort = sort === 'new' ? 'New' : sort === 'hot' ? 'Hot' : 'Top';
-  const apifyTime = timeRange === 'week' ? 'Week' : timeRange === 'month' ? 'Month' : 'Day';
+  const startUrls = subreddits.map((sub) => {
+    const url = `https://www.reddit.com/r/${sub}/${sort}/?t=${timeRange}`;
+    console.log(
+      `[apify][input] sub=${sub} sort=${apifySort ?? '(omitted)'} time=${apifyTime ?? '(omitted)'} url=${url}`,
+    );
+    return { url };
+  });
 
-  const body = {
-    startUrls: subreddits.map((sub) => ({
-      url: `https://www.reddit.com/r/${sub}/${sort}/?t=${timeRange}`,
-    })),
+  const body: Record<string, unknown> = {
+    startUrls,
     proxy: {
       useApifyProxy: true,
     },
     skipComments: true,
     maxItems: perSubreddit,
-    sort: apifySort,
-    time: apifyTime,
     debugMode: process.env.DEBUG_REDDIT === '1',
   };
+  if (apifySort !== undefined) {
+    body.sort = apifySort;
+  }
+  if (apifyTime !== undefined) {
+    body.time = apifyTime;
+  }
 
   try {
     const res = await fetch(url, {
