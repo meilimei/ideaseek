@@ -645,6 +645,57 @@ async function fetchRedditPostsViaApify(
   sort: RedditSort,
   timeRange: RedditTimeRange,
 ): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
+  async function apifyStartRun(actorId: string, token: string, input: Record<string, unknown>) {
+    const res = await fetch(
+      `https://api.apify.com/v2/acts/${actorId}/runs?token=${encodeURIComponent(token)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    );
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(
+        `Apify start failed ${res.status}: ${typeof json === 'string' ? json : JSON.stringify(json).slice(0, 500)}`,
+      );
+    }
+    const runId = (json as any)?.data?.id ?? (json as any)?.id;
+    if (!runId) throw new Error('Apify start did not return run id');
+    return runId as string;
+  }
+
+  async function apifyPollRun(token: string, runId: string, maxMs = 12 * 60 * 1000, intervalMs = 5000) {
+    const endAt = Date.now() + maxMs;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const res = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}?token=${encodeURIComponent(token)}`,
+      );
+      const json = await res.json();
+      const status = (json as any)?.data?.status ?? (json as any)?.status;
+      console.log(`[apify][poll] runId=${runId} status=${status ?? 'unknown'}`);
+      if (status === 'SUCCEEDED') return json as Record<string, unknown>;
+      if (status === 'FAILED' || status === 'TIMED-OUT' || status === 'ABORTED') {
+        throw new Error(`Apify run failed: status=${status}`);
+      }
+      if (Date.now() > endAt) {
+        throw new Error('Apify run polling timeout');
+      }
+      await sleep(intervalMs);
+    }
+  }
+
+  async function apifyGetDatasetItems(token: string, datasetId: string) {
+    const res = await fetch(
+      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=1&format=json`,
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to fetch dataset items ${res.status}`);
+    }
+    return (await res.json()) as any[];
+  }
+
   const ALLOWED_SORT = new Set(['', 'relevance', 'hot', 'top', 'new', 'rising', 'comments']);
   const ALLOWED_TIME = new Set(['all', 'hour', 'day', 'week', 'month', 'year']);
   const normalizeApifySort = (v: unknown): string | undefined => {
@@ -690,7 +741,8 @@ async function fetchRedditPostsViaApify(
       useApifyProxy: true,
     },
     skipComments: true,
-    maxItems: perSubreddit,
+    maxItems: perSubreddit * Math.max(1, subreddits.length),
+    maxPostCount: perSubreddit,
     debugMode: process.env.DEBUG_REDDIT === '1',
   };
   if (apifySort !== undefined) {
@@ -701,25 +753,17 @@ async function fetchRedditPostsViaApify(
   }
 
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const message = await res.text();
-      return {
-        posts: [],
-        errors: subreddits.map((sub) => ({
-          subreddit: sub,
-          status: res.status,
-          message: message.slice(0, 500),
-        })),
-      };
+    console.log(
+      `[apify][run] actor=${actor} subCount=${subreddits.length} maxItems=${body.maxItems}`,
+    );
+    const runId = await apifyStartRun(actor, token, body);
+    const run = await apifyPollRun(token, runId);
+    const datasetId =
+      (run as any)?.data?.defaultDatasetId ?? (run as any)?.defaultDatasetId;
+    if (!datasetId) {
+      throw new Error('Apify run missing datasetId');
     }
-    const data = (await res.json()) as any[];
+    const data = await apifyGetDatasetItems(token, datasetId);
     const posts: RedditPost[] = [];
     if (Array.isArray(data)) {
       if (process.env.DEBUG_REDDIT === '1' && data[0] && typeof data[0] === 'object') {
