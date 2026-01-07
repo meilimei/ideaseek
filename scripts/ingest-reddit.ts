@@ -440,6 +440,19 @@ function toEpochMs(value: number | string | null | undefined): number | null {
   return parsed < 1e12 ? parsed * 1000 : parsed;
 }
 
+function toEpochMsAny(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return toEpochMs(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) return toEpochMs(num);
+    const iso = Date.parse(trimmed);
+    return Number.isFinite(iso) ? iso : null;
+  }
+  return null;
+}
+
 function isRedditUrl(url: string) {
   try {
     const host = new URL(url).host;
@@ -619,6 +632,133 @@ async function fetchJsonWithRetry<T = unknown>(
   }
 
   throw lastError ?? new Error(`Failed to fetch ${url}`);
+}
+
+async function fetchRedditPostsViaApify(
+  subreddits: string[],
+  perSubreddit: number,
+  sort: RedditSort,
+  timeRange: RedditTimeRange,
+  maxAgeDays: number,
+): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
+  const token = process.env.APIFY_TOKEN?.trim();
+  if (!token) {
+    return {
+      posts: [],
+      errors: [
+        {
+          subreddit: 'all',
+          message: 'Missing APIFY_TOKEN',
+        },
+      ],
+    };
+  }
+
+  const actor = process.env.APIFY_REDDIT_ACTOR?.trim() || 'trudax~reddit-scraper';
+  const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(
+    token,
+  )}&format=json&clean=1`;
+
+  const body = {
+    startUrls: subreddits.map((sub) => ({
+      url: `https://www.reddit.com/r/${sub}/${sort}/?t=${timeRange}`,
+    })),
+    proxy: {
+      useApifyProxy: true,
+      apifyProxyGroups: ['RESIDENTIAL'],
+    },
+    ignoreStartUrls: false,
+    searchPosts: false,
+    searchComments: false,
+    searchCommunities: false,
+    searchUsers: false,
+    skipComments: true,
+    maxComments: 0,
+    maxPostCount: perSubreddit,
+    maxItems: perSubreddit * Math.max(1, subreddits.length),
+    scrollTimeout: 10,
+    includeNSFW: false,
+    debugMode: process.env.DEBUG_REDDIT === '1',
+    sort: sort === 'new' ? 'new' : sort === 'hot' ? 'hot' : 'top',
+    time: timeRange === 'week' ? 'week' : timeRange === 'month' ? 'month' : 'day',
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const message = await res.text();
+      return {
+        posts: [],
+        errors: subreddits.map((sub) => ({
+          subreddit: sub,
+          status: res.status,
+          message: message.slice(0, 500),
+        })),
+      };
+    }
+    const data = (await res.json()) as any[];
+    const posts: RedditPost[] = [];
+    if (Array.isArray(data)) {
+      if (process.env.DEBUG_REDDIT === '1' && data[0] && typeof data[0] === 'object') {
+        console.log(`[apify][debug] firstItemKeys=${Object.keys(data[0]).join(',')}`);
+      }
+      for (const item of data) {
+        const id =
+          typeof item.id === 'string'
+            ? item.id
+            : typeof item.postId === 'string'
+              ? item.postId
+              : null;
+        const subreddit =
+          typeof item.subreddit === 'string'
+            ? item.subreddit
+          : typeof item.subredditName === 'string'
+            ? item.subredditName
+            : null;
+        if (!id || !subreddit) continue;
+        const created =
+          item.createdAt ??
+          item.created_at ??
+          item.created ??
+          item.created_utc ??
+          item.createdUtc ??
+          null;
+        const createdMs = toEpochMsAny(created);
+        const post: RedditPost = {
+          id,
+          title: item.title ?? '',
+          selftext: item.text ?? item.body ?? item.selftext ?? '',
+          score: Number(item.score ?? item.upvotes ?? item.ups ?? 0) || 0,
+          num_comments: Number(item.comments ?? item.numComments ?? item.num_comments ?? 0) || 0,
+          url:
+            typeof item.url === 'string'
+              ? item.url
+              : typeof item.permalink === 'string'
+                ? `https://www.reddit.com${item.permalink}`
+                : '',
+          subreddit,
+          created_utc: typeof item.created_utc === 'number' ? item.created_utc : undefined,
+          created_at_ms: createdMs,
+        };
+        posts.push(post);
+      }
+    }
+    return { posts, errors: [] };
+  } catch (err) {
+    return {
+      posts: [],
+      errors: subreddits.map((sub) => ({
+        subreddit: sub,
+        message: err instanceof Error ? err.message : String(err),
+      })),
+    };
+  }
 }
 
 // ============ 第一步：抓 Reddit 帖子 ============
@@ -1027,10 +1167,11 @@ async function main() {
 
   console.log(`Track: ${cfgTrack || '-'}`);
   const configSourceLabel = jobConfig
-    ? 'job.payload.config'
+    ? 'job.payload'
     : dbStrategyConfig
       ? 'strategy.config'
       : 'none';
+  console.log(`[reddit] provider=${provider}`);
   console.log(
     `[reddit][cfg] jobId=${jobId ?? 'none'} strategyId=${strategyId || '-'} payloadStrategyId=${payloadStrategyId || '-'} ` +
       `jobHasConfig=${jobConfig ? '1' : '0'} dbHasConfig=${dbStrategyConfig ? '1' : '0'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} subs=${explicitSubreddits.join(
@@ -1052,15 +1193,27 @@ async function main() {
       ` | subsUsed=${subreddits.join(',') || '-'} | subredditsSource=${subredditsSource} | source=${configSourceLabel}`,
   );
 
-  const { posts, errors } = await fetchRedditPosts(
-    subreddits,
-    cfgLimit,
-    cfgSort,
-    cfgTimeRange,
-    timeRangeSeconds,
-    signals.maxAgeDays,
-    fetchMode,
-  );
+  const { posts, errors } =
+    provider === 'apify'
+      ? await fetchRedditPostsViaApify(
+          subreddits,
+          cfgLimit,
+          cfgSort,
+          cfgTimeRange,
+          signals.maxAgeDays,
+        )
+      : await fetchRedditPosts(
+          subreddits,
+          cfgLimit,
+          cfgSort,
+          cfgTimeRange,
+          timeRangeSeconds,
+          signals.maxAgeDays,
+          fetchMode,
+        );
+  if (provider === 'apify') {
+    console.log(`[reddit][apify] fetched=${posts.length} errors=${errors.length}`);
+  }
   let timeSample = '';
   if (posts.length > 0) {
     const p = posts[0];

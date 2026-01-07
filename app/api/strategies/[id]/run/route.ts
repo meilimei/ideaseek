@@ -85,13 +85,18 @@ export async function POST(
     );
   }
 
-  let body: { provider?: string } = {};
+  let body: { provider?: string; fetchProvider?: string } = {};
   try {
-    body = (await req.json()) as { provider?: string };
+    body = (await req.json()) as { provider?: string; fetchProvider?: string };
   } catch {
     // ignore parse errors; treat as empty
   }
-  const provider = typeof body?.provider === 'string' ? body.provider : undefined;
+  const provider =
+    typeof body?.fetchProvider === 'string'
+      ? body.fetchProvider
+      : typeof body?.provider === 'string'
+        ? body.provider
+        : undefined;
 
   try {
     const jobId = await createAdminJob(jobType, {
@@ -102,7 +107,7 @@ export async function POST(
         config: strategy.config ?? {},
         triggeredBy: 'user',
         userId: user.id,
-        ...(provider ? { provider } : {}),
+        ...(provider ? { fetchProvider: provider } : {}),
       },
       strategyId: strategy.id,
       source: strategy.source ?? null,

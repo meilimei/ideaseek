@@ -9,14 +9,14 @@ export default function RunNowButton({ strategyId }: { strategyId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleRun = async (provider?: string) => {
+  const handleRun = async (fetchProvider?: string) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/strategies/${strategyId}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: provider ? JSON.stringify({ provider }) : undefined,
+        body: fetchProvider ? JSON.stringify({ fetchProvider }) : undefined,
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {

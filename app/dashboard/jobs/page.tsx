@@ -257,7 +257,11 @@ export default async function DashboardJobsPage({
 
   const now = new Date();
 
-  const errorParam = searchParams?.error;
+  const resolvedSearchParams =
+    'then' in searchParams && typeof (searchParams as any).then === 'function'
+      ? await (searchParams as Promise<Record<string, unknown>>)
+      : (searchParams as Record<string, unknown>);
+  const errorParam = resolvedSearchParams?.error;
   const errorValue = Array.isArray(errorParam) ? errorParam[0] : errorParam;
 
   return (
