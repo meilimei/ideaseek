@@ -39,6 +39,9 @@ console.log(`[reddit] fetchMode=${fetchMode}`);
 if (process.env.INGEST_PROVIDER) {
   console.log(`[reddit] provider=${process.env.INGEST_PROVIDER}`);
 }
+console.log(
+  `[env] apify_token_present=${process.env.APIFY_TOKEN ? '1' : '0'}`,
+);
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);
@@ -557,7 +560,12 @@ async function fetchJsonWithRetry<T = unknown>(
   retries = FETCH_RETRIES,
 ): Promise<T> {
   let lastError: unknown;
-  const headers = isRedditUrl(url) ? buildRedditHeaders() : {};
+  const headers = isRedditUrl(url)
+    ? buildRedditHeaders()
+    : {
+        Accept: 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+      };
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -639,7 +647,6 @@ async function fetchRedditPostsViaApify(
   perSubreddit: number,
   sort: RedditSort,
   timeRange: RedditTimeRange,
-  maxAgeDays: number,
 ): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
   const token = process.env.APIFY_TOKEN?.trim();
   if (!token) {
@@ -659,28 +666,21 @@ async function fetchRedditPostsViaApify(
     token,
   )}&format=json&clean=1`;
 
+  const apifySort = sort === 'new' ? 'New' : sort === 'hot' ? 'Hot' : 'Top';
+  const apifyTime = timeRange === 'week' ? 'Week' : timeRange === 'month' ? 'Month' : 'Day';
+
   const body = {
     startUrls: subreddits.map((sub) => ({
       url: `https://www.reddit.com/r/${sub}/${sort}/?t=${timeRange}`,
     })),
     proxy: {
       useApifyProxy: true,
-      apifyProxyGroups: ['RESIDENTIAL'],
     },
-    ignoreStartUrls: false,
-    searchPosts: false,
-    searchComments: false,
-    searchCommunities: false,
-    searchUsers: false,
     skipComments: true,
-    maxComments: 0,
-    maxPostCount: perSubreddit,
-    maxItems: perSubreddit * Math.max(1, subreddits.length),
-    scrollTimeout: 10,
-    includeNSFW: false,
+    maxItems: perSubreddit,
+    sort: apifySort,
+    time: apifyTime,
     debugMode: process.env.DEBUG_REDDIT === '1',
-    sort: sort === 'new' ? 'new' : sort === 'hot' ? 'hot' : 'top',
-    time: timeRange === 'week' ? 'week' : timeRange === 'month' ? 'month' : 'day',
   };
 
   try {
@@ -714,14 +714,16 @@ async function fetchRedditPostsViaApify(
             ? item.id
             : typeof item.postId === 'string'
               ? item.postId
-              : null;
+              : typeof item.shortId === 'string'
+                ? item.shortId
+                : undefined;
         const subreddit =
-          typeof item.subreddit === 'string'
-            ? item.subreddit
-          : typeof item.subredditName === 'string'
+          typeof item.subredditName === 'string'
             ? item.subredditName
-            : null;
-        if (!id || !subreddit) continue;
+            : typeof item.subreddit === 'string'
+              ? item.subreddit
+              : undefined;
+        if (!subreddit) continue;
         const created =
           item.createdAt ??
           item.created_at ??
@@ -731,19 +733,35 @@ async function fetchRedditPostsViaApify(
           null;
         const createdMs = toEpochMsAny(created);
         const post: RedditPost = {
-          id,
-          title: item.title ?? '',
+          id: id ?? `${subreddit}-${Math.random().toString(36).slice(2, 10)}`,
+          title: item.title ?? item.name ?? '',
           selftext: item.text ?? item.body ?? item.selftext ?? '',
-          score: Number(item.score ?? item.upvotes ?? item.ups ?? 0) || 0,
-          num_comments: Number(item.comments ?? item.numComments ?? item.num_comments ?? 0) || 0,
+          score:
+            Number(item.score ?? item.upVotes ?? item.upvotes ?? item.ups ?? 0) ||
+            0,
+          num_comments:
+            Number(
+              item.numberOfComments ??
+                item.numComments ??
+                item.commentsCount ??
+                item.num_comments ??
+                0,
+            ) || 0,
           url:
             typeof item.url === 'string'
               ? item.url
               : typeof item.permalink === 'string'
-                ? `https://www.reddit.com${item.permalink}`
+                ? item.permalink.startsWith('/')
+                  ? `https://www.reddit.com${item.permalink}`
+                  : item.permalink
                 : '',
           subreddit,
-          created_utc: typeof item.created_utc === 'number' ? item.created_utc : undefined,
+          created_utc:
+            typeof item.created_utc === 'number'
+              ? item.created_utc
+              : typeof item.createdUtc === 'number'
+                ? item.createdUtc
+                : undefined,
           created_at_ms: createdMs,
         };
         posts.push(post);
@@ -1122,19 +1140,28 @@ async function main() {
       : typeof (jobPayload as any)?.redditProvider === 'string'
         ? String((jobPayload as any)?.redditProvider).trim()
         : '';
+  const payloadConfigProviderRaw =
+    typeof (payloadCfgCandidate as any)?.fetchProvider === 'string'
+      ? String((payloadCfgCandidate as any)?.fetchProvider).trim()
+      : '';
   const cfgProviderRaw =
     typeof (cfg as any)?.fetchProvider === 'string'
       ? String((cfg as any)?.fetchProvider).trim()
       : '';
-  const fetchProvider =
-    (process.env.REDDIT_FETCH_PROVIDER?.trim() ||
-      payloadProviderRaw.trim() ||
-      cfgProviderRaw.trim() ||
-      'reddit') === 'apify'
-      ? 'apify'
-      : 'reddit';
-  console.log(`[reddit] fetchProvider=${fetchProvider}`);
-  console.log(`[reddit] fetchProvider=${fetchProvider}`);
+  const strategyProviderRaw =
+    typeof (dbStrategyConfig as any)?.fetchProvider === 'string'
+      ? String((dbStrategyConfig as any)?.fetchProvider).trim()
+      : typeof (envStrategyConfig as any)?.fetchProvider === 'string'
+        ? String((envStrategyConfig as any)?.fetchProvider).trim()
+        : '';
+  const fetchProviderRaw =
+    payloadProviderRaw ||
+    payloadConfigProviderRaw ||
+    cfgProviderRaw ||
+    strategyProviderRaw ||
+    'reddit';
+  const fetchProvider = fetchProviderRaw.toLowerCase() === 'apify' ? 'apify' : 'reddit';
+  console.log(`[reddit][provider] jobId=${jobId ?? 'none'} fetchProvider=${fetchProvider}`);
   const cfgTrack = typeof cfg.track === 'string' ? cfg.track.trim() : '';
   const rawSubs = (cfg as any)?.subreddits;
   const explicitSubreddits = coerceStringArray(rawSubs)
@@ -1191,7 +1218,7 @@ async function main() {
       ? 'strategy.config'
       : 'none';
   console.log(
-    `[reddit] fetchProvider=${fetchProvider} (env=${process.env.REDDIT_FETCH_PROVIDER ? 1 : 0} payload=${payloadProviderRaw || '-'} cfg=${cfgProviderRaw || '-'})`,
+    `[reddit] fetchProvider=${fetchProvider} (payload=${payloadProviderRaw || '-'} payloadConfig=${payloadConfigProviderRaw || '-'} cfg=${cfgProviderRaw || '-'} strategy=${strategyProviderRaw || '-'})`,
   );
   console.log(
     `[reddit][cfg] jobId=${jobId ?? 'none'} strategyId=${strategyId || '-'} payloadStrategyId=${payloadStrategyId || '-'} ` +
@@ -1223,12 +1250,14 @@ async function main() {
       await markAdminJobFailed(msg);
       process.exit(1);
     }
+    for (const sub of subreddits) {
+      console.log(`[apify] sub=${sub} maxItems=${cfgLimit} sort=${cfgSort} time=${cfgTimeRange}`);
+    }
     ({ posts, errors } = await fetchRedditPostsViaApify(
       subreddits,
       cfgLimit,
       cfgSort,
       cfgTimeRange,
-      signals.maxAgeDays,
     ));
   } else {
     ({ posts, errors } = await fetchRedditPosts(
