@@ -1116,6 +1116,25 @@ async function main() {
     console.warn(`No strategy config found in DB for ${strategyId}, using env/defaults.`);
   }
 
+  const payloadProviderRaw =
+    typeof (jobPayload as any)?.fetchProvider === 'string'
+      ? String((jobPayload as any)?.fetchProvider).trim()
+      : typeof (jobPayload as any)?.redditProvider === 'string'
+        ? String((jobPayload as any)?.redditProvider).trim()
+        : '';
+  const cfgProviderRaw =
+    typeof (cfg as any)?.fetchProvider === 'string'
+      ? String((cfg as any)?.fetchProvider).trim()
+      : '';
+  const fetchProvider =
+    (process.env.REDDIT_FETCH_PROVIDER?.trim() ||
+      payloadProviderRaw.trim() ||
+      cfgProviderRaw.trim() ||
+      'reddit') === 'apify'
+      ? 'apify'
+      : 'reddit';
+  console.log(`[reddit] fetchProvider=${fetchProvider}`);
+  console.log(`[reddit] fetchProvider=${fetchProvider}`);
   const cfgTrack = typeof cfg.track === 'string' ? cfg.track.trim() : '';
   const rawSubs = (cfg as any)?.subreddits;
   const explicitSubreddits = coerceStringArray(rawSubs)
@@ -1171,7 +1190,9 @@ async function main() {
     : dbStrategyConfig
       ? 'strategy.config'
       : 'none';
-  console.log(`[reddit] provider=${provider}`);
+  console.log(
+    `[reddit] fetchProvider=${fetchProvider} (env=${process.env.REDDIT_FETCH_PROVIDER ? 1 : 0} payload=${payloadProviderRaw || '-'} cfg=${cfgProviderRaw || '-'})`,
+  );
   console.log(
     `[reddit][cfg] jobId=${jobId ?? 'none'} strategyId=${strategyId || '-'} payloadStrategyId=${payloadStrategyId || '-'} ` +
       `jobHasConfig=${jobConfig ? '1' : '0'} dbHasConfig=${dbStrategyConfig ? '1' : '0'} rawSubsType=${Array.isArray(rawSubs) ? 'array' : typeof rawSubs} subs=${explicitSubreddits.join(
@@ -1193,26 +1214,32 @@ async function main() {
       ` | subsUsed=${subreddits.join(',') || '-'} | subredditsSource=${subredditsSource} | source=${configSourceLabel}`,
   );
 
-  const { posts, errors } =
-    provider === 'apify'
-      ? await fetchRedditPostsViaApify(
-          subreddits,
-          cfgLimit,
-          cfgSort,
-          cfgTimeRange,
-          signals.maxAgeDays,
-        )
-      : await fetchRedditPosts(
-          subreddits,
-          cfgLimit,
-          cfgSort,
-          cfgTimeRange,
-          timeRangeSeconds,
-          signals.maxAgeDays,
-          fetchMode,
-        );
-  if (provider === 'apify') {
-    console.log(`[reddit][apify] fetched=${posts.length} errors=${errors.length}`);
+  let posts: RedditPost[] = [];
+  let errors: SubredditFetchError[] = [];
+  if (fetchProvider === 'apify') {
+    if (!process.env.APIFY_TOKEN) {
+      const msg = 'APIFY_TOKEN is required for fetchProvider=apify';
+      console.error(msg);
+      await markAdminJobFailed(msg);
+      process.exit(1);
+    }
+    ({ posts, errors } = await fetchRedditPostsViaApify(
+      subreddits,
+      cfgLimit,
+      cfgSort,
+      cfgTimeRange,
+      signals.maxAgeDays,
+    ));
+  } else {
+    ({ posts, errors } = await fetchRedditPosts(
+      subreddits,
+      cfgLimit,
+      cfgSort,
+      cfgTimeRange,
+      timeRangeSeconds,
+      signals.maxAgeDays,
+      fetchMode,
+    ));
   }
   let timeSample = '';
   if (posts.length > 0) {
@@ -1221,7 +1248,7 @@ async function main() {
     const ageDays = createdMs ? (Date.now() - createdMs) / 86400000 : null;
     timeSample = ` sample(raw=${p.created_utc ?? 'n/a'} createdMs=${createdMs ?? 'n/a'} ageDays=${ageDays !== null ? ageDays.toFixed(2) : 'n/a'})`;
   }
-  console.log(`Fetched ${posts.length} posts${timeSample}`);
+  console.log(`Fetched ${posts.length} posts (provider=${fetchProvider})${timeSample}`);
   if (posts.length === 0 && errors.length > 0) {
     const summary = errors
       .map((err) => {
