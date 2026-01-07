@@ -9,11 +9,15 @@ export default function RunNowButton({ strategyId }: { strategyId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleRun = async () => {
+  const handleRun = async (provider?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/strategies/${strategyId}/run`, { method: 'POST' });
+      const res = await fetch(`/api/strategies/${strategyId}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: provider ? JSON.stringify({ provider }) : undefined,
+      });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(json?.message || json?.error || 'Failed to create job');
@@ -31,16 +35,28 @@ export default function RunNowButton({ strategyId }: { strategyId: string }) {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        className="rounded-full px-3"
-        onClick={handleRun}
-        disabled={loading}
-      >
-        {loading ? 'Queuing…' : 'Run now'}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="rounded-full px-3"
+          onClick={() => handleRun()}
+          disabled={loading}
+        >
+          {loading ? 'Queuing…' : 'Run now'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="rounded-full px-3"
+          onClick={() => handleRun('apify')}
+          disabled={loading}
+        >
+          {loading ? 'Queuing…' : 'Run via Apify'}
+        </Button>
+      </div>
       {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   );

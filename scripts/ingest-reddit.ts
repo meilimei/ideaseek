@@ -36,6 +36,9 @@ const fetchMode: RedditFetchMode =
         ? 'fallback-only'
         : 'auto';
 console.log(`[reddit] fetchMode=${fetchMode}`);
+if (process.env.INGEST_PROVIDER) {
+  console.log(`[reddit] provider=${process.env.INGEST_PROVIDER}`);
+}
 
 function ensureEnv(keys: string[]) {
   const missing = keys.filter((key) => !process.env[key]);

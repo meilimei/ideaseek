@@ -13,7 +13,7 @@ type StrategyRow = {
 };
 
 export async function POST(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const supabase = await createServerSupabaseClient();
@@ -85,6 +85,14 @@ export async function POST(
     );
   }
 
+  let body: { provider?: string } = {};
+  try {
+    body = (await req.json()) as { provider?: string };
+  } catch {
+    // ignore parse errors; treat as empty
+  }
+  const provider = typeof body?.provider === 'string' ? body.provider : undefined;
+
   try {
     const jobId = await createAdminJob(jobType, {
       payload: {
@@ -94,6 +102,7 @@ export async function POST(
         config: strategy.config ?? {},
         triggeredBy: 'user',
         userId: user.id,
+        ...(provider ? { provider } : {}),
       },
       strategyId: strategy.id,
       source: strategy.source ?? null,

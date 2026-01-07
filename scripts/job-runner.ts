@@ -304,6 +304,9 @@ async function runCommand(
       // ignore
     }
   }
+  if (payload?.provider || payload?.redditProvider) {
+    env.INGEST_PROVIDER = payload.provider ?? payload.redditProvider;
+  }
 
   const { stdout, stderr } = await execAsync(command, { env });
   const combined = `${stdout ?? ''}${stderr ?? ''}`;
