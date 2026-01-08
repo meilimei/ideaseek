@@ -487,6 +487,88 @@ function isRedditUrl(url: string) {
   }
 }
 
+type RetryableErr = { code?: string; cause?: any; message?: string };
+
+function isTransientNetworkError(err: unknown): boolean {
+  const e = err as RetryableErr;
+  const code = (e?.cause?.code || e?.code || '') as string;
+  const msg = (e?.message || '') as string;
+  const lowered = msg.toLowerCase();
+  return (
+    code === 'UND_ERR_SOCKET' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EAI_AGAIN' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    lowered.includes('terminated') ||
+    lowered.includes('socket') ||
+    lowered.includes('other side closed')
+  );
+}
+
+async function fetchJsonWithRetryPlain<T>(
+  url: string,
+  init: RequestInit,
+  opts: { retries?: number; timeoutMs?: number; stage?: string } = {},
+): Promise<T> {
+  const retries = opts.retries ?? 3;
+  const timeoutMs = opts.timeoutMs ?? 20_000;
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      console.log(
+        `[net] stage=${opts.stage ?? 'fetch'} attempt=${attempt + 1}/${retries + 1} url=${url}`,
+      );
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(t);
+
+      const text = await res.text().catch(() => '');
+      const json = text ? (JSON.parse(text) as any) : ({} as any);
+
+      if (!res.ok) {
+        if ((res.status === 429 || res.status >= 500) && attempt < retries) {
+          const backoff = Math.min(
+            15_000,
+            800 * (attempt + 1) + Math.floor(Math.random() * 600),
+          );
+          await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
+        throw new Error(
+          `HTTP ${res.status}: ${typeof json === 'string' ? json : JSON.stringify(json).slice(0, 500)}`,
+        );
+      }
+
+      return json as T;
+    } catch (err) {
+      clearTimeout(t);
+      lastErr = err;
+
+      const transient = isTransientNetworkError(err);
+      const isLast = attempt === retries;
+      console.warn(
+        `[net] stage=${opts.stage ?? 'fetch'} failed transient=${transient} last=${isLast}:`,
+        err instanceof Error ? err.message : err,
+      );
+
+      if (!isLast && transient) {
+        const backoff = Math.min(
+          20_000,
+          1200 * (attempt + 1) + Math.floor(Math.random() * 900),
+        );
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastErr ?? new Error('fetchJsonWithRetryPlain failed');
+}
+
 type RedditSignals = {
   minUpvotes: number;
   minComments: number;
@@ -688,39 +770,36 @@ async function fetchRedditPostsViaApify(
   }
 
   async function apifyStartRun(actorIdIn: string, tokenIn: string, input: Record<string, unknown>) {
-    const res = await fetch(
-      `https://api.apify.com/v2/acts/${actorIdIn}/runs?token=${encodeURIComponent(tokenIn)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
-      },
-    );
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const errType = (json as any)?.error?.type;
-      if (errType === 'actor-is-not-rented') {
+    try {
+      const json = await fetchJsonWithRetryPlain<any>(
+        `https://api.apify.com/v2/acts/${actorIdIn}/runs?token=${encodeURIComponent(tokenIn)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+        { stage: 'apifyStart' },
+      );
+      const runId = (json as any)?.data?.id ?? (json as any)?.id;
+      if (!runId) throw new Error(`Apify start did not return run id: ${clipJson(json)}`);
+      return runId as string;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('actor-is-not-rented')) {
         throw new Error(
           `Apify actor is not rented: ${actorIdIn}. Rent it, or set APIFY_REDDIT_ACTOR=trudax~reddit-scraper-lite.`,
         );
       }
-      throw new Error(`Apify start failed ${res.status}: ${clipJson(json)}`);
+      throw err;
     }
-    const runId = (json as any)?.data?.id ?? (json as any)?.id;
-    if (!runId) throw new Error(`Apify start did not return run id: ${clipJson(json)}`);
-    return runId as string;
   }
 
   async function apifyGetRun(tokenIn: string, runId: string) {
-    const res = await fetch(
+    return fetchJsonWithRetryPlain<any>(
       `https://api.apify.com/v2/actor-runs/${runId}?token=${encodeURIComponent(tokenIn)}`,
       { method: 'GET' },
+      { stage: 'apifyGetRun' },
     );
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(`Apify run get failed ${res.status}: ${clipJson(json)}`);
-    }
-    return json as any;
   }
 
   function sleep(ms: number) {
@@ -748,14 +827,11 @@ async function fetchRedditPostsViaApify(
   }
 
   async function apifyGetDatasetItems(tokenIn: string, datasetId: string) {
-    const res = await fetch(
+    const json = await fetchJsonWithRetryPlain<any>(
       `https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(tokenIn)}&clean=1&format=json`,
       { method: 'GET' },
+      { stage: 'apifyDataset' },
     );
-    const json = await res.json().catch(() => ([]));
-    if (!res.ok) {
-      throw new Error(`Apify dataset items failed ${res.status}: ${clipJson(json)}`);
-    }
     if (!Array.isArray(json)) return [];
     return json as any[];
   }
@@ -1104,20 +1180,47 @@ Here are the raw Reddit snippets:
 ${snippets}
 `;
 
-  const completion = await deepseek.chat.completions.create({
-    model: 'deepseek-chat',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are a precise JSON generator that outputs only valid JSON objects.',
-      },
-      { role: 'user', content: prompt },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.9,
-    max_tokens: 2000,
-  });
+  async function deepseekCreateWithRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+    let last: unknown;
+    for (let i = 0; i <= retries; i++) {
+      try {
+        console.log(`[net] stage=deepseek attempt=${i + 1}/${retries + 1}`);
+        return await fn();
+      } catch (err) {
+        last = err;
+        const transient = isTransientNetworkError(err);
+        const isLast = i === retries;
+        console.warn(
+          `[net] stage=deepseek failed transient=${transient} last=${isLast}:`,
+          err instanceof Error ? err.message : err,
+        );
+        if (!isLast && transient) {
+          const backoff = 1500 * (i + 1) + Math.floor(Math.random() * 800);
+          await new Promise((r) => setTimeout(r, backoff));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw last ?? new Error('deepseekCreateWithRetry failed');
+  }
+
+  const completion = await deepseekCreateWithRetry(() =>
+    deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a precise JSON generator that outputs only valid JSON objects.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.9,
+      max_tokens: 2000,
+    }),
+  );
 
   const content = completion.choices[0]?.message?.content ?? '{}';
 
