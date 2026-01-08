@@ -1000,12 +1000,48 @@ async function fetchRedditPosts(
 
 // 简单过滤：分数 + 关键词
 function filterPainfulPosts(posts: RedditPost[], keywords: string[]): RedditPost[] {
+  const GENERIC_PAIN_TERMS = [
+    'how do i',
+    'how to',
+    'should i',
+    'what should',
+    'any advice',
+    'advice',
+    'help',
+    'recommend',
+    'recommendation',
+    'what is the best',
+    'best way',
+    'anyone',
+    'can i',
+    'cant',
+    "can't",
+    'cannot',
+    'confused',
+    'struggle',
+    'struggling',
+    'stuck',
+    'problem',
+    'issue',
+    'mistake',
+    'mess',
+  ];
   const minScore = 10; // 可以调
   return posts.filter((p) => {
     const text = (p.title + ' ' + p.selftext).toLowerCase();
     if (p.score < minScore) return false;
 
-    return keywords.some((kw) => text.includes(kw));
+    if (keywords.some((kw) => text.includes(kw))) return true;
+    if (GENERIC_PAIN_TERMS.some((term) => text.includes(term))) return true;
+    if (
+      text.includes('?') &&
+      ['how', 'what', 'should', 'recommend', 'advice', 'help', 'anyone'].some((q) =>
+        text.includes(q),
+      )
+    ) {
+      return true;
+    }
+    return false;
   });
 }
 
@@ -1384,8 +1420,21 @@ async function main() {
   console.log(
     `[reddit] painPatterns=${keywords.length} sample=${keywords.slice(0, 6).join(' | ')}`,
   );
-  const filtered = filterPainfulPosts(signalFiltered, keywords);
+  let filtered = filterPainfulPosts(signalFiltered, keywords);
   console.log(`After pain filter: ${filtered.length}`);
+  if (filtered.length === 0 && signalFiltered.length > 0) {
+    console.log(
+      `[reddit] pain filter yielded 0; fallback=signalFiltered top=${Math.min(10, signalFiltered.length)}`,
+    );
+    const fallback = signalFiltered.slice(0, Math.min(10, signalFiltered.length));
+    console.log(
+      `[reddit][fallback] sampleTitles=${fallback
+        .slice(0, 3)
+        .map((p) => p.title.slice(0, 80))
+        .join(' | ')}`,
+    );
+    filtered = fallback;
+  }
 
   if (filtered.length === 0) {
     console.log('No qualified posts found, exit.');
