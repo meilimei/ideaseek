@@ -221,7 +221,7 @@ async function heartbeat(worker: string) {
 function startJobHeartbeat({
   jobId,
   lockedBy,
-  intervalMs = 15_000,
+  intervalMs = Number(process.env.JOB_HEARTBEAT_MS ?? 20_000),
 }: {
   jobId: string;
   lockedBy: string;
@@ -235,7 +235,8 @@ function startJobHeartbeat({
       .from('admin_jobs')
       .update({ locked_at: nowIso })
       .eq('id', jobId)
-      .eq('locked_by', lockedBy);
+      .eq('locked_by', lockedBy)
+      .eq('status', 'running');
     if (error) {
       const now = Date.now();
       if (now - lastErrorLogAt > 60_000) {
