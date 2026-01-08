@@ -136,6 +136,26 @@ function sanitizeEnglishArray(values: unknown): string[] | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
+function normalizePainPatterns(raw: string[]): string[] {
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue;
+    const normalized = normalizeSmartPunctuation(entry);
+    const parts = normalized.split('/');
+    for (const part of parts) {
+      const cleaned = part
+        .toLowerCase()
+        .replace(/\.\.\./g, '')
+        .replace(/[^a-z0-9'\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (cleaned.length < 4) continue;
+      seen.add(cleaned);
+    }
+  }
+  return Array.from(seen);
+}
+
 function parseMaybeJson<T = any>(value: any): T | undefined {
   if (!value) return undefined;
   if (typeof value === 'object' && !Array.isArray(value)) return value as T;
@@ -1249,10 +1269,6 @@ async function main() {
       subredditsSource = 'default';
     }
   }
-  const keywords = (cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS).map((keyword) =>
-    keyword.toLowerCase(),
-  );
-
   console.log(`Track: ${cfgTrack || '-'}`);
   const configSourceLabel = jobConfig
     ? 'job.payload'
@@ -1273,7 +1289,9 @@ async function main() {
       ',',
     )}`,
   );
-  console.log(`Keywords: ${keywords.length}`);
+  const rawKeywords = cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS;
+  const keywords = normalizePainPatterns(rawKeywords);
+  console.log(`Keywords: ${rawKeywords.length}`);
   console.log(`Sort: ${cfgSort} timeRange: ${cfgTimeRange} limit: ${cfgLimit}`);
 
   const signals = parseSignals(cfg);
@@ -1363,6 +1381,9 @@ async function main() {
       `low_upvotes=${breakdown.dropped_low_upvotes} low_comments=${breakdown.dropped_low_comments}]`,
   );
 
+  console.log(
+    `[reddit] painPatterns=${keywords.length} sample=${keywords.slice(0, 6).join(' | ')}`,
+  );
   const filtered = filterPainfulPosts(signalFiltered, keywords);
   console.log(`After pain filter: ${filtered.length}`);
 
