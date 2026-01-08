@@ -1166,21 +1166,68 @@ async function generateIdeasFromPosts(
 ): Promise<IdeaForInsert[]> {
   if (posts.length === 0) return [];
 
-  // 避免 prompt 太长，先截一小部分
-  const limited = posts.slice(0, 10);
-  const representativeUrl = limited[0]?.url ?? undefined;
+  const batchSizeRaw = Number(process.env.DEEPSEEK_BATCH_SIZE ?? 4);
+  const maxBatchesRaw = Number(process.env.DEEPSEEK_MAX_BATCHES ?? 3);
+  const batchSize = Number.isFinite(batchSizeRaw) && batchSizeRaw > 0 ? batchSizeRaw : 4;
+  const maxBatches = Number.isFinite(maxBatchesRaw) && maxBatchesRaw > 0 ? maxBatchesRaw : 3;
+  const chosen = posts.slice(0, batchSize * maxBatches);
+  const allIdeas: IdeaForInsert[] = [];
+  let failedBatches = 0;
 
-  const snippets = limited
-    .map(
-      (p) =>
-        `Subreddit: r/${p.subreddit}\nTitle: ${p.title}\nText: ${p.selftext.slice(
-          0,
-          400
-        )}\nScore: ${p.score}, Comments: ${p.num_comments}\nURL: ${p.url}`
-    )
-    .join('\n\n---\n\n');
+  async function deepseekCreateWithRetry<T>(fn: () => Promise<T>, retries = 6): Promise<T> {
+    let last: unknown;
+    const backoffs = [2000, 4000, 8000, 15000, 20000, 30000];
+    for (let i = 0; i <= retries; i++) {
+      try {
+        console.log(
+          `[net] stage=deepseek attempt=${i + 1}/${retries + 1} backoffMs=0`,
+        );
+        return await fn();
+      } catch (err) {
+        last = err;
+        const transient = isTransientNetworkError(err);
+        const isLast = i === retries;
+        console.warn(
+          `[net] stage=deepseek failed transient=${transient} last=${isLast}:`,
+          err instanceof Error ? err.message : err,
+        );
+        if (!isLast && transient) {
+          const base = backoffs[i] ?? 30000;
+          const jitter = Math.floor(Math.random() * 800);
+          const backoffMs = Math.min(30_000, base) + jitter;
+          console.log(
+            `[net] stage=deepseek attempt=${i + 1}/${retries + 1} backoffMs=${backoffMs}`,
+          );
+          await new Promise((r) => setTimeout(r, backoffMs));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw last ?? new Error('deepseekCreateWithRetry failed');
+  }
 
-  const prompt = `
+  const totalBatches = Math.ceil(chosen.length / batchSize);
+  for (let i = 0; i < chosen.length; i += batchSize) {
+    const batch = chosen.slice(i, i + batchSize);
+    if (batch.length === 0) break;
+    const batchIndex = Math.floor(i / batchSize) + 1;
+    console.log(
+      `[deepseek] batch=${batchIndex}/${totalBatches} size=${batch.length}`,
+    );
+    const representativeUrl = batch[0]?.url ?? undefined;
+
+    const snippets = batch
+      .map(
+        (p) =>
+          `Subreddit: r/${p.subreddit}\nTitle: ${p.title}\nText: ${p.selftext.slice(
+            0,
+            400
+          )}\nScore: ${p.score}, Comments: ${p.num_comments}\nURL: ${p.url}`
+      )
+      .join('\n\n---\n\n');
+
+    const prompt = `
 You are a senior startup opportunity analyst who extracts product opportunities from real user pain points.
 
 Below are Reddit discussions from startup / SaaS / indie dev communities. Please:
@@ -1217,89 +1264,83 @@ Here are the raw Reddit snippets:
 ${snippets}
 `;
 
-  async function deepseekCreateWithRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
-    let last: unknown;
-    for (let i = 0; i <= retries; i++) {
+    try {
+      const completion = await deepseekCreateWithRetry(() =>
+        deepseek.chat.completions.create({
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are a precise JSON generator that outputs only valid JSON objects.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.9,
+          max_tokens: 2000,
+        }),
+      );
+
+      const content = completion.choices[0]?.message?.content ?? '{}';
+
+      type DeepSeekIdeasResponse = {
+        ideas?: Array<Partial<IdeaForInsert>>;
+      };
+
+      let parsed: DeepSeekIdeasResponse;
       try {
-        console.log(`[net] stage=deepseek attempt=${i + 1}/${retries + 1}`);
-        return await fn();
+        parsed = JSON.parse(content) as DeepSeekIdeasResponse;
       } catch (err) {
-        last = err;
-        const transient = isTransientNetworkError(err);
-        const isLast = i === retries;
-        console.warn(
-          `[net] stage=deepseek failed transient=${transient} last=${isLast}:`,
-          err instanceof Error ? err.message : err,
-        );
-        if (!isLast && transient) {
-          const backoff = 1500 * (i + 1) + Math.floor(Math.random() * 800);
-          await new Promise((r) => setTimeout(r, backoff));
-          continue;
-        }
-        throw err;
+        console.error('Failed to parse DeepSeek JSON:', err, content);
+        failedBatches += 1;
+        continue;
       }
+
+      if (!parsed || !Array.isArray(parsed.ideas)) {
+        console.error('DeepSeek response missing ideas[]:', parsed);
+        failedBatches += 1;
+        continue;
+      }
+
+      const ideas: IdeaForInsert[] = parsed.ideas.map((raw) => ({
+        title: sanitizeEnglishText(raw.title) ?? '',
+        one_liner: sanitizeEnglishText(raw.one_liner),
+        description: sanitizeEnglishText(raw.description),
+        tags: sanitizeEnglishArray(raw.tags),
+        difficulty: raw.difficulty ?? undefined,
+        market_size: raw.market_size ?? undefined,
+        demand_strength: raw.demand_strength ?? undefined,
+        pain_points: sanitizeEnglishArray(raw.pain_points),
+        target_users: sanitizeEnglishText(raw.target_users),
+        market_stage: sanitizeEnglishText(raw.market_stage),
+        competition: sanitizeEnglishText(raw.competition),
+        monetization: sanitizeEnglishArray(raw.monetization),
+        key_risks: sanitizeEnglishArray(raw.key_risks),
+        next_steps: sanitizeEnglishText(raw.next_steps),
+        source_type: 'reddit',
+        source_url:
+          sanitizeEnglishText(raw.source_url) ??
+          (representativeUrl ? sanitizeEnglishText(representativeUrl) : undefined),
+      }));
+
+      allIdeas.push(...ideas);
+    } catch (err) {
+      if (isTransientNetworkError(err)) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[deepseek] batch failed after retries: ${message}`);
+        failedBatches += 1;
+        continue;
+      }
+      throw err;
     }
-    throw last ?? new Error('deepseekCreateWithRetry failed');
   }
 
-  const completion = await deepseekCreateWithRetry(() =>
-    deepseek.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a precise JSON generator that outputs only valid JSON objects.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.9,
-      max_tokens: 2000,
-    }),
-  );
-
-  const content = completion.choices[0]?.message?.content ?? '{}';
-
-  type DeepSeekIdeasResponse = {
-    ideas?: Array<Partial<IdeaForInsert>>;
-  };
-
-  let parsed: DeepSeekIdeasResponse;
-  try {
-    parsed = JSON.parse(content) as DeepSeekIdeasResponse;
-  } catch (err) {
-    console.error('Failed to parse DeepSeek JSON:', err, content);
-    return [];
+  if (allIdeas.length === 0 && failedBatches > 0) {
+    console.warn('[deepseek] all batches failed');
   }
 
-  if (!parsed || !Array.isArray(parsed.ideas)) {
-    console.error('DeepSeek response missing ideas[]:', parsed);
-    return [];
-  }
-
-  const ideas: IdeaForInsert[] = parsed.ideas.map((raw) => ({
-    title: sanitizeEnglishText(raw.title) ?? '',
-    one_liner: sanitizeEnglishText(raw.one_liner),
-    description: sanitizeEnglishText(raw.description),
-    tags: sanitizeEnglishArray(raw.tags),
-    difficulty: raw.difficulty ?? undefined,
-    market_size: raw.market_size ?? undefined,
-    demand_strength: raw.demand_strength ?? undefined,
-    pain_points: sanitizeEnglishArray(raw.pain_points),
-    target_users: sanitizeEnglishText(raw.target_users),
-    market_stage: sanitizeEnglishText(raw.market_stage),
-    competition: sanitizeEnglishText(raw.competition),
-    monetization: sanitizeEnglishArray(raw.monetization),
-    key_risks: sanitizeEnglishArray(raw.key_risks),
-    next_steps: sanitizeEnglishText(raw.next_steps),
-    source_type: 'reddit',
-    source_url:
-      sanitizeEnglishText(raw.source_url) ??
-      (representativeUrl ? sanitizeEnglishText(representativeUrl) : undefined),
-  }));
-
-  return ideas;
+  return allIdeas;
 }
 
 // ============ 第三步：插入 Supabase ideas 表 ============
