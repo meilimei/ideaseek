@@ -494,7 +494,13 @@ function isTransientNetworkError(err: unknown): boolean {
   const code = (e?.cause?.code || e?.code || '') as string;
   const msg = (e?.message || '') as string;
   const lowered = msg.toLowerCase();
+  const status = (e as any)?.status;
+  const snippet = ((e as any)?.bodySnippet ?? '') as string;
+  const isHtmlSnippet = snippet.trim().startsWith('<') || snippet.toLowerCase().includes('<html');
   return (
+    status === 408 ||
+    status === 429 ||
+    (typeof status === 'number' && status >= 500) ||
     code === 'UND_ERR_SOCKET' ||
     code === 'ECONNRESET' ||
     code === 'ETIMEDOUT' ||
@@ -502,7 +508,9 @@ function isTransientNetworkError(err: unknown): boolean {
     code === 'UND_ERR_CONNECT_TIMEOUT' ||
     lowered.includes('terminated') ||
     lowered.includes('socket') ||
-    lowered.includes('other side closed')
+    lowered.includes('other side closed') ||
+    ((lowered.includes('non-json response') || lowered.includes('invalid json')) &&
+      isHtmlSnippet)
   );
 }
 
@@ -525,11 +533,22 @@ async function fetchJsonWithRetryPlain<T>(
       const res = await fetch(url, { ...init, signal: controller.signal });
       clearTimeout(t);
 
+      const status = res.status;
+      const ctype = res.headers.get('content-type') || '';
       const text = await res.text().catch(() => '');
-      const json = text ? (JSON.parse(text) as any) : ({} as any);
+      const trimmed = text.trim();
+      const looksJson =
+        ctype.includes('application/json') ||
+        trimmed.startsWith('{') ||
+        trimmed.startsWith('[');
+      const snippet = trimmed.slice(0, 300);
 
       if (!res.ok) {
-        if ((res.status === 429 || res.status >= 500) && attempt < retries) {
+        const err = new Error(`HTTP ${status} ctype=${ctype} snippet=${snippet}`);
+        (err as any).status = status;
+        (err as any).bodySnippet = snippet;
+        (err as any).contentType = ctype;
+        if ((status === 429 || status >= 500) && attempt < retries) {
           const backoff = Math.min(
             15_000,
             800 * (attempt + 1) + Math.floor(Math.random() * 600),
@@ -537,12 +556,30 @@ async function fetchJsonWithRetryPlain<T>(
           await new Promise((r) => setTimeout(r, backoff));
           continue;
         }
-        throw new Error(
-          `HTTP ${res.status}: ${typeof json === 'string' ? json : JSON.stringify(json).slice(0, 500)}`,
-        );
+        throw err;
       }
 
-      return json as T;
+      if (!looksJson) {
+        const err = new Error(
+          `Non-JSON response HTTP ${status} ctype=${ctype} snippet=${snippet}`,
+        );
+        (err as any).status = status;
+        (err as any).bodySnippet = snippet;
+        (err as any).contentType = ctype;
+        throw err;
+      }
+
+      try {
+        return (text ? (JSON.parse(text) as any) : ({} as any)) as T;
+      } catch {
+        const err = new Error(
+          `Invalid JSON HTTP ${status} ctype=${ctype} snippet=${snippet}`,
+        );
+        (err as any).status = status;
+        (err as any).bodySnippet = snippet;
+        (err as any).contentType = ctype;
+        throw err;
+      }
     } catch (err) {
       clearTimeout(t);
       lastErr = err;
