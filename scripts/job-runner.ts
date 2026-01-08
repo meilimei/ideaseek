@@ -218,6 +218,39 @@ async function heartbeat(worker: string) {
   }
 }
 
+function startJobHeartbeat({
+  jobId,
+  lockedBy,
+  intervalMs = 15_000,
+}: {
+  jobId: string;
+  lockedBy: string;
+  intervalMs?: number;
+}) {
+  let lastErrorLogAt = 0;
+  console.log(`[job-runner] heartbeat start jobId=${jobId} every=${intervalMs}ms`);
+  const timer = setInterval(async () => {
+    const nowIso = new Date().toISOString();
+    const { error } = await supabase
+      .from('admin_jobs')
+      .update({ locked_at: nowIso })
+      .eq('id', jobId)
+      .eq('locked_by', lockedBy);
+    if (error) {
+      const now = Date.now();
+      if (now - lastErrorLogAt > 60_000) {
+        console.warn('[job-runner] heartbeat update failed:', error.message);
+        lastErrorLogAt = now;
+      }
+    }
+  }, intervalMs);
+
+  return () => {
+    clearInterval(timer);
+    console.log(`[job-runner] heartbeat stop jobId=${jobId}`);
+  };
+}
+
 async function linkJobToIdea(
   jobId: number | string,
   ideaId: string,
@@ -965,6 +998,10 @@ async function main() {
       continue;
     }
     console.log(`Claimed job ${job.id} (${job.job_type})`);
+    const stopHeartbeat = startJobHeartbeat({
+      jobId: String(job.id),
+      lockedBy: worker,
+    });
     const ideaIds = extractIdeaIds(job.payload ?? null);
     if (ideaIds.length > 0) {
       await Promise.all(
@@ -978,7 +1015,11 @@ async function main() {
         }),
       );
     }
-    await processJob(job);
+    try {
+      await processJob(job);
+    } finally {
+      stopHeartbeat();
+    }
     processed += 1;
     idleLoops = 0;
   }

@@ -645,198 +645,179 @@ async function fetchRedditPostsViaApify(
   sort: RedditSort,
   timeRange: RedditTimeRange,
 ): Promise<{ posts: RedditPost[]; errors: SubredditFetchError[] }> {
-  async function apifyStartRun(actorId: string, token: string, input: Record<string, unknown>) {
+  const token = process.env.APIFY_TOKEN?.trim();
+  const errors: SubredditFetchError[] = [];
+  if (!token) {
+    return {
+      posts: [],
+      errors: [{ subreddit: 'apify', status: 0, message: 'Missing APIFY_TOKEN' }],
+    };
+  }
+
+  const rawActor =
+    (process.env.APIFY_REDDIT_ACTOR?.trim() || 'trudax~reddit-scraper-lite').trim();
+  const actorId = rawActor.includes('/') ? rawActor.replace('/', '~') : rawActor;
+
+  function clipJson(v: any, max = 700) {
+    try {
+      const s = typeof v === 'string' ? v : JSON.stringify(v);
+      return s.length > max ? s.slice(0, max) + '…' : s;
+    } catch {
+      return String(v);
+    }
+  }
+
+  async function apifyStartRun(actorIdIn: string, tokenIn: string, input: Record<string, unknown>) {
     const res = await fetch(
-      `https://api.apify.com/v2/acts/${actorId}/runs?token=${encodeURIComponent(token)}`,
+      `https://api.apify.com/v2/acts/${actorIdIn}/runs?token=${encodeURIComponent(tokenIn)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       },
     );
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(
-        `Apify start failed ${res.status}: ${typeof json === 'string' ? json : JSON.stringify(json).slice(0, 500)}`,
-      );
+      const errType = (json as any)?.error?.type;
+      if (errType === 'actor-is-not-rented') {
+        throw new Error(
+          `Apify actor is not rented: ${actorIdIn}. Rent it, or set APIFY_REDDIT_ACTOR=trudax~reddit-scraper-lite.`,
+        );
+      }
+      throw new Error(`Apify start failed ${res.status}: ${clipJson(json)}`);
     }
     const runId = (json as any)?.data?.id ?? (json as any)?.id;
-    if (!runId) throw new Error('Apify start did not return run id');
+    if (!runId) throw new Error(`Apify start did not return run id: ${clipJson(json)}`);
     return runId as string;
   }
 
-  async function apifyPollRun(token: string, runId: string, maxMs = 12 * 60 * 1000, intervalMs = 5000) {
-    const endAt = Date.now() + maxMs;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const res = await fetch(
-        `https://api.apify.com/v2/actor-runs/${runId}?token=${encodeURIComponent(token)}`,
-      );
-      const json = await res.json();
-      const status = (json as any)?.data?.status ?? (json as any)?.status;
-      console.log(`[apify][poll] runId=${runId} status=${status ?? 'unknown'}`);
-      if (status === 'SUCCEEDED') return json as Record<string, unknown>;
-      if (status === 'FAILED' || status === 'TIMED-OUT' || status === 'ABORTED') {
-        throw new Error(`Apify run failed: status=${status}`);
+  async function apifyGetRun(tokenIn: string, runId: string) {
+    const res = await fetch(
+      `https://api.apify.com/v2/actor-runs/${runId}?token=${encodeURIComponent(tokenIn)}`,
+      { method: 'GET' },
+    );
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(`Apify run get failed ${res.status}: ${clipJson(json)}`);
+    }
+    return json as any;
+  }
+
+  function sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  async function apifyPollRun(tokenIn: string, runId: string, maxMs = 12 * 60_000, intervalMs = 5_000) {
+    const started = Date.now();
+    let lastStatus = '';
+    while (Date.now() - started < maxMs) {
+      const run = await apifyGetRun(tokenIn, runId);
+      const status =
+        run?.data?.status ?? run?.status ?? '';
+      if (status && status !== lastStatus) {
+        console.log(`[apify][poll] runId=${runId} status=${status}`);
+        lastStatus = status;
       }
-      if (Date.now() > endAt) {
-        throw new Error('Apify run polling timeout');
+      if (status === 'SUCCEEDED') return run;
+      if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
+        throw new Error(`Apify run ended: status=${status} runId=${runId}`);
       }
       await sleep(intervalMs);
     }
+    throw new Error(`Apify run polling timeout (client-side) runId=${runId}`);
   }
 
-  async function apifyGetDatasetItems(token: string, datasetId: string) {
+  async function apifyGetDatasetItems(tokenIn: string, datasetId: string) {
     const res = await fetch(
-      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=1&format=json`,
+      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${encodeURIComponent(tokenIn)}&clean=1&format=json`,
+      { method: 'GET' },
     );
+    const json = await res.json().catch(() => ([]));
     if (!res.ok) {
-      throw new Error(`Failed to fetch dataset items ${res.status}`);
+      throw new Error(`Apify dataset items failed ${res.status}: ${clipJson(json)}`);
     }
-    return (await res.json()) as any[];
+    if (!Array.isArray(json)) return [];
+    return json as any[];
   }
 
-  const ALLOWED_SORT = new Set(['', 'relevance', 'hot', 'top', 'new', 'rising', 'comments']);
-  const ALLOWED_TIME = new Set(['all', 'hour', 'day', 'week', 'month', 'year']);
-  const normalizeApifySort = (v: unknown): string | undefined => {
-    const value = typeof v === 'string' ? v.toLowerCase() : '';
-    return ALLOWED_SORT.has(value) ? value : undefined;
-  };
-  const normalizeApifyTime = (v: unknown): string | undefined => {
-    const value = typeof v === 'string' ? v.toLowerCase() : '';
-    return ALLOWED_TIME.has(value) ? value : undefined;
-  };
-  const apifySort = normalizeApifySort(sort);
-  const apifyTime = normalizeApifyTime(timeRange);
+  // Build ONE run for all subreddits (avoid 5 separate runs / timeouts)
+  const startUrls = subreddits.map((sub) => ({
+    url: `https://www.reddit.com/r/${sub}/${sort}/?t=${timeRange}`,
+  }));
 
-  const token = process.env.APIFY_TOKEN?.trim();
-  if (!token) {
-    return {
-      posts: [],
-      errors: [
-        {
-          subreddit: 'all',
-          message: 'Missing APIFY_TOKEN',
-        },
-      ],
-    };
-  }
-
-  const actor = process.env.APIFY_REDDIT_ACTOR?.trim() || 'trudax~reddit-scraper';
-  const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(
-    token,
-  )}&format=json&clean=1`;
-
-  const startUrls = subreddits.map((sub) => {
-    const url = `https://www.reddit.com/r/${sub}/${sort}/?t=${timeRange}`;
-    console.log(
-      `[apify][input] sub=${sub} sort=${apifySort ?? '(omitted)'} time=${apifyTime ?? '(omitted)'} url=${url}`,
-    );
-    return { url };
-  });
-
-  const body: Record<string, unknown> = {
+  const input: Record<string, unknown> = {
     startUrls,
-    proxy: {
-      useApifyProxy: true,
-    },
-    skipComments: true,
-    maxItems: perSubreddit * Math.max(1, subreddits.length),
+    maxItems: subreddits.length * perSubreddit,
     maxPostCount: perSubreddit,
-    debugMode: process.env.DEBUG_REDDIT === '1',
+    skipComments: true,
+    // Do NOT set sort/time here; we encode them in the URL already to avoid invalid-input.
+    proxy: { useApifyProxy: true },
   };
-  if (apifySort !== undefined) {
-    body.sort = apifySort;
-  }
-  if (apifyTime !== undefined) {
-    body.time = apifyTime;
-  }
+
+  console.log(
+    `[apify][run] actor=${actorId} subCount=${subreddits.length} maxItems=${input.maxItems}`,
+  );
 
   try {
-    console.log(
-      `[apify][run] actor=${actor} subCount=${subreddits.length} maxItems=${body.maxItems}`,
-    );
-    const runId = await apifyStartRun(actor, token, body);
+    const runId = await apifyStartRun(actorId, token, input);
+    console.log(`[apify][run] started runId=${runId}`);
     const run = await apifyPollRun(token, runId);
+
     const datasetId =
-      (run as any)?.data?.defaultDatasetId ?? (run as any)?.defaultDatasetId;
+      run?.data?.defaultDatasetId ??
+      run?.defaultDatasetId ??
+      run?.data?.output?.defaultDatasetId;
+
     if (!datasetId) {
-      throw new Error('Apify run missing datasetId');
+      throw new Error(`Apify run missing defaultDatasetId: ${clipJson(run)}`);
     }
-    const data = await apifyGetDatasetItems(token, datasetId);
+
+    const items = await apifyGetDatasetItems(token, String(datasetId));
     const posts: RedditPost[] = [];
-    if (Array.isArray(data)) {
-      if (process.env.DEBUG_REDDIT === '1' && data[0] && typeof data[0] === 'object') {
-        console.log(`[apify][debug] firstItemKeys=${Object.keys(data[0]).join(',')}`);
-      }
-      for (const item of data) {
-        const id =
-          typeof item.id === 'string'
-            ? item.id
-            : typeof item.postId === 'string'
-              ? item.postId
-              : typeof item.shortId === 'string'
-                ? item.shortId
-                : undefined;
-        const subreddit =
-          typeof item.subredditName === 'string'
-            ? item.subredditName
-            : typeof item.subreddit === 'string'
-              ? item.subreddit
-              : undefined;
-        if (!subreddit) continue;
-        const created =
-          item.createdAt ??
-          item.created_at ??
-          item.created ??
-          item.created_utc ??
-          item.createdUtc ??
-          null;
-        const createdMs = toEpochMsAny(created);
-        const post: RedditPost = {
-          id: id ?? `${subreddit}-${Math.random().toString(36).slice(2, 10)}`,
-          title: item.title ?? item.name ?? '',
-          selftext: item.text ?? item.body ?? item.selftext ?? '',
-          score:
-            Number(item.score ?? item.upVotes ?? item.upvotes ?? item.ups ?? 0) ||
+
+    for (const item of items) {
+      const createdMs = toEpochMsAny(
+        (item as any)?.createdAt ??
+          (item as any)?.createdUtc ??
+          (item as any)?.created_utc ??
+          (item as any)?.created,
+      );
+
+      const url =
+        (item as any)?.url ??
+        (item as any)?.postUrl ??
+        ((item as any)?.permalink ? `https://www.reddit.com${(item as any).permalink}` : '');
+
+      const subredditName =
+        (item as any)?.subreddit ??
+        (item as any)?.subredditName ??
+        (typeof url === 'string' && url.includes('/r/')
+          ? url.split('/r/')[1]?.split('/')[0]
+          : '');
+
+      posts.push({
+        id: String((item as any)?.id ?? (item as any)?.postId ?? (item as any)?.redditId ?? ''),
+        title: String((item as any)?.title ?? ''),
+        selftext: String((item as any)?.text ?? (item as any)?.body ?? (item as any)?.selftext ?? ''),
+        score: Number((item as any)?.score ?? (item as any)?.upVotes ?? (item as any)?.upvotes ?? 0),
+        num_comments: Number(
+          (item as any)?.numComments ??
+            (item as any)?.numberOfComments ??
+            (item as any)?.commentsCount ??
             0,
-          num_comments:
-            Number(
-              item.numberOfComments ??
-                item.numComments ??
-                item.commentsCount ??
-                item.num_comments ??
-                0,
-            ) || 0,
-          url:
-            typeof item.url === 'string'
-              ? item.url
-              : typeof item.permalink === 'string'
-                ? item.permalink.startsWith('/')
-                  ? `https://www.reddit.com${item.permalink}`
-                  : item.permalink
-                : '',
-          subreddit,
-          created_utc:
-            typeof item.created_utc === 'number'
-              ? item.created_utc
-              : typeof item.createdUtc === 'number'
-                ? item.createdUtc
-                : undefined,
-          created_at_ms: createdMs,
-        };
-        posts.push(post);
-      }
+        ),
+        url: String(url ?? ''),
+        subreddit: String(subredditName || ''),
+        created_utc: createdMs ? Math.floor(createdMs / 1000) : undefined,
+        created_at_ms: createdMs ?? null,
+      });
     }
+
     return { posts, errors: [] };
-  } catch (err) {
-    return {
-      posts: [],
-      errors: subreddits.map((sub) => ({
-        subreddit: sub,
-        message: err instanceof Error ? err.message : String(err),
-      })),
-    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push({ subreddit: 'apify', status: 0, message: msg });
+    return { posts: [], errors };
   }
 }
 
