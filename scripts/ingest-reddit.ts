@@ -202,7 +202,10 @@ function escapeLikePattern(input: string): string {
   return input.replace(/[%_]/g, '\\$&');
 }
 
-async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
+async function insertIdeasWithIds(
+  ideas: IdeaForInsert[],
+  visibility: 'public' | 'private',
+): Promise<string[]> {
   if (ideas.length === 0) {
     console.log('No ideas to insert.');
     return [];
@@ -265,9 +268,11 @@ async function insertIdeasWithIds(ideas: IdeaForInsert[]): Promise<string[]> {
     return [];
   }
 
-  const rowsToInsert = ownerId
-    ? uniqueIdeas.map((idea) => ({ ...idea, created_by: ownerId }))
-    : uniqueIdeas;
+  const rowsToInsert = uniqueIdeas.map((idea) => ({
+    ...idea,
+    visibility: idea.visibility ?? visibility,
+    ...(ownerId ? { created_by: ownerId } : {}),
+  }));
 
   const { data, error } = await supabaseServiceClient
     .from('ideas')
@@ -363,6 +368,21 @@ async function loadStrategyConfig(strategyId: string): Promise<Record<string, un
   }
 
   return (data?.config as unknown) ?? null;
+}
+
+async function loadStrategyVisibility(strategyId: string): Promise<string | null> {
+  const { data, error } = await supabaseServiceClient
+    .from('ingest_strategies')
+    .select('ideas_visibility')
+    .eq('id', strategyId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to load strategy visibility:', error.message);
+    return null;
+  }
+
+  return typeof data?.ideas_visibility === 'string' ? data.ideas_visibility : null;
 }
 
 async function loadJobPayload(jobId: number): Promise<Record<string, unknown> | null> {
@@ -1404,6 +1424,8 @@ async function main() {
     (dbStrategyConfigRaw && typeof dbStrategyConfigRaw === 'object' && !Array.isArray(dbStrategyConfigRaw)
       ? (dbStrategyConfigRaw as Record<string, unknown>)
       : null);
+  const strategyVisibilityRaw = strategyId ? await loadStrategyVisibility(strategyId) : null;
+  const ideasVisibility = strategyVisibilityRaw === 'private' ? 'private' : 'public';
   const cfg = {
     ...(dbStrategyConfig ?? {}),
     ...(envStrategyConfig ?? {}),
@@ -1506,6 +1528,7 @@ async function main() {
       ',',
     )}`,
   );
+  console.log(`[ideas] visibility=${ideasVisibility} (source=strategy)`);
   const rawKeywords = cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS;
   const keywords = normalizePainPatterns(rawKeywords);
   console.log(`Keywords: ${rawKeywords.length}`);
@@ -1625,7 +1648,7 @@ async function main() {
   const ideas = await generateIdeasFromPosts(filtered, 5);
   console.log(`Generated ${ideas.length} ideas from DeepSeek.`);
 
-  const insertedIds = await insertIdeasWithIds(ideas);
+  const insertedIds = await insertIdeasWithIds(ideas, ideasVisibility);
   if (insertedIds.length > 0) {
     await recordJobOutputs({
       supabase: supabaseServiceClient,

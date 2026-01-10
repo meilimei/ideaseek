@@ -12,7 +12,7 @@ type NavItem = { href: string; label: string };
 
 const navItems: NavItem[] = [
   { href: '/ideas/database', label: 'Find Ideas' },
-  { href: '/trends', label: 'Trends' },
+  { href: '/strategies', label: 'Strategies' },
   { href: '/market-insights', label: 'Market Insights' },
   { href: '/pricing', label: 'Pricing' },
 ];

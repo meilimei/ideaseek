@@ -215,6 +215,35 @@ export async function toggleStrategyActive(id: string, currentActive: boolean | 
   revalidatePath('/dashboard/strategies');
 }
 
+export async function toggleStrategyVisibility(id: string, currentVisibility: string | null) {
+  const supabase = await createServerSupabaseClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error('Failed to get user for visibility toggle:', userError.message);
+  }
+
+  const user = userData?.user ?? null;
+  if (!user) {
+    return redirect('/login');
+  }
+
+  const current = currentVisibility === 'private' ? 'private' : 'public';
+  const nextVisibility = current === 'private' ? 'public' : 'private';
+
+  const { error } = await supabase
+    .from('ingest_strategies')
+    .update({ ideas_visibility: nextVisibility })
+    .eq('id', id)
+    .eq('created_by', user.id);
+
+  if (error) {
+    console.error('Failed to toggle ideas visibility:', error.message);
+  }
+
+  revalidatePath('/dashboard/strategies');
+}
+
 export async function deleteStrategy(strategyId: string) {
   const supabase = await createServerSupabaseClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();

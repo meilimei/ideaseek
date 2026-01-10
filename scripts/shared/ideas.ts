@@ -17,6 +17,7 @@ export type IdeaForInsert = {
   next_steps?: string | null;
   source_type?: string | null;
   source_url?: string | null;
+  visibility?: string | null;
 };
 
 type SkipReason = 'source_url' | 'title';
