@@ -1,11 +1,10 @@
 // app/api/ideas/route.ts
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { supabase } from '@/lib/supabaseClient';
 
 type SortParam = 'newest' | 'oldest' | 'published' | 'pinned' | 'featured';
 
-function applySort(query: ReturnType<typeof supabase.from>, sort?: SortParam) {
+function applySort(query: any, sort?: SortParam) {
   switch (sort) {
     case 'oldest':
       return query.order('created_at', { ascending: true });
@@ -32,11 +31,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const sort = (url.searchParams.get('sort') as SortParam) ?? 'newest';
 
-  let query = supabase
+  const supabaseServer = await createServerSupabaseClient();
+  let query = supabaseServer
     .from('ideas')
     .select(
       'id, title, one_liner, tags, difficulty, market_size, demand_strength, source_type, source_url, created_at, created_by, published, pinned, featured'
     );
+  query = query.eq('visibility', 'public').is('archived_at', null);
 
   try {
     query = applySort(query, sort);

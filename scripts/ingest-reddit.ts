@@ -268,11 +268,18 @@ async function insertIdeasWithIds(
     return [];
   }
 
+  const publish = visibility === 'public';
+  const publishedAt = publish ? new Date().toISOString() : null;
   const rowsToInsert = uniqueIdeas.map((idea) => ({
     ...idea,
     visibility: idea.visibility ?? visibility,
+    published: idea.published ?? publish,
+    published_at: idea.published_at ?? publishedAt,
     ...(ownerId ? { created_by: ownerId } : {}),
   }));
+  console.log(
+    `[ideas] insert visibility=${visibility} published=${publish ? '1' : '0'}`,
+  );
 
   const { data, error } = await supabaseServiceClient
     .from('ideas')
@@ -355,10 +362,13 @@ async function markAdminJobFailed(message: string) {
   }
 }
 
-async function loadStrategyConfig(strategyId: string): Promise<Record<string, unknown> | null> {
+async function loadStrategyConfig(strategyId: string): Promise<{
+  config: unknown;
+  ideas_visibility: string | null;
+} | null> {
   const { data, error } = await supabaseServiceClient
     .from('ingest_strategies')
-    .select('config')
+    .select('config, ideas_visibility')
     .eq('id', strategyId)
     .maybeSingle();
 
@@ -367,22 +377,15 @@ async function loadStrategyConfig(strategyId: string): Promise<Record<string, un
     return null;
   }
 
-  return (data?.config as unknown) ?? null;
-}
-
-async function loadStrategyVisibility(strategyId: string): Promise<string | null> {
-  const { data, error } = await supabaseServiceClient
-    .from('ingest_strategies')
-    .select('ideas_visibility')
-    .eq('id', strategyId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Failed to load strategy visibility:', error.message);
-    return null;
-  }
-
-  return typeof data?.ideas_visibility === 'string' ? data.ideas_visibility : null;
+  return data
+    ? {
+        config: (data as { config?: unknown }).config ?? null,
+        ideas_visibility:
+          typeof (data as { ideas_visibility?: unknown }).ideas_visibility === 'string'
+            ? ((data as { ideas_visibility?: unknown }).ideas_visibility as string)
+            : null,
+      }
+    : null;
 }
 
 async function loadJobPayload(jobId: number): Promise<Record<string, unknown> | null> {
@@ -1418,14 +1421,28 @@ async function main() {
     payloadStrategyId ||
     (process.env.INGEST_STRATEGY_ID?.trim() || '');
 
-  const dbStrategyConfigRaw = strategyId ? await loadStrategyConfig(strategyId) : null;
+  const strategyMeta = strategyId ? await loadStrategyConfig(strategyId) : null;
+  const dbStrategyConfigRaw = strategyMeta?.config ?? null;
   const dbStrategyConfig =
     parseMaybeJson<Record<string, unknown>>(dbStrategyConfigRaw) ??
     (dbStrategyConfigRaw && typeof dbStrategyConfigRaw === 'object' && !Array.isArray(dbStrategyConfigRaw)
       ? (dbStrategyConfigRaw as Record<string, unknown>)
       : null);
-  const strategyVisibilityRaw = strategyId ? await loadStrategyVisibility(strategyId) : null;
-  const ideasVisibility = strategyVisibilityRaw === 'private' ? 'private' : 'public';
+  const payloadIdeasVisibilityRaw =
+    typeof (jobPayload as any)?.ideasVisibility === 'string'
+      ? (jobPayload as any)?.ideasVisibility
+      : typeof (jobPayload as any)?.ideas_visibility === 'string'
+        ? (jobPayload as any)?.ideas_visibility
+        : null;
+  let ideasVisibility: 'public' | 'private' = 'public';
+  let ideasVisibilitySource: 'payload' | 'strategy' | 'default' = 'default';
+  if (payloadIdeasVisibilityRaw) {
+    ideasVisibility = payloadIdeasVisibilityRaw === 'private' ? 'private' : 'public';
+    ideasVisibilitySource = 'payload';
+  } else if (strategyMeta?.ideas_visibility) {
+    ideasVisibility = strategyMeta.ideas_visibility === 'private' ? 'private' : 'public';
+    ideasVisibilitySource = 'strategy';
+  }
   const cfg = {
     ...(dbStrategyConfig ?? {}),
     ...(envStrategyConfig ?? {}),
@@ -1528,7 +1545,7 @@ async function main() {
       ',',
     )}`,
   );
-  console.log(`[ideas] visibility=${ideasVisibility} (source=strategy)`);
+  console.log(`[ideas] visibility=${ideasVisibility} source=${ideasVisibilitySource}`);
   const rawKeywords = cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS;
   const keywords = normalizePainPatterns(rawKeywords);
   console.log(`Keywords: ${rawKeywords.length}`);

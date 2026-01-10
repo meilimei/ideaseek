@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,7 +13,8 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  const supabaseServer = await createServerSupabaseClient();
+  const { data, error } = await supabaseServer
     .from('ideas')
     .select(
       [
@@ -55,7 +56,7 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: 'Idea not found' }, { status: 404 });
   }
 
-  const { data: evidence, error: evidenceError } = await supabase
+  const { data: evidence, error: evidenceError } = await supabaseServer
     .from('idea_evidence')
     .select('id, source_type, title, url, excerpt, metrics, created_at')
     .eq('idea_id', id)
