@@ -10,6 +10,7 @@ type IdeasToolbarProps = {
   onOpenFilters: () => void;
   viewMode?: "all" | "mine";
   onViewModeChange?: (value: "all" | "mine") => void;
+  canViewMine?: boolean;
 };
 
 export default function IdeasToolbar({
@@ -19,14 +20,34 @@ export default function IdeasToolbar({
   onOpenFilters,
   viewMode = "all",
   onViewModeChange,
+  canViewMine = true,
 }: IdeasToolbarProps) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card/40 p-3 shadow-soft backdrop-blur lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-foreground">All ideas</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-foreground">Ideas</span>
         <span className="rounded-full border border-border/60 bg-secondary/20 px-2.5 py-0.5 text-xs text-muted-foreground">
           {filteredCount ?? totalCount}
         </span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant={viewMode === "all" ? "pill" : "ghostPill"}
+            size="sm"
+            onClick={() => onViewModeChange?.("all")}
+          >
+            Public ideas
+          </Button>
+          <Button
+            type="button"
+            variant={viewMode === "mine" ? "pill" : "ghostPill"}
+            size="sm"
+            onClick={() => onViewModeChange?.("mine")}
+            disabled={!canViewMine}
+          >
+            My ideas
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">

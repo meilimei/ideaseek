@@ -30,6 +30,8 @@ function applySort(query: any, sort?: SortParam) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const sort = (url.searchParams.get('sort') as SortParam) ?? 'newest';
+  const view = url.searchParams.get('view');
+  const visibilityParam = url.searchParams.get('visibility');
 
   const supabaseServer = await createServerSupabaseClient();
   let query = supabaseServer
@@ -37,7 +39,24 @@ export async function GET(request: Request) {
     .select(
       'id, title, one_liner, tags, difficulty, market_size, demand_strength, source_type, source_url, created_at, created_by, published, pinned, featured'
     );
-  query = query.eq('visibility', 'public').is('archived_at', null);
+  const wantsPrivate =
+    view === 'mine' || (visibilityParam && visibilityParam.toLowerCase() === 'private');
+  if (wantsPrivate) {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseServer.auth.getUser();
+    if (userError) {
+      console.error('[API] Failed to get user for private ideas:', userError.message);
+    }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    query = query.eq('visibility', 'private').eq('created_by', user.id);
+  } else {
+    query = query.eq('visibility', 'public');
+  }
+  query = query.is('archived_at', null);
 
   try {
     query = applySort(query, sort);

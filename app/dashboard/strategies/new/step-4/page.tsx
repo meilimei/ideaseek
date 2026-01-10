@@ -158,13 +158,14 @@ export default function StrategyStep4Page() {
       disableNext
       rightSlot={<SummaryCard />}
     >
-      <div className="space-y-6">
-        <div className="space-y-4">
+      <div className="space-y-8">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="space-y-2 text-sm">
-            <label className="text-muted-foreground">Schedule</label>
+            <label className="text-sm font-medium text-muted-foreground">Schedule</label>
             <AdminSelect
               value={schedule}
               onChange={(event) => handleScheduleChange(event.target.value)}
+              className="h-11 text-base"
             >
               {scheduleOptions.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -177,10 +178,11 @@ export default function StrategyStep4Page() {
                 value={draft.cron ?? ''}
                 onChange={(event) => updateDraft({ cron: event.target.value })}
                 placeholder={weeklyCron}
+                className="h-11 text-base"
               />
             )}
           </div>
-          <div className="text-sm">
+          <div className="rounded-2xl border border-border/50 bg-card/60 px-4 py-3 text-sm">
             <Checkbox
               checked={draft.active ?? true}
               onChange={(event) => updateDraft({ active: event.target.checked })}
@@ -199,7 +201,13 @@ export default function StrategyStep4Page() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" size="sm" onClick={handleSubmit} disabled={isPending}>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={isPending}
+            className="rounded-full px-6 transition hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+          >
             {isPending
               ? isEdit
                 ? 'Updating...'

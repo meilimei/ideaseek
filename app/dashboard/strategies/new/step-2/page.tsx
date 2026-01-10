@@ -113,13 +113,13 @@ export default function StrategyStep2Page() {
       nextHref={nextHref}
       rightSlot={<SummaryCard />}
     >
-      <div className="space-y-6">
-        <div className="space-y-2">
+      <div className="space-y-8">
+        <div className="space-y-3">
           <div className="text-sm font-semibold text-foreground">Subreddits</div>
           <div className="text-xs text-muted-foreground">
             Add and press Enter (without r/).
           </div>
-          <div className="flex flex-wrap gap-2 rounded-xl border border-border/50 bg-card/60 p-3">
+          <div className="flex flex-wrap gap-2 rounded-2xl border border-border/50 bg-card/60 p-4">
             {subreddits.length === 0 ? (
               <span className="text-xs text-muted-foreground">No subreddits yet.</span>
             ) : (
@@ -149,6 +149,7 @@ export default function StrategyStep2Page() {
                 setNewSubreddit('');
               }}
               placeholder="Add subreddit (e.g. startups) and press Enter"
+              className="h-11 text-base"
             />
             {subreddits.length > 0 && (
               <Button
@@ -190,12 +191,12 @@ export default function StrategyStep2Page() {
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="text-sm font-semibold text-foreground">Keywords / title patterns</div>
           <div className="text-xs text-muted-foreground">
             Patterns help match pain points in titles and descriptions.
           </div>
-          <div className="flex flex-wrap gap-2 rounded-xl border border-border/50 bg-card/60 p-3">
+          <div className="flex flex-wrap gap-2 rounded-2xl border border-border/50 bg-card/60 p-4">
             {keywords.length === 0 ? (
               <span className="text-xs text-muted-foreground">No keywords yet.</span>
             ) : (
@@ -224,6 +225,7 @@ export default function StrategyStep2Page() {
               setNewKeyword('');
             }}
             placeholder="Add keyword pattern and press Enter"
+            className="h-11 text-base"
           />
           <div className="space-y-2">
             <div className="text-xs font-semibold text-muted-foreground">Templates</div>

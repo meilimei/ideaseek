@@ -56,22 +56,23 @@ export default function StrategyStep3Page() {
       nextHref={nextHref}
       rightSlot={<SummaryCard />}
     >
-      <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
+      <div className="space-y-8">
+        <div className="grid gap-6 sm:grid-cols-3">
           <div className="space-y-2 text-sm">
-            <label className="text-muted-foreground">Sort</label>
+            <label className="text-sm font-medium text-muted-foreground">Sort</label>
             <AdminSelect
               value={sort}
               onChange={(event) =>
                 updateDraft({ sort: event.target.value as 'top' | 'new' })
               }
+              className="h-11 text-base"
             >
               <option value="top">Top</option>
               <option value="new">New</option>
             </AdminSelect>
           </div>
           <div className="space-y-2 text-sm">
-            <label className="text-muted-foreground">Time range</label>
+            <label className="text-sm font-medium text-muted-foreground">Time range</label>
             <AdminSelect
               value={timeRange}
               onChange={(event) =>
@@ -79,6 +80,7 @@ export default function StrategyStep3Page() {
                   timeRange: event.target.value as 'day' | 'week' | 'month',
                 })
               }
+              className="h-11 text-base"
             >
               <option value="day">Day</option>
               <option value="week">Week</option>
@@ -86,7 +88,7 @@ export default function StrategyStep3Page() {
             </AdminSelect>
           </div>
           <div className="space-y-2 text-sm">
-            <label className="text-muted-foreground">Limit</label>
+            <label className="text-sm font-medium text-muted-foreground">Limit</label>
             <AdminInput
               type="number"
               min={10}
@@ -103,18 +105,19 @@ export default function StrategyStep3Page() {
                 const clamped = Math.min(100, Math.max(10, limit || 10));
                 updateDraft({ limit: clamped });
               }}
+              className="h-11 text-base"
             />
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3 rounded-2xl border border-border/40 bg-card/60 p-4">
           <div className="text-sm font-semibold text-foreground">Signals</div>
           <div className="text-xs text-muted-foreground">
             Tune thresholds to focus on higher-signal posts.
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-3">
             <div className="space-y-2 text-sm">
-              <label className="text-muted-foreground">Min upvotes</label>
+              <label className="text-sm font-medium text-muted-foreground">Min upvotes</label>
               <AdminInput
                 type="number"
                 min={0}
@@ -134,10 +137,11 @@ export default function StrategyStep3Page() {
                     signals: { ...signals, minUpvotes: clamped },
                   });
                 }}
+                className="h-11 text-base"
               />
             </div>
             <div className="space-y-2 text-sm">
-              <label className="text-muted-foreground">Min comments</label>
+              <label className="text-sm font-medium text-muted-foreground">Min comments</label>
               <AdminInput
                 type="number"
                 min={0}
@@ -157,10 +161,13 @@ export default function StrategyStep3Page() {
                     signals: { ...signals, minComments: clamped },
                   });
                 }}
+                className="h-11 text-base"
               />
             </div>
             <div className="space-y-2 text-sm">
-              <label className="text-muted-foreground">Recency (days)</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Recency (days)
+              </label>
               <AdminInput
                 type="number"
                 min={1}
@@ -180,6 +187,7 @@ export default function StrategyStep3Page() {
                     signals: { ...signals, maxAgeDays: clamped },
                   });
                 }}
+                className="h-11 text-base"
               />
             </div>
           </div>

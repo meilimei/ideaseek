@@ -178,6 +178,7 @@ export default function IdeasDatabasePage() {
       try {
         const params = new URLSearchParams();
         if (currentSort) params.set('sort', currentSort);
+        params.set('visibility', currentView === 'mine' ? 'private' : 'public');
         const res = await fetch(`/api/ideas?${params.toString()}`);
         if (!res.ok) {
           throw new Error('Failed to fetch ideas');
@@ -192,7 +193,7 @@ export default function IdeasDatabasePage() {
       }
     }
     fetchIdeas();
-  }, [currentSort]);
+  }, [currentSort, currentView]);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
@@ -376,6 +377,7 @@ export default function IdeasDatabasePage() {
           updateQuery({ view: v }, { resetPage: true });
           scrollToListTop();
         }}
+        canViewMine={Boolean(currentUserId)}
         onOpenFilters={() => setFiltersOpen(true)}
       />
 
