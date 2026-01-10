@@ -159,80 +159,45 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
             )}
           </div>
         ) : (
-          <DataTable>
-            <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Strategy</th>
-                <th className="px-3 py-2 font-medium">Source</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Visibility</th>
-                <th className="px-3 py-2 font-medium">Schedule</th>
-                <th className="px-3 py-2 font-medium">Last run</th>
-                <th className="px-3 py-2 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
+          <>
+            <div className="space-y-4 sm:hidden">
               {filtered.map((strategy) => {
                 const visibility =
                   strategy.ideas_visibility === 'private' ? 'private' : 'public';
                 return (
-                  <tr key={strategy.id} className="align-top">
-                    <td className="px-3 py-2">
-                      <div className="font-semibold text-foreground">
-                        {strategy.name || 'Untitled strategy'}
+                  <div
+                    key={strategy.id}
+                    className="rounded-2xl border border-border/40 bg-card/60 p-4"
+                  >
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-base font-semibold text-foreground">
+                          {strategy.name || 'Untitled strategy'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {strategy.description || '—'}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {strategy.description || '—'}
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>Source: {strategy.source ?? '—'}</span>
+                        <span>Schedule: {strategy.cron_expr ?? '—'}</span>
+                        <span>Last run: {formatDate(strategy.last_run_at)}</span>
                       </div>
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {strategy.source ?? '—'}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge
-                        className={
-                          strategy.is_active
-                            ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
-                            : 'bg-secondary/40 text-muted-foreground border-border/60'
-                        }
-                      >
-                        {strategy.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <form
-                        action={toggleStrategyVisibility.bind(
-                          null,
-                          strategy.id,
-                          visibility,
-                        )}
-                      >
-                        <Button
-                          type="submit"
-                          size="sm"
-                          variant="ghost"
-                          className="rounded-full px-3"
+                      <div className="flex flex-wrap gap-2">
+                        <Badge
+                          className={
+                            strategy.is_active
+                              ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
+                              : 'bg-secondary/40 text-muted-foreground border-border/60'
+                          }
                         >
-                          {visibility === 'public' ? 'Public' : 'Private'}
-                        </Button>
-                      </form>
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {strategy.cron_expr ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {formatDate(strategy.last_run_at)}
-                      <div className="text-xs text-muted-foreground">
-                        {strategy.last_run_status || '—'}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex flex-col items-end gap-2">
+                          {strategy.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
                         <form
-                          action={toggleStrategyActive.bind(
+                          action={toggleStrategyVisibility.bind(
                             null,
                             strategy.id,
-                            strategy.is_active,
+                            visibility,
                           )}
                         >
                           <Button
@@ -241,30 +206,156 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                             variant="ghost"
                             className="rounded-full px-3"
                           >
-                            {strategy.is_active ? 'Deactivate' : 'Activate'}
+                            {visibility === 'public' ? 'Public' : 'Private'}
                           </Button>
                         </form>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <form
+                        action={toggleStrategyActive.bind(
+                          null,
+                          strategy.id,
+                          strategy.is_active,
+                        )}
+                      >
                         <Button
-                          asChild
+                          type="submit"
                           size="sm"
                           variant="ghost"
                           className="rounded-full px-3"
                         >
-                          <Link
-                            href={`/dashboard/strategies/edit/step-1?mode=edit&strategyId=${strategy.id}`}
-                          >
-                            Edit
-                          </Link>
+                          {strategy.is_active ? 'Deactivate' : 'Activate'}
                         </Button>
-                        <RunNowButton strategyId={strategy.id} />
-                        <DeleteStrategyButton strategyId={strategy.id} />
-                      </div>
-                    </td>
-                  </tr>
+                      </form>
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-full px-3"
+                      >
+                        <Link
+                          href={`/dashboard/strategies/edit/step-1?mode=edit&strategyId=${strategy.id}`}
+                        >
+                          Edit
+                        </Link>
+                      </Button>
+                      <RunNowButton strategyId={strategy.id} />
+                      <DeleteStrategyButton strategyId={strategy.id} />
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </DataTable>
+            </div>
+            <div className="hidden sm:block">
+              <DataTable>
+                <thead className="bg-secondary/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Strategy</th>
+                    <th className="px-3 py-2 font-medium">Source</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">Visibility</th>
+                    <th className="px-3 py-2 font-medium">Schedule</th>
+                    <th className="px-3 py-2 font-medium">Last run</th>
+                    <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {filtered.map((strategy) => {
+                    const visibility =
+                      strategy.ideas_visibility === 'private' ? 'private' : 'public';
+                    return (
+                      <tr key={strategy.id} className="align-top">
+                        <td className="px-3 py-2">
+                          <div className="font-semibold text-foreground">
+                            {strategy.name || 'Untitled strategy'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {strategy.description || '—'}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-muted-foreground">
+                          {strategy.source ?? '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge
+                            className={
+                              strategy.is_active
+                                ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
+                                : 'bg-secondary/40 text-muted-foreground border-border/60'
+                            }
+                          >
+                            {strategy.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2">
+                          <form
+                            action={toggleStrategyVisibility.bind(
+                              null,
+                              strategy.id,
+                              visibility,
+                            )}
+                          >
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="ghost"
+                              className="rounded-full px-3"
+                            >
+                              {visibility === 'public' ? 'Public' : 'Private'}
+                            </Button>
+                          </form>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-muted-foreground">
+                          {strategy.cron_expr ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-muted-foreground">
+                          {formatDate(strategy.last_run_at)}
+                          <div className="text-xs text-muted-foreground">
+                            {strategy.last_run_status || '—'}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex flex-col items-end gap-2">
+                            <form
+                              action={toggleStrategyActive.bind(
+                                null,
+                                strategy.id,
+                                strategy.is_active,
+                              )}
+                            >
+                              <Button
+                                type="submit"
+                                size="sm"
+                                variant="ghost"
+                                className="rounded-full px-3"
+                              >
+                                {strategy.is_active ? 'Deactivate' : 'Activate'}
+                              </Button>
+                            </form>
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="ghost"
+                              className="rounded-full px-3"
+                            >
+                              <Link
+                                href={`/dashboard/strategies/edit/step-1?mode=edit&strategyId=${strategy.id}`}
+                              >
+                                Edit
+                              </Link>
+                            </Button>
+                            <RunNowButton strategyId={strategy.id} />
+                            <DeleteStrategyButton strategyId={strategy.id} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </div>
+          </>
         )}
       </CardBody>
     </GlassCard>

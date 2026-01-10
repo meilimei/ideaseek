@@ -21,7 +21,25 @@ type StrategyRow = {
   ideas_visibility: string | null;
 };
 
-export default async function DashboardStrategiesPage({
+async function fetchStrategies(userId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from('ingest_strategies')
+    .select(
+      'id, name, source, description, is_active, cron_expr, created_at, updated_at, last_run_at, last_run_status, last_error, ideas_visibility',
+    )
+    .eq('created_by', userId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Failed to load user strategies:', error.message);
+  }
+
+  return (data ?? []) as StrategyRow[];
+}
+
+export default async function StrategiesPage({
   searchParams,
 }: {
   searchParams?:
@@ -41,25 +59,12 @@ export default async function DashboardStrategiesPage({
     return redirect('/login');
   }
 
-  const { data, error } = await supabase
-    .from('ingest_strategies')
-    .select(
-      'id, name, source, description, is_active, cron_expr, created_at, updated_at, last_run_at, last_run_status, last_error, ideas_visibility',
-    )
-    .eq('created_by', user.id)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Failed to load user strategies:', error.message);
-  }
-
-  const strategies = (data ?? []) as StrategyRow[];
+  const strategies = await fetchStrategies(user.id);
   const toast =
     typeof resolvedSearchParams?.toast === 'string' ? resolvedSearchParams.toast : null;
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-6 py-10 lg:px-12">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-6 py-10 sm:px-8 lg:px-12">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold text-foreground">Strategy Center</h1>
@@ -72,7 +77,9 @@ export default async function DashboardStrategiesPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild size="sm">
-            <Link href="/dashboard/strategies/new/step-1">New strategy (guided)</Link>
+            <Link href="/dashboard/strategies/new/step-1">
+              Create New Strategy (Guided)
+            </Link>
           </Button>
         </div>
       </div>
