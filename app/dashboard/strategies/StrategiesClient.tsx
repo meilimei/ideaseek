@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,8 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
   const [sourceFilter, setSourceFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
+  const pageSize = 8;
+  const [visibleCount, setVisibleCount] = useState(pageSize);
   const hasFilters =
     query.trim().length > 0 ||
     sourceFilter !== 'all' ||
@@ -58,13 +60,23 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
     });
   }, [strategies, query, sourceFilter, statusFilter, visibilityFilter]);
 
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [pageSize, query, sourceFilter, statusFilter, visibilityFilter, strategies.length]);
+
+  const visible = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+  const canShowMore = filtered.length > visibleCount;
+
   return (
     <GlassCard>
       <CardHeading
         title="Strategy Center"
         description="Manage your ingestion strategies and visibility settings."
       />
-      <CardBody className="space-y-4 pt-0">
+      <CardBody className="space-y-3 pt-0">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex flex-1 flex-col gap-2">
             <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -121,7 +133,11 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{filtered.length} strategies</span>
+          <span>
+            {canShowMore
+              ? `Showing ${visible.length} of ${filtered.length} strategies`
+              : `${filtered.length} strategies`}
+          </span>
           {hasFilters && (
             <button
               type="button"
@@ -139,7 +155,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/60 bg-card/40 p-8 text-center">
+          <div className="rounded-2xl border border-dashed border-border/60 bg-card/40 p-6 text-center">
             {strategies.length === 0 ? (
               <>
                 <div className="text-sm font-semibold text-foreground">No strategies yet</div>
@@ -160,23 +176,26 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
           </div>
         ) : (
           <>
-            <div className="space-y-4 sm:hidden">
-              {filtered.map((strategy) => {
+            <div className="space-y-3 sm:hidden">
+              {visible.map((strategy) => {
                 const visibility =
                   strategy.ideas_visibility === 'private' ? 'private' : 'public';
+                const description = strategy.description?.trim();
                 return (
                   <div
                     key={strategy.id}
-                    className="rounded-2xl border border-border/40 bg-card/60 p-4"
+                    className="rounded-2xl border border-border/40 bg-card/60 p-3"
                   >
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div>
                         <div className="text-base font-semibold text-foreground">
                           {strategy.name || 'Untitled strategy'}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {strategy.description || '—'}
-                        </div>
+                        {description ? (
+                          <div className="text-xs text-muted-foreground">
+                            {description}
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                         <span>Source: {strategy.source ?? '—'}</span>
@@ -211,7 +230,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                         </form>
                       </div>
                     </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <form
                         action={toggleStrategyActive.bind(
                           null,
@@ -240,8 +259,8 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                           Edit
                         </Link>
                       </Button>
-                      <RunNowButton strategyId={strategy.id} />
-                      <DeleteStrategyButton strategyId={strategy.id} />
+                      <RunNowButton strategyId={strategy.id} align="start" />
+                      <DeleteStrategyButton strategyId={strategy.id} align="start" />
                     </div>
                   </div>
                 );
@@ -261,18 +280,21 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
-                  {filtered.map((strategy) => {
+                  {visible.map((strategy) => {
                     const visibility =
                       strategy.ideas_visibility === 'private' ? 'private' : 'public';
+                    const description = strategy.description?.trim();
                     return (
                       <tr key={strategy.id} className="align-top">
                         <td className="px-3 py-2">
                           <div className="font-semibold text-foreground">
                             {strategy.name || 'Untitled strategy'}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {strategy.description || '—'}
-                          </div>
+                          {description ? (
+                            <div className="text-xs text-muted-foreground">
+                              {description}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-3 py-2 text-sm text-muted-foreground">
                           {strategy.source ?? '—'}
@@ -316,7 +338,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <div className="flex flex-col items-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <form
                               action={toggleStrategyActive.bind(
                                 null,
@@ -345,8 +367,8 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                                 Edit
                               </Link>
                             </Button>
-                            <RunNowButton strategyId={strategy.id} />
-                            <DeleteStrategyButton strategyId={strategy.id} />
+                            <RunNowButton strategyId={strategy.id} align="end" />
+                            <DeleteStrategyButton strategyId={strategy.id} align="end" />
                           </div>
                         </td>
                       </tr>
@@ -355,6 +377,21 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyR
                 </tbody>
               </DataTable>
             </div>
+            {canShowMore && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-full px-4"
+                  onClick={() =>
+                    setVisibleCount((count) => Math.min(count + pageSize, filtered.length))
+                  }
+                >
+                  Show more
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardBody>

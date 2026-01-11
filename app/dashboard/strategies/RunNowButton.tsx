@@ -1,13 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
-export default function RunNowButton({ strategyId }: { strategyId: string }) {
+export default function RunNowButton({
+  strategyId,
+  align = 'end',
+}: {
+  strategyId: string;
+  align?: 'start' | 'end';
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const alignClass = useMemo(() => (align === 'end' ? 'items-end' : 'items-start'), [align]);
 
   const handleRun = async (fetchProvider?: string) => {
     setLoading(true);
@@ -34,8 +41,8 @@ export default function RunNowButton({ strategyId }: { strategyId: string }) {
   };
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap gap-2">
+    <div className={`flex flex-col gap-1 ${alignClass}`}>
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"

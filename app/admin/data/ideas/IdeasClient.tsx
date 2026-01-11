@@ -11,6 +11,7 @@ import {
   DataTable,
   GlassCard,
 } from '@/components/admin/primitives';
+import BulkIdeasActionsDialog from '@/components/admin/BulkIdeasActionsDialog';
 
 type IdeaRow = {
   id: string;
@@ -205,6 +206,7 @@ export default function IdeasClient() {
         >
           {loading ? 'Loading…' : 'Refresh'}
         </Button>
+        <BulkIdeasActionsDialog />
         <div className="text-muted-foreground">
           Page {page} of {totalPages} ({total} rows)
         </div>
