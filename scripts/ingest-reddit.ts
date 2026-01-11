@@ -72,6 +72,8 @@ type RedditPost = {
   subreddit: string;
   created_utc?: number;
   created_at_ms?: number | null;
+  author?: string | null;
+  flair?: string | null;
 };
 
 type RedditListingChild = {
@@ -85,6 +87,8 @@ type RedditListingChild = {
     subreddit: string;
     created_utc?: number;
     created?: number;
+    author?: string;
+    link_flair_text?: string | null;
   };
 };
 
@@ -106,6 +110,8 @@ type PullpushPost = {
   subreddit?: string;
   created_utc?: number;
   created?: number;
+  author?: string;
+  link_flair_text?: string | null;
 };
 
 type PullpushResponse = {
@@ -713,6 +719,70 @@ function applySignalsFilter(
   return { filtered, breakdown };
 }
 
+type SignalInsertRow = {
+  source: 'reddit';
+  external_id: string;
+  url: string | null;
+  author: string | null;
+  title: string | null;
+  content: string | null;
+  community: string | null;
+  signal_created_at: string | null;
+  meta: Record<string, unknown> | null;
+};
+
+function buildSignalContent(post: RedditPost) {
+  const title = post.title?.trim() ?? '';
+  const body = post.selftext?.trim() ?? '';
+  const parts = [title, body].filter(Boolean);
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
+async function upsertSignalsFromPosts(posts: RedditPost[]): Promise<number> {
+  if (posts.length === 0) return 0;
+  const rowsById = new Map<string, SignalInsertRow>();
+  for (const post of posts) {
+    const externalId = typeof post.id === 'string' ? post.id.trim() : '';
+    if (!externalId) continue;
+    const createdMs = post.created_at_ms ?? toEpochMs(post.created_utc);
+    const signalCreatedAt = createdMs ? new Date(createdMs).toISOString() : null;
+    const title = post.title?.trim() ?? '';
+    rowsById.set(externalId, {
+      source: 'reddit',
+      external_id: externalId,
+      url: post.url ? post.url : null,
+      author: post.author ?? null,
+      title: title ? title : null,
+      content: buildSignalContent(post),
+      community: post.subreddit ?? null,
+      signal_created_at: signalCreatedAt,
+      meta: {
+        score: post.score ?? null,
+        num_comments: post.num_comments ?? null,
+        flair: post.flair ?? null,
+        author: post.author ?? null,
+        created_utc: post.created_utc ?? null,
+      },
+    });
+  }
+
+  const rows = Array.from(rowsById.values());
+  if (rows.length === 0) return 0;
+  const batchSize = 500;
+  let total = 0;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const batch = rows.slice(i, i + batchSize);
+    const { error } = await supabaseServiceClient
+      .from('signals')
+      .upsert(batch, { onConflict: 'source,external_id' });
+    if (error) {
+      throw new Error(error.message);
+    }
+    total += batch.length;
+  }
+  return total;
+}
+
 async function fetchJsonWithRetry<T = unknown>(
   url: string,
   options: RequestInit = {},
@@ -951,6 +1021,17 @@ async function fetchRedditPostsViaApify(
           ? url.split('/r/')[1]?.split('/')[0]
           : '');
 
+      const author =
+        (item as any)?.author ??
+        (item as any)?.username ??
+        (item as any)?.authorName ??
+        null;
+      const flair =
+        (item as any)?.flair ??
+        (item as any)?.linkFlairText ??
+        (item as any)?.link_flair_text ??
+        null;
+
       posts.push({
         id: String((item as any)?.id ?? (item as any)?.postId ?? (item as any)?.redditId ?? ''),
         title: String((item as any)?.title ?? ''),
@@ -966,6 +1047,8 @@ async function fetchRedditPostsViaApify(
         subreddit: String(subredditName || ''),
         created_utc: createdMs ? Math.floor(createdMs / 1000) : undefined,
         created_at_ms: createdMs ?? null,
+        author: typeof author === 'string' ? author : null,
+        flair: typeof flair === 'string' ? flair : null,
       });
     }
 
@@ -1010,6 +1093,8 @@ async function fetchRedditPosts(
             subreddit: d.subreddit,
             created_utc: d.created_utc,
             created_at_ms: createdAtMs,
+            author: d.author ?? null,
+            flair: d.link_flair_text ?? null,
           };
           posts.push(post);
         }
@@ -1049,6 +1134,8 @@ async function fetchRedditPosts(
           subreddit: d.subreddit ?? sub,
           created_utc: d.created_utc,
           created_at_ms: createdAtMs,
+          author: d.author ?? null,
+          flair: d.link_flair_text ?? null,
         };
         posts.push(post);
       }
@@ -1072,6 +1159,8 @@ async function fetchRedditPosts(
             subreddit: d.subreddit ?? sub,
             created_utc: d.created_utc,
             created_at_ms: createdAtMs,
+            author: d.author ?? null,
+            flair: d.link_flair_text ?? null,
           };
           posts.push(post);
         }
@@ -1628,6 +1717,16 @@ async function main() {
       shown += 1;
       if (shown >= 3) break;
     }
+  }
+
+  try {
+    const upsertedSignals = await upsertSignalsFromPosts(posts);
+    console.log(`[signals] upserted ${upsertedSignals}`);
+  } catch (err) {
+    console.error(
+      'Failed to upsert signals:',
+      err instanceof Error ? err.message : err,
+    );
   }
 
   const { filtered: signalFiltered, breakdown } = applySignalsFilter(posts, signals);

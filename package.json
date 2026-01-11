@@ -2,6 +2,7 @@
   "name": "ideaseek",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +12,11 @@
     "ingest:trends": "tsx scripts/ingest-trends.ts",
     "ingest:trends:searchapi": "tsx scripts/ingest-trends-searchapi.ts",
     "ingest:youtube": "tsx scripts/ingest-youtube.ts",
-    "enrich:trends": "tsx scripts/enrich-trends.ts"
+    "enrich:trends": "tsx scripts/enrich-trends.ts",
+    "backfill:signal-embeddings": "tsx scripts/backfill-signal-embeddings.ts",
+    "cluster:signals": "tsx scripts/cluster-signals.ts",
+    "score:clusters": "tsx scripts/score-clusters.ts",
+    "gen:briefs": "tsx scripts/generate-opportunity-briefs.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -32,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }
