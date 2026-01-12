@@ -18,6 +18,7 @@ type ClusterRow = {
   buyer_clarity_score?: number | null;
   reachability_score?: number | null;
   score_total?: number | null;
+  meta?: Record<string, unknown> | null;
 };
 
 type BriefRow = {
@@ -51,9 +52,10 @@ async function fetchClusters(): Promise<ClusterRow[]> {
   const { data, error } = await supabase
     .from('signal_clusters')
     .select(
-      'id, gate_passed, updated_at, last_seen_at, evidence, signal_count, last_30d_signal_count, paid_intent_score, buyer_clarity_score, reachability_score, score_total',
+      'id, gate_passed, updated_at, last_seen_at, evidence, signal_count, last_30d_signal_count, paid_intent_score, buyer_clarity_score, reachability_score, score_total, meta',
     )
-    .eq('gate_passed', true);
+    .eq('gate_passed', true)
+    .contains('meta', { type: 'need' });
   if (error) throw new Error(error.message);
   return (data ?? []) as ClusterRow[];
 }
@@ -86,7 +88,7 @@ function buildPrompt(cluster: ClusterRow) {
   };
 
   return `
-You are an opportunity analyst. Read the cluster signals and produce a concise brief.
+You are an opportunity analyst. Read the cluster signals and produce a concise brief for a "Need cluster" (recurring pain points).
 
 Data (JSON):
 ${JSON.stringify(payload, null, 2)}
@@ -95,21 +97,25 @@ Return ONLY valid JSON with this schema:
 {
   "title": "Concise opportunity title",
   "one_liner": "1-sentence value prop",
-  "markdown": "# Opportunity\\n... (short sections: Problem, Alternatives, Why pay, Wedge, 2-week MVP, Acquisition channels, Validation script)",
+  "markdown": "# Opportunity\\n... (short sections: Pain points, Target persona, Competitors, Why pay, Wedge, MVP, Go-to-market, Evidence)",
   "brief": {
-    "problem": "...",
-    "alternatives": ["..."],
+    "pain_points": ["..."],
+    "target_persona": "...",
+    "competitors": ["..."],
     "why_pay": "...",
     "wedge": "...",
-    "two_week_mvp": ["step1", "step2"],
-    "acquisition": ["channel1", "channel2"],
-    "validation_script": ["question1", "question2"]
+    "mvp": ["..."],
+    "go_to_market": ["..."],
+    "validation_script": ["..."],
+    "evidence": [
+      { "quote": "...", "url": "...", "author": "...", "created_at": "..." }
+    ]
   }
 }
 
 Rules:
 - Keep markdown short and skimmable.
-- Use evidence quotes lightly; do not paste full quotes.
+- Use evidence quotes lightly; include 2-5 short quotes with links.
 - If data is thin, be conservative.
 - Output ONLY JSON, no extra text.`;
 }

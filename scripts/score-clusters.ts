@@ -19,6 +19,9 @@ type MemberRow = {
 const HOURS_LOOKBACK = Number(process.env.CLUSTER_SCORE_LOOKBACK_HOURS ?? 24);
 const SCORE_GATE = Number(process.env.CLUSTER_SCORE_GATE ?? 0.6);
 const TOP_N = Number(process.env.CLUSTER_SCORE_TOP_N ?? 20);
+const MIN_REPETITION = Number(process.env.CLUSTER_MIN_REPETITION ?? 3);
+const MIN_BUYER_SCORE = Number(process.env.CLUSTER_MIN_BUYER_SCORE ?? 0.4);
+const MIN_PAID_SCORE = Number(process.env.CLUSTER_MIN_PAID_SCORE ?? 0.4);
 
 const paidIntentKeywords = {
   pricing: [
@@ -171,14 +174,11 @@ function computeScores(members: MemberRow[]) {
   const reachability_score = Math.min(1, reachSum / denom);
   const score_total =
     paid_intent_score * 0.5 + buyer_clarity_score * 0.3 + reachability_score * 0.2;
-  const gate_passed = score_total >= SCORE_GATE;
-
   return {
     paid_intent_score,
     buyer_clarity_score,
     reachability_score,
     score_total,
-    gate_passed,
   };
 }
 
@@ -197,7 +197,8 @@ async function fetchClusters(): Promise<ClusterRow[]> {
   const { data, error } = await supabase
     .from('signal_clusters')
     .select('id, updated_at, last_seen_at')
-    .or(`updated_at.gte.${cutoffIso},last_seen_at.gte.${cutoffIso}`);
+    .or(`updated_at.gte.${cutoffIso},last_seen_at.gte.${cutoffIso}`)
+    .contains('meta', { type: 'need' });
   if (error) throw new Error(error.message);
   return (data ?? []) as ClusterRow[];
 }
@@ -215,6 +216,7 @@ async function updateClusterScores(
   clusterId: string,
   scores: ReturnType<typeof computeScores>,
   last30dCount: number,
+  gatePassed: boolean,
 ) {
   const { error } = await supabase
     .from('signal_clusters')
@@ -224,7 +226,7 @@ async function updateClusterScores(
       buyer_clarity_score: scores.buyer_clarity_score,
       reachability_score: scores.reachability_score,
       score_total: scores.score_total,
-      gate_passed: scores.gate_passed,
+      gate_passed: gatePassed,
     })
     .eq('id', clusterId);
   if (error) throw new Error(error.message);
@@ -243,8 +245,13 @@ async function main() {
     const last30dCount = members.reduce((acc, m) => {
       return acc + (isWithin30Days(m.signals?.signal_created_at ?? null) ? 1 : 0);
     }, 0);
+    const gatePassed =
+      scores.score_total >= SCORE_GATE &&
+      last30dCount >= MIN_REPETITION &&
+      scores.buyer_clarity_score >= MIN_BUYER_SCORE &&
+      scores.paid_intent_score >= MIN_PAID_SCORE;
 
-    await updateClusterScores(cluster.id, scores, last30dCount);
+    await updateClusterScores(cluster.id, scores, last30dCount, gatePassed);
     updated += 1;
   }
 

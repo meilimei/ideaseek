@@ -9,6 +9,7 @@ type SignalRow = {
   author?: string | null;
   content?: string | null;
   signal_created_at?: string | null;
+  source?: string | null;
 };
 
 type ClusterRow = {
@@ -55,7 +56,8 @@ function avgCentroid(prev: number[], count: number, next: number[]) {
 async function fetchClusters(): Promise<ClusterRow[]> {
   const { data, error } = await supabase
     .from('signal_clusters')
-    .select('id, centroid, signal_count, first_seen_at, last_seen_at, meta');
+    .select('id, centroid, signal_count, first_seen_at, last_seen_at, meta')
+    .contains('meta', { type: 'need' });
   if (error) throw new Error(error.message);
   return (data ?? []) as ClusterRow[];
 }
@@ -63,7 +65,8 @@ async function fetchClusters(): Promise<ClusterRow[]> {
 async function fetchNextSignals(limit: number): Promise<SignalRow[]> {
   const { data, error } = await supabase
     .from('signals')
-    .select('id, embedding, url, author, content, signal_created_at')
+    .select('id, embedding, url, author, content, signal_created_at, source')
+    .eq('source', 'reddit')
     .not('embedding', 'is', null)
     .order('signal_created_at', { ascending: true, nullsLast: true })
     .limit(limit * 2); // grab extra before membership filter
@@ -98,6 +101,8 @@ async function insertCluster(
       first_seen_at: createdAt ?? new Date().toISOString(),
       last_seen_at: createdAt ?? new Date().toISOString(),
       meta: {
+        type: 'need',
+        source: 'reddit',
         ...(author ? { authors: [author] } : {}),
         ...(signalId ? { signal_ids: [signalId] } : {}),
       },
