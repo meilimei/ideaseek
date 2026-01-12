@@ -49,6 +49,84 @@ type BriefOutput = {
 const EXPECTED_DIM = Math.max(1, Number(process.env.OUTPUT_DIMENSION ?? 1024));
 const MODEL = process.env.DEEPSEEK_MODEL ?? 'deepseek-chat';
 const PROMPT_VERSION = 'api-v1';
+const MIN_UNIQUE_AUTHORS = Math.max(
+  1,
+  Number(process.env.CLUSTER_MIN_UNIQUE_AUTHORS ?? 3),
+);
+const MIN_MONETIZATION_MATCHES = Math.max(
+  1,
+  Number(process.env.CLUSTER_MIN_MONETIZATION_MATCHES ?? 1),
+);
+const MIN_PERSONA_MATCHES = Math.max(
+  1,
+  Number(process.env.CLUSTER_MIN_PERSONA_MATCHES ?? 1),
+);
+const MIN_COMMUNITIES = Math.max(
+  1,
+  Number(process.env.CLUSTER_MIN_COMMUNITIES ?? 1),
+);
+const GATING_SAMPLE_LIMIT = Math.max(
+  10,
+  Number(process.env.CLUSTER_GATING_SAMPLE_LIMIT ?? 120),
+);
+
+const MONETIZATION_TERMS = [
+  'pricing',
+  'price',
+  'cost',
+  'expensive',
+  'cheap',
+  'cheaper',
+  'subscription',
+  'license',
+  'fee',
+  'paid',
+  'premium',
+  'freemium',
+  'trial',
+  'budget',
+  'affordable',
+  'pay',
+  'paying',
+  'charge',
+  'buy',
+  'purchase',
+];
+const COMPETITOR_TERMS = [
+  'we use',
+  'switch',
+  'switching',
+  'replace',
+  'alternative to',
+  'better than',
+  'competing',
+  'incumbent',
+  'existing solution',
+];
+const PERSONA_TERMS = [
+  'founder',
+  'owner',
+  'operator',
+  'manager',
+  'marketer',
+  'marketing',
+  'sales',
+  'recruiter',
+  'hr',
+  'designer',
+  'developer',
+  'engineer',
+  'product',
+  'finance',
+  'accountant',
+  'consultant',
+  'agency',
+  'teacher',
+  'student',
+  'doctor',
+  'therapist',
+  'lawyer',
+];
 
 function cosineSimilarity(a: number[], b: number[]) {
   if (a.length !== b.length || a.length === 0) return 0;
@@ -98,6 +176,21 @@ async function fetchSignalsByIds(ids: string[]): Promise<SignalRow[]> {
     .eq('source', 'reddit');
   if (error) throw new Error(error.message);
   return (data ?? []) as SignalRow[];
+}
+
+async function fetchClusterSignals(
+  clusterId: string,
+  limit: number,
+): Promise<SignalRow[]> {
+  const { data, error } = await supabase
+    .from('signal_cluster_members')
+    .select('signals(id, url, author, content, signal_created_at, source)')
+    .eq('cluster_id', clusterId)
+    .order('similarity', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Array<{ signals: SignalRow | null }>;
+  return rows.map((row) => row.signals).filter(Boolean) as SignalRow[];
 }
 
 async function fetchNextSignals(limit: number, offset: number): Promise<SignalRow[]> {
@@ -263,6 +356,51 @@ async function refreshEvidence(clusterId: string) {
   if (updateError) throw new Error(updateError.message);
 }
 
+function extractSubreddit(url?: string | null) {
+  if (!url) return null;
+  const match = url.match(/\/r\/([^/]+)/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function hasTerm(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(term));
+}
+
+function evaluateGating(signals: SignalRow[]) {
+  const authors = new Set<string>();
+  const communities = new Set<string>();
+  let monetizationMatches = 0;
+  let personaMatches = 0;
+
+  for (const signal of signals) {
+    if (signal.author) authors.add(signal.author);
+    const text = (signal.content ?? '').toLowerCase();
+    const hasMoney =
+      text.includes('$') ||
+      hasTerm(text, MONETIZATION_TERMS) ||
+      hasTerm(text, COMPETITOR_TERMS);
+    const hasPersona = hasTerm(text, PERSONA_TERMS);
+    if (hasMoney) monetizationMatches += 1;
+    if (hasPersona) personaMatches += 1;
+    const subreddit = extractSubreddit(signal.url);
+    if (subreddit) communities.add(subreddit);
+  }
+
+  const pass =
+    authors.size >= MIN_UNIQUE_AUTHORS &&
+    monetizationMatches >= MIN_MONETIZATION_MATCHES &&
+    personaMatches >= MIN_PERSONA_MATCHES &&
+    communities.size >= MIN_COMMUNITIES;
+
+  return {
+    pass,
+    authors: authors.size,
+    monetizationMatches,
+    personaMatches,
+    communities: communities.size,
+  };
+}
+
 function buildPrompt(cluster: {
   signal_count?: number | null;
   last_seen_at?: string | null;
@@ -391,8 +529,6 @@ export async function POST(request: Request) {
 
   const clusters = await fetchClusters();
   const touched = new Set<string>();
-  const assignments = new Map<string, { clusterId: string; similarity: number }>();
-  const clusteredSignals: Record<string, SignalRow[]> = {};
 
   async function processSignals(signals: SignalRow[]) {
     for (const signal of signals) {
@@ -453,7 +589,6 @@ export async function POST(request: Request) {
         });
         await insertMember(signal.id, newId, 1);
         touched.add(newId);
-        assignments.set(signal.id, { clusterId: newId, similarity: 1 });
         continue;
       }
 
@@ -466,7 +601,6 @@ export async function POST(request: Request) {
       );
       await insertMember(signal.id, bestId, bestSim);
       touched.add(bestId);
-      assignments.set(signal.id, { clusterId: bestId, similarity: bestSim });
     }
   }
 
@@ -510,6 +644,14 @@ export async function POST(request: Request) {
   }> = [];
 
   for (const cluster of clusterRows ?? []) {
+    const signalList = await fetchClusterSignals(cluster.id, GATING_SAMPLE_LIMIT);
+    const gating = evaluateGating(signalList);
+    console.log(
+      `[cluster][gate] id=${cluster.id} authors=${gating.authors} monetization=${gating.monetizationMatches} persona=${gating.personaMatches} communities=${gating.communities} pass=${gating.pass}`,
+    );
+    if (!gating.pass) {
+      continue;
+    }
     const brief = await generateBrief(cluster);
     if (brief) {
       await upsertBrief(cluster.id, brief);
@@ -517,26 +659,8 @@ export async function POST(request: Request) {
     clustersOut.push({
       id: cluster.id,
       brief,
-      signals: [],
+      signals: signalList,
     });
-  }
-
-  if (assignments.size > 0) {
-    const ids = Array.from(assignments.keys());
-    const { data: signalRows } = await supabase
-      .from('signals')
-      .select('id, url, author, content, signal_created_at, source')
-      .in('id', ids);
-    const signalMap = new Map((signalRows ?? []).map((row: SignalRow) => [row.id, row]));
-    for (const cluster of clustersOut) {
-      const signalList: SignalRow[] = [];
-      for (const [signalId, entry] of assignments.entries()) {
-        if (entry.clusterId !== cluster.id) continue;
-        const row = signalMap.get(signalId);
-        if (row) signalList.push(row);
-      }
-      cluster.signals = signalList;
-    }
   }
 
   return NextResponse.json({ ok: true, clusters: clustersOut });
