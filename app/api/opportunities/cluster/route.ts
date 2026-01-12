@@ -424,22 +424,40 @@ Return ONLY valid JSON with this schema:
 {
   "title": "Concise opportunity title",
   "one_liner": "1-sentence value prop",
-  "markdown": "# Opportunity\\n... (short sections: Pain points, Target persona, Competitors, Why pay, MVP, Channels, Evidence)",
+  "markdown": "# Opportunity\\n... (short sections: Problem, Personas, Alternatives, Monetization, Wedge, MVP, Channels, Validation, Evidence)",
   "brief": {
+    "problem_definition": {
+      "who": "...",
+      "task": "...",
+      "obstacle": "..."
+    },
     "pain_points": ["..."],
-    "target_persona": "...",
-    "competitors": ["..."],
-    "why_pay": "...",
-    "mvp": ["..."],
+    "personas": ["Persona 1", "Persona 2", "Persona 3"],
+    "existing_solutions": ["..."],
+    "monetization_reasons": ["..."],
+    "wedge": "...",
+    "mvp_features": ["..."],
     "channels": ["..."],
-    "evidence": [
-      { "quote": "...", "url": "...", "author": "...", "created_at": "..." }
-    ]
+    "validation": {
+      "interview_questions": ["..."],
+      "landing_page_test": "..."
+    },
+    "evidence": {
+      "signal_count": 0,
+      "trend_summary": "...",
+      "quotes": [
+        { "quote": "...", "url": "...", "author": "...", "created_at": "..." }
+      ]
+    }
   }
 }
 
 Rules:
 - Use evidence quotes lightly; include 2-5 short quotes with links.
+- Provide 2-3 personas.
+- Provide 5-8 MVP features.
+- Provide 3 acquisition channels.
+- Provide 10 interview questions plus one landing page test.
 - If data is thin, be conservative.
 - Output ONLY JSON, no extra text.`;
 }
