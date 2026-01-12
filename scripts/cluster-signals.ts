@@ -1,5 +1,7 @@
 import { supabaseServiceClient as supabase } from '../lib/supabaseServiceClient';
 
+const EXPECTED_DIM = Math.max(1, Number(process.env.OUTPUT_DIMENSION ?? 1024));
+
 type SignalRow = {
   id: string;
   embedding: number[] | null;
@@ -212,6 +214,12 @@ async function main() {
 
     for (const signal of candidates) {
       if (!signal.embedding || signal.embedding.length === 0) continue;
+      if (signal.embedding.length !== EXPECTED_DIM) {
+        console.warn(
+          `[cluster] skip signal ${signal.id} dim=${signal.embedding.length} expected=${EXPECTED_DIM}`,
+        );
+        continue;
+      }
       processed += 1;
       let bestId: string | null = null;
       let bestSim = -1;
@@ -219,6 +227,7 @@ async function main() {
 
       for (const cluster of clusters) {
         if (!cluster.centroid) continue;
+        if (cluster.centroid.length !== EXPECTED_DIM) continue;
         const sim = cosineSimilarity(cluster.centroid, signal.embedding);
         if (sim > bestSim) {
           bestSim = sim;
