@@ -81,7 +81,13 @@ async function filterUnclustered(signals: SignalRow[]) {
   return signals.filter((s) => !clustered.has(s.id));
 }
 
-async function insertCluster(embedding: number[], createdAt: string | null, author?: string | null) {
+async function insertCluster(
+  embedding: number[],
+  createdAt: string | null,
+  author?: string | null,
+  signalId?: string | null,
+) {
+  // meta tracks lightweight, rolling metadata such as recent signal IDs and authors.
   const { data, error } = await supabase
     .from('signal_clusters')
     .insert({
@@ -89,7 +95,10 @@ async function insertCluster(embedding: number[], createdAt: string | null, auth
       signal_count: 1,
       first_seen_at: createdAt ?? new Date().toISOString(),
       last_seen_at: createdAt ?? new Date().toISOString(),
-      meta: author ? { authors: [author] } : {},
+      meta: {
+        ...(author ? { authors: [author] } : {}),
+        ...(signalId ? { signal_ids: [signalId] } : {}),
+      },
     })
     .select('id')
     .maybeSingle();
@@ -97,7 +106,13 @@ async function insertCluster(embedding: number[], createdAt: string | null, auth
   return data?.id as string;
 }
 
-async function updateClusterStats(cluster: ClusterRow, embedding: number[], createdAt: string | null, author?: string | null) {
+async function updateClusterStats(
+  cluster: ClusterRow,
+  embedding: number[],
+  createdAt: string | null,
+  author?: string | null,
+  signalId?: string | null,
+) {
   const count = Number(cluster.signal_count ?? 0);
   const centroid = cluster.centroid ?? embedding;
   const newCentroid = avgCentroid(centroid, count, embedding);
@@ -115,6 +130,12 @@ async function updateClusterStats(cluster: ClusterRow, embedding: number[], crea
   const authors: string[] = Array.isArray(meta.authors) ? meta.authors : [];
   if (author && !authors.includes(author)) authors.push(author);
   meta.authors = authors;
+  const signalIds: string[] = Array.isArray(meta.signal_ids) ? meta.signal_ids : [];
+  if (signalId && !signalIds.includes(signalId)) {
+    signalIds.push(signalId);
+    if (signalIds.length > 25) signalIds.shift();
+  }
+  meta.signal_ids = signalIds;
 
   const { error } = await supabase
     .from('signal_clusters')
@@ -211,6 +232,7 @@ async function main() {
           signal.embedding,
           signal.signal_created_at ?? null,
           signal.author ?? null,
+          signal.id,
         );
         clusters.push({
           id: newId,
@@ -231,6 +253,7 @@ async function main() {
         signal.embedding,
         signal.signal_created_at ?? null,
         signal.author ?? null,
+        signal.id,
       );
       await insertMember(signal.id, bestId, bestSim);
       touched.add(bestId);
