@@ -49,24 +49,36 @@ type BriefOutput = {
 const EXPECTED_DIM = Math.max(1, Number(process.env.OUTPUT_DIMENSION ?? 1024));
 const MODEL = process.env.DEEPSEEK_MODEL ?? 'deepseek-chat';
 const PROMPT_VERSION = 'api-v1';
+const ROLLING_WINDOW_DAYS = Math.max(
+  1,
+  Number(process.env.CLUSTER_ROLLING_WINDOW_DAYS ?? 30),
+);
+const MIN_ROLLING_SIGNALS = Math.max(
+  1,
+  Number(process.env.CLUSTER_ROLLING_MIN_SIGNALS ?? 20),
+);
+const MIN_SIGNAL_COUNT = Math.max(
+  1,
+  Number(process.env.CLUSTER_MIN_SIGNAL_COUNT ?? 20),
+);
 const MIN_UNIQUE_AUTHORS = Math.max(
   1,
-  Number(process.env.CLUSTER_MIN_UNIQUE_AUTHORS ?? 3),
+  Number(process.env.CLUSTER_MIN_UNIQUE_AUTHORS ?? 20),
 );
 const MIN_MONETIZATION_MATCHES = Math.max(
   1,
-  Number(process.env.CLUSTER_MIN_MONETIZATION_MATCHES ?? 1),
+  Number(process.env.CLUSTER_MIN_MONETIZATION_MATCHES ?? 2),
 );
 const MIN_PERSONA_MATCHES = Math.max(
   1,
-  Number(process.env.CLUSTER_MIN_PERSONA_MATCHES ?? 1),
+  Number(process.env.CLUSTER_MIN_PERSONA_MATCHES ?? 2),
 );
 const MIN_COMMUNITIES = Math.max(
   1,
-  Number(process.env.CLUSTER_MIN_COMMUNITIES ?? 1),
+  Number(process.env.CLUSTER_MIN_COMMUNITIES ?? 2),
 );
 const GATING_SAMPLE_LIMIT = Math.max(
-  10,
+  MIN_SIGNAL_COUNT,
   Number(process.env.CLUSTER_GATING_SAMPLE_LIMIT ?? 120),
 );
 
@@ -91,9 +103,28 @@ const MONETIZATION_TERMS = [
   'charge',
   'buy',
   'purchase',
+  'revenue',
+  'profit',
+  'margin',
+  'roi',
+  'loss',
+  'lost revenue',
+  'lost sales',
+  'missed revenue',
+  'missed sales',
+  'losing money',
+  'churn',
+  'refund',
+  'chargeback',
+  'bleeding',
+  'downtime cost',
+  'overpay',
+  'overpaid',
+  'overpaying',
 ];
 const COMPETITOR_TERMS = [
   'we use',
+  'using',
   'switch',
   'switching',
   'replace',
@@ -102,20 +133,34 @@ const COMPETITOR_TERMS = [
   'competing',
   'incumbent',
   'existing solution',
+  'competitor',
+  'migration',
+  'rip and replace',
 ];
 const PERSONA_TERMS = [
+  'buyer',
+  'customer',
+  'client',
+  'subscriber',
   'founder',
   'owner',
   'operator',
   'manager',
+  'director',
+  'lead',
   'marketer',
   'marketing',
   'sales',
+  'sales ops',
   'recruiter',
   'hr',
+  'people ops',
   'designer',
   'developer',
   'engineer',
+  'cto',
+  'cmo',
+  'cfo',
   'product',
   'finance',
   'accountant',
@@ -126,7 +171,19 @@ const PERSONA_TERMS = [
   'doctor',
   'therapist',
   'lawyer',
+  'coach',
+  'freelancer',
+  'creator',
+  'founder-led',
+  'operations',
+  'ops',
+  'smb',
+  'enterprise',
+  'small business',
+  'ecommerce',
+  'merchant',
 ];
+const moneyRegex = /(\$|usd|eur|gbp)\s?\d+/i;
 
 function cosineSimilarity(a: number[], b: number[]) {
   if (a.length !== b.length || a.length === 0) return 0;
@@ -158,6 +215,11 @@ function normalizeEmbedding(vector: number[]) {
   return vector.concat(new Array(EXPECTED_DIM - vector.length).fill(0));
 }
 
+function getRollingWindowStartIso(days: number) {
+  const millis = days * 24 * 60 * 60 * 1000;
+  return new Date(Date.now() - millis).toISOString();
+}
+
 async function fetchClusters(): Promise<ClusterRow[]> {
   const { data, error } = await supabase
     .from('signal_clusters')
@@ -167,13 +229,28 @@ async function fetchClusters(): Promise<ClusterRow[]> {
   return (data ?? []) as ClusterRow[];
 }
 
-async function fetchSignalsByIds(ids: string[]): Promise<SignalRow[]> {
+async function countRollingSignals(windowStart: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('signals')
+    .select('id', { count: 'exact', head: true })
+    .eq('source', 'reddit')
+    .not('signal_created_at', 'is', null)
+    .gte('signal_created_at', windowStart);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+async function fetchSignalsByIds(ids: string[], windowStart?: string): Promise<SignalRow[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from('signals')
     .select('id, embedding, url, author, content, signal_created_at, source, meta')
     .in('id', ids)
     .eq('source', 'reddit');
+  if (windowStart) {
+    query = query.not('signal_created_at', 'is', null).gte('signal_created_at', windowStart);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as SignalRow[];
 }
@@ -181,26 +258,41 @@ async function fetchSignalsByIds(ids: string[]): Promise<SignalRow[]> {
 async function fetchClusterSignals(
   clusterId: string,
   limit: number,
+  windowStart?: string,
 ): Promise<SignalRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('signal_cluster_members')
     .select('signals(id, url, author, content, signal_created_at, source)')
     .eq('cluster_id', clusterId)
     .order('similarity', { ascending: false })
     .limit(limit);
+  if (windowStart) {
+    query = query
+      .not('signals.signal_created_at', 'is', null)
+      .gte('signals.signal_created_at', windowStart);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Array<{ signals: SignalRow | null }>;
   return rows.map((row) => row.signals).filter(Boolean) as SignalRow[];
 }
 
-async function fetchNextSignals(limit: number, offset: number): Promise<SignalRow[]> {
-  const { data, error } = await supabase
+async function fetchNextSignals(
+  limit: number,
+  offset: number,
+  windowStart?: string,
+): Promise<SignalRow[]> {
+  let query = supabase
     .from('signals')
     .select('id, embedding, url, author, content, signal_created_at, source, meta')
     .eq('source', 'reddit')
     .not('embedding', 'is', null)
     .order('signal_created_at', { ascending: true, nullsLast: true })
     .range(offset, offset + limit - 1);
+  if (windowStart) {
+    query = query.not('signal_created_at', 'is', null).gte('signal_created_at', windowStart);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as SignalRow[];
 }
@@ -302,13 +394,19 @@ async function insertMember(signalId: string, clusterId: string, similarity: num
   if (error) throw new Error(error.message);
 }
 
-async function refreshEvidence(clusterId: string) {
-  const { data, error } = await supabase
+async function refreshEvidence(clusterId: string, windowStart?: string) {
+  let query = supabase
     .from('signal_cluster_members')
     .select('similarity, signals(id, content, url, author, signal_created_at)')
     .eq('cluster_id', clusterId)
     .order('similarity', { ascending: false })
     .limit(5);
+  if (windowStart) {
+    query = query
+      .not('signals.signal_created_at', 'is', null)
+      .gte('signals.signal_created_at', windowStart);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   const members = (data ?? []) as MemberRow[];
   const evidence = members
@@ -373,10 +471,11 @@ function evaluateGating(signals: SignalRow[]) {
   let personaMatches = 0;
 
   for (const signal of signals) {
-    if (signal.author) authors.add(signal.author);
+    const author = signal.author?.trim().toLowerCase();
+    if (author) authors.add(author);
     const text = (signal.content ?? '').toLowerCase();
     const hasMoney =
-      text.includes('$') ||
+      moneyRegex.test(text) ||
       hasTerm(text, MONETIZATION_TERMS) ||
       hasTerm(text, COMPETITOR_TERMS);
     const hasPersona = hasTerm(text, PERSONA_TERMS);
@@ -386,7 +485,9 @@ function evaluateGating(signals: SignalRow[]) {
     if (subreddit) communities.add(subreddit);
   }
 
+  const signalCount = signals.length;
   const pass =
+    signalCount >= MIN_SIGNAL_COUNT &&
     authors.size >= MIN_UNIQUE_AUTHORS &&
     monetizationMatches >= MIN_MONETIZATION_MATCHES &&
     personaMatches >= MIN_PERSONA_MATCHES &&
@@ -394,6 +495,7 @@ function evaluateGating(signals: SignalRow[]) {
 
   return {
     pass,
+    signalCount,
     authors: authors.size,
     monetizationMatches,
     personaMatches,
@@ -544,6 +646,15 @@ export async function POST(request: Request) {
 
   const threshold = Number(process.env.CLUSTER_SIM_THRESHOLD || 0.86);
   const batchSize = Math.max(1, Number(process.env.BATCH_SIZE || 50));
+  const windowStart = getRollingWindowStartIso(ROLLING_WINDOW_DAYS);
+
+  const rollingCount = await countRollingSignals(windowStart);
+  if (rollingCount < MIN_ROLLING_SIGNALS) {
+    console.log(
+      `[cluster] skip: rolling signals ${rollingCount} < min ${MIN_ROLLING_SIGNALS}`,
+    );
+    return NextResponse.json({ ok: true, clusters: [] });
+  }
 
   const clusters = await fetchClusters();
   const touched = new Set<string>();
@@ -623,13 +734,13 @@ export async function POST(request: Request) {
   }
 
   if (rawIds.length > 0) {
-    const signals = await fetchSignalsByIds(rawIds);
+    const signals = await fetchSignalsByIds(rawIds, windowStart);
     const candidates = await filterUnclustered(signals);
     await processSignals(candidates);
   } else {
     let offset = 0;
     while (true) {
-      const signals = await fetchNextSignals(batchSize, offset);
+      const signals = await fetchNextSignals(batchSize, offset, windowStart);
       if (signals.length === 0) break;
       const candidates = await filterUnclustered(signals);
       await processSignals(candidates);
@@ -639,7 +750,7 @@ export async function POST(request: Request) {
   }
 
   for (const id of touched) {
-    await refreshEvidence(id);
+    await refreshEvidence(id, windowStart);
   }
 
   const touchedIds = Array.from(touched);
@@ -662,10 +773,14 @@ export async function POST(request: Request) {
   }> = [];
 
   for (const cluster of clusterRows ?? []) {
-    const signalList = await fetchClusterSignals(cluster.id, GATING_SAMPLE_LIMIT);
+    const signalList = await fetchClusterSignals(
+      cluster.id,
+      GATING_SAMPLE_LIMIT,
+      windowStart,
+    );
     const gating = evaluateGating(signalList);
     console.log(
-      `[cluster][gate] id=${cluster.id} authors=${gating.authors} monetization=${gating.monetizationMatches} persona=${gating.personaMatches} communities=${gating.communities} pass=${gating.pass}`,
+      `[cluster][gate] id=${cluster.id} signals=${gating.signalCount} authors=${gating.authors} monetization=${gating.monetizationMatches} persona=${gating.personaMatches} communities=${gating.communities} pass=${gating.pass}`,
     );
     if (!gating.pass) {
       continue;
