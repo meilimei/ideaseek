@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,12 @@ type BriefDetails = {
   personas?: string[];
   existing_solutions?: string[];
   monetization_reasons?: string[];
+  mvp_features?: string[];
+  channels?: string[];
+  validation?: {
+    interview_questions?: string[];
+    landing_page_test?: string;
+  };
   evidence?: {
     signal_count?: number;
     trend_summary?: string;
@@ -73,6 +79,12 @@ type SaveTarget = {
 };
 
 type SavedPackage = SaveTarget & { savedAt: string };
+type LocalCollectionState = {
+  savedIdeas: Record<string, boolean>;
+  interesting: Record<string, boolean>;
+};
+
+const LOCAL_COLLECTION_KEY = 'opportunity-collections-v1';
 
 function EvidenceList({ evidence }: { evidence: EvidenceItem[] }) {
   if (!evidence.length) {
@@ -196,9 +208,30 @@ export default function OpportunitiesClient({
   const [minSignals, setMinSignals] = useState(0);
   const [saveTargets, setSaveTargets] = useState<Record<string, SaveTarget>>({});
   const [savedPackages, setSavedPackages] = useState<Record<string, SavedPackage>>({});
+  const [savedIdeas, setSavedIdeas] = useState<Record<string, boolean>>({});
+  const [interesting, setInteresting] = useState<Record<string, boolean>>({});
   const [feedbackState, setFeedbackState] = useState<
     Record<string, { busy: boolean; message?: string }>
   >({});
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(LOCAL_COLLECTION_KEY);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as LocalCollectionState;
+      if (parsed.savedIdeas) setSavedIdeas(parsed.savedIdeas);
+      if (parsed.interesting) setInteresting(parsed.interesting);
+    } catch {
+      window.localStorage.removeItem(LOCAL_COLLECTION_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const payload: LocalCollectionState = { savedIdeas, interesting };
+    window.localStorage.setItem(LOCAL_COLLECTION_KEY, JSON.stringify(payload));
+  }, [interesting, savedIdeas]);
 
   const pipelineSteps = useMemo(
     () => [
@@ -276,6 +309,14 @@ export default function OpportunitiesClient({
       delete next[id];
       return next;
     });
+  };
+
+  const toggleSavedIdea = (id: string) => {
+    setSavedIdeas((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleInteresting = (id: string) => {
+    setInteresting((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const setFeedback = (briefId: string, patch: { busy?: boolean; message?: string }) => {
@@ -565,10 +606,44 @@ export default function OpportunitiesClient({
             const targetUsers = getTargetUsers(details);
             const competitors = coerceStringArray(details?.existing_solutions);
             const paidReasons = coerceStringArray(details?.monetization_reasons);
+            const mvpFeatures = coerceStringArray(details?.mvp_features);
+            const channels = coerceStringArray(details?.channels);
+            const interviewQuestions = coerceStringArray(details?.validation?.interview_questions).slice(
+              0,
+              6,
+            );
+            const landingPageTest =
+              typeof details?.validation?.landing_page_test === 'string'
+                ? details.validation.landing_page_test.trim()
+                : '';
             const briefEvidence = coerceEvidence(details?.evidence?.quotes);
             const evidence = briefEvidence.length > 0 ? briefEvidence : cluster.evidence ?? [];
             const feedback = cluster.brief ? feedbackState[cluster.brief.id] : undefined;
             const markdown = cluster.brief?.markdown?.trim();
+            const readinessChecks = [
+              { label: 'Pain points', done: painPoints.length > 0 },
+              { label: 'Target users', done: targetUsers.length > 0 },
+              { label: 'MVP list', done: mvpFeatures.length > 0 },
+              { label: 'Acquisition paths', done: channels.length > 0 },
+              { label: 'Evidence', done: evidence.length > 0 },
+            ];
+            const readinessDone = readinessChecks.filter((check) => check.done).length;
+            const readinessPercent = Math.round(
+              (readinessDone / readinessChecks.length) * 100,
+            );
+            const guidanceSteps = [
+              targetUsers.length > 0
+                ? `Interview 5 ${targetUsers.slice(0, 2).join(' and ')} to validate the pain points.`
+                : 'Interview at least 5 target users to validate the pain points.',
+              mvpFeatures.length > 0
+                ? `Prototype ${Math.min(3, mvpFeatures.length)} MVP features and ship a lightweight demo.`
+                : 'Prototype 2-3 MVP features that address the core pain point.',
+              channels.length > 0
+                ? `Run a small acquisition test in ${channels.slice(0, 2).join(' and ')}.`
+                : 'Pick two acquisition channels and run a small test to confirm reach.',
+            ];
+            const savedIdea = Boolean(savedIdeas[cluster.id]);
+            const markedInteresting = Boolean(interesting[cluster.id]);
 
             return (
               <Card key={cluster.id} id={`cluster-${cluster.id}`} className="overflow-hidden">
@@ -576,6 +651,9 @@ export default function OpportunitiesClient({
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle className="text-xl">{getClusterName(cluster)}</CardTitle>
                     <Badge variant={status === 'generated' ? 'secondary' : 'outline'}>
+                      {status === 'collecting' && (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      )}
                       {statusLabel}
                     </Badge>
                     {cluster.score_total != null && (
@@ -607,34 +685,50 @@ export default function OpportunitiesClient({
                     >
                       {isOpen ? 'Hide opportunity package' : 'View opportunity package'}
                     </Button>
-                    {cluster.brief && (
-                      <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => sendFeedback(cluster.brief.id, 'useful')}
-                          disabled={Boolean(feedback?.busy)}
-                        >
-                          Useful
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => sendFeedback(cluster.brief.id, 'not_relevant')}
-                          disabled={Boolean(feedback?.busy)}
-                        >
-                          Not relevant
-                        </Button>
-                        {feedback?.message && (
-                          <span className="text-xs text-muted-foreground">
-                            {feedback.message}
-                          </span>
-                        )}
-                      </>
-                    )}
                   </div>
+
+                  {cluster.brief && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Feedback
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => sendFeedback(cluster.brief.id, 'thumbs_up')}
+                        disabled={Boolean(feedback?.busy)}
+                        aria-label="Thumbs up"
+                      >
+                        👍
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => sendFeedback(cluster.brief.id, 'thumbs_down')}
+                        disabled={Boolean(feedback?.busy)}
+                        aria-label="Thumbs down"
+                      >
+                        👎
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => sendFeedback(cluster.brief.id, 'star')}
+                        disabled={Boolean(feedback?.busy)}
+                        aria-label="Star"
+                      >
+                        ⭐
+                      </Button>
+                      {feedback?.message && (
+                        <span className="text-xs text-muted-foreground">
+                          {feedback.message}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-3 rounded-2xl border border-border/40 bg-card/50 p-3">
                     <div className="flex flex-wrap items-center gap-3">
@@ -694,6 +788,25 @@ export default function OpportunitiesClient({
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={savedIdea ? 'secondary' : 'outline'}
+                      onClick={() => toggleSavedIdea(cluster.id)}
+                    >
+                      {savedIdea ? 'Saved to My Ideas' : 'Save to My Ideas'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={markedInteresting ? 'secondary' : 'ghost'}
+                      onClick={() => toggleInteresting(cluster.id)}
+                    >
+                      {markedInteresting ? 'Marked Interesting' : 'Mark as Interesting'}
+                    </Button>
+                  </div>
+
                   {isOpen && (
                     <div className="rounded-2xl border border-border/40 bg-card/50 p-4">
                       {!cluster.brief && (
@@ -737,6 +850,82 @@ export default function OpportunitiesClient({
                                 <BulletList items={paidReasons} />
                               </div>
                             </div>
+                          </div>
+
+                          <div className="rounded-xl border border-border/40 bg-card/60 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-foreground">
+                                Package readiness
+                              </div>
+                              <Badge variant="secondary">
+                                {readinessDone}/{readinessChecks.length} signals
+                              </Badge>
+                            </div>
+                            <div className="mt-2 h-2 w-full rounded-full bg-border/40">
+                              <div
+                                className="h-2 rounded-full bg-emerald-400/80 transition-all"
+                                style={{ width: `${readinessPercent}%` }}
+                              />
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {readinessChecks.map((check) => (
+                                <Badge
+                                  key={check.label}
+                                  variant={check.done ? 'secondary' : 'outline'}
+                                >
+                                  {check.label}
+                                </Badge>
+                              ))}
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Use the next steps below to move from insight to action.
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl border border-border/40 bg-card/60 p-3">
+                            <div className="mb-2 text-sm font-semibold text-foreground">
+                              Next steps
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  MVP list
+                                </div>
+                                <div className="mt-2">
+                                  <BulletList items={mvpFeatures} />
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Customer acquisition paths
+                                </div>
+                                <div className="mt-2">
+                                  <BulletList items={channels} />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-border/40 bg-card/60 p-3">
+                            <div className="mb-2 text-sm font-semibold text-foreground">
+                              Start developing
+                            </div>
+                            <BulletList items={guidanceSteps} />
+                            {interviewQuestions.length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Interview prompts
+                                </div>
+                                <div className="mt-2">
+                                  <BulletList items={interviewQuestions} />
+                                </div>
+                              </div>
+                            )}
+                            {landingPageTest && (
+                              <div className="mt-3 text-xs text-muted-foreground">
+                                Landing page test: {landingPageTest}
+                              </div>
+                            )}
                           </div>
 
                           {markdown && (
