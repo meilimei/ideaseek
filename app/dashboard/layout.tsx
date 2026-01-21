@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import DashboardNav from './DashboardNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,5 +20,10 @@ export default async function DashboardLayout({
     return redirect('/login');
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <DashboardNav />
+      {children}
+    </>
+  );
 }

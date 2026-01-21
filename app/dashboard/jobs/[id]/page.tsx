@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { enqueueIdeaEnrich } from '@/lib/enrich';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -20,6 +21,12 @@ type JobRow = {
   created_at: string | null;
   started_at: string | null;
   finished_at: string | null;
+  next_run_at: string | null;
+  locked_at: string | null;
+  locked_by: string | null;
+  strategy_id: string | null;
+  source: string | null;
+  dedupe_key: string | null;
   payload: Record<string, unknown> | null;
   log: string | null;
   error: string | null;
@@ -144,6 +151,7 @@ async function forceRerunEnrich(ideaId: string, rerunOf: number) {
   return redirect(`/dashboard/jobs/${result.jobId}`);
 }
 
+// Manual test: open /dashboard/jobs, click a row, and verify metadata, payload, and log render.
 export default async function DashboardJobDetailPage({
   params,
 }: {
@@ -169,7 +177,9 @@ export default async function DashboardJobDetailPage({
 
   const { data: job, error: jobError } = await supabase
     .from('admin_jobs')
-    .select('*')
+    .select(
+      'id, job_type, status, created_at, started_at, finished_at, error, log, payload, attempts, max_attempts, next_run_at, locked_at, locked_by, strategy_id, source, dedupe_key',
+    )
     .eq('id', jobId)
     .eq('created_by', user.id)
     .maybeSingle();
@@ -215,11 +225,6 @@ export default async function DashboardJobDetailPage({
         <Button asChild variant="ghost" size="sm">
           <Link href="/dashboard/jobs">Back to Jobs</Link>
         </Button>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span>Created: {formatRelative(job.created_at)}</span>
-          <span>Started: {formatRelative(job.started_at)}</span>
-          <span>Finished: {formatRelative(job.finished_at)}</span>
-        </div>
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -253,6 +258,80 @@ export default async function DashboardJobDetailPage({
           </div>
         )}
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Metadata</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Created at
+              </div>
+              <div className="text-foreground">{formatRelative(job.created_at)}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Started at
+              </div>
+              <div className="text-foreground">{formatRelative(job.started_at)}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Finished at
+              </div>
+              <div className="text-foreground">{formatRelative(job.finished_at)}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Attempts
+              </div>
+              <div className="text-foreground">
+                {job.attempts ?? 0} / {job.max_attempts ?? 3}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Next run
+              </div>
+              <div className="text-foreground">{formatRelative(job.next_run_at)}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Locked at
+              </div>
+              <div className="text-foreground">{formatRelative(job.locked_at)}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Locked by
+              </div>
+              <div className="text-foreground">{job.locked_by ?? '—'}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Strategy
+              </div>
+              <div className="text-foreground">{job.strategy_id ?? '—'}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Source
+              </div>
+              <div className="text-foreground">{job.source ?? '—'}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Dedupe key
+              </div>
+              <div className="text-foreground">{job.dedupe_key ?? '—'}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       {job.job_type === IDEA_ENRICH_JOB_TYPE && payloadIdeaId && (
         <Card>
@@ -300,11 +379,11 @@ export default async function DashboardJobDetailPage({
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Related Ideas</CardTitle>
+          <CardTitle>Outputs</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           {related.length === 0 ? (
-            <div>No related ideas recorded.</div>
+            <div>No outputs recorded.</div>
           ) : (
             related.map((link) => {
               const idea = asIdea(link);
@@ -377,7 +456,7 @@ export default async function DashboardJobDetailPage({
           <CardTitle>Payload</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+          <pre className="max-h-80 overflow-auto whitespace-pre font-mono text-xs text-muted-foreground">
             {JSON.stringify(job.payload ?? {}, null, 2)}
           </pre>
         </CardContent>
@@ -393,12 +472,12 @@ export default async function DashboardJobDetailPage({
               {job.error}
             </div>
           )}
-          {job.log ? (
-            <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+          {job.log?.trim() ? (
+            <pre className="max-h-96 overflow-auto whitespace-pre font-mono text-xs text-muted-foreground">
               {job.log}
             </pre>
           ) : (
-            <div className="text-sm text-muted-foreground">No log output yet.</div>
+            <div className="text-sm text-muted-foreground">No log recorded.</div>
           )}
         </CardContent>
       </Card>

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
@@ -421,68 +422,95 @@ export default async function DashboardJobsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
-                {jobs.map((job) => (
-                  <tr
-                    key={String(job.id)}
-                    className="group cursor-pointer align-top even:bg-background/5 hover:bg-muted/50"
-                  >
+                {jobs.map((job) => {
+                  const jobHref = `/dashboard/jobs/${job.id}`;
+                  const cellLink = (children: ReactNode) => (
+                    <Link
+                      href={jobHref}
+                      className="block w-full no-underline"
+                      style={{ color: 'inherit' }}
+                    >
+                      {children}
+                    </Link>
+                  );
+                  return (
+                    <tr
+                      key={String(job.id)}
+                      className="group cursor-pointer align-top even:bg-background/5 hover:bg-muted/50"
+                    >
                     <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground hidden lg:table-cell">
-                      {String(job.id)}
+                      {cellLink(String(job.id))}
                     </td>
                     <td className="px-3 py-2 text-sm text-foreground">
-                      <span className="block max-w-[140px] truncate whitespace-nowrap">
-                        {job.job_type ?? '—'}
-                      </span>
+                      {cellLink(
+                        <span className="block max-w-[140px] truncate whitespace-nowrap">
+                          {job.job_type ?? '—'}
+                        </span>,
+                      )}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="[&>div]:px-2 [&>div]:py-0.5 [&>div]:text-[11px]">
-                        <StatusBadge status={job.status} />
-                      </div>
+                      {cellLink(
+                        <div className="[&>div]:px-2 [&>div]:py-0.5 [&>div]:text-[11px]">
+                          <StatusBadge status={job.status} />
+                        </div>,
+                      )}
                     </td>
                     <td className="px-3 py-2 text-sm text-muted-foreground hidden lg:table-cell">
-                      {(() => {
-                        const hint = getJobHint(job, now, runnerOnline);
-                        if (!hint) return '—';
-                        const scheduledLabel =
-                          hint === 'Scheduled' ? formatDate(job.next_run_at ?? null) : null;
-                        return (
-                          <span
-                            className="block max-w-[160px] truncate text-xs text-muted-foreground"
-                            title={
-                              scheduledLabel ? `Scheduled at ${scheduledLabel}` : undefined
-                            }
-                          >
-                            {hint}
-                          </span>
-                        );
-                      })()}
+                      {cellLink(
+                        (() => {
+                          const hint = getJobHint(job, now, runnerOnline);
+                          if (!hint) return '—';
+                          const scheduledLabel =
+                            hint === 'Scheduled' ? formatDate(job.next_run_at ?? null) : null;
+                          return (
+                            <span
+                              className="block max-w-[160px] truncate text-xs text-muted-foreground"
+                              title={
+                                scheduledLabel ? `Scheduled at ${scheduledLabel}` : undefined
+                              }
+                            >
+                              {hint}
+                            </span>
+                          );
+                        })(),
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground font-mono tabular-nums whitespace-nowrap hidden lg:table-cell">
-                      {job.attempts ?? 0} / {job.max_attempts ?? 3}
+                      {cellLink(
+                        <span>
+                          {job.attempts ?? 0} / {job.max_attempts ?? 3}
+                        </span>,
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums">
-                      {(() => {
-                        const value = formatRelativeTimestamp(job.created_at);
-                        if (!value.title) return '—';
-                        return <span title={value.title}>{value.label}</span>;
-                      })()}
+                      {cellLink(
+                        (() => {
+                          const value = formatRelativeTimestamp(job.created_at);
+                          if (!value.title) return '—';
+                          return <span title={value.title}>{value.label}</span>;
+                        })(),
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums hidden md:table-cell">
-                      {(() => {
-                        const value = formatRelativeTimestamp(job.started_at);
-                        if (!value.title) return '—';
-                        return <span title={value.title}>{value.label}</span>;
-                      })()}
+                      {cellLink(
+                        (() => {
+                          const value = formatRelativeTimestamp(job.started_at);
+                          if (!value.title) return '—';
+                          return <span title={value.title}>{value.label}</span>;
+                        })(),
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground whitespace-nowrap tabular-nums hidden lg:table-cell">
-                      {(() => {
-                        const value = formatRelativeTimestamp(job.finished_at);
-                        if (!value.title) return '—';
-                        return <span title={value.title}>{value.label}</span>;
-                      })()}
+                      {cellLink(
+                        (() => {
+                          const value = formatRelativeTimestamp(job.finished_at);
+                          if (!value.title) return '—';
+                          return <span title={value.title}>{value.label}</span>;
+                        })(),
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-muted-foreground font-mono tabular-nums whitespace-nowrap hidden lg:table-cell">
-                      {formatDuration(job.started_at, job.finished_at)}
+                      {cellLink(formatDuration(job.started_at, job.finished_at))}
                     </td>
                     <td className="px-3 py-2 text-sm text-muted-foreground">
                       {job.job_type === IDEA_ENRICH_JOB_TYPE ? (
@@ -525,15 +553,16 @@ export default async function DashboardJobsPage({
                     </td>
                     <td className="px-2 py-2 text-right">
                       <Link
-                        href={`/dashboard/jobs/${job.id}`}
+                        href={jobHref}
                         className="inline-flex items-center justify-end text-muted-foreground transition-colors group-hover:text-foreground"
                         aria-label={`Open job ${job.id}`}
                       >
                         <ChevronDown className="h-4 w-4 -rotate-90" />
                       </Link>
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
                 {jobs.length === 0 && (
                   <tr>
                     <td className="px-4 py-4 text-sm text-muted-foreground" colSpan={13}>
