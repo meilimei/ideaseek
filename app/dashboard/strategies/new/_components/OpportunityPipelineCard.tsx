@@ -11,11 +11,15 @@ type OpportunityPipelineCardProps = {
 };
 
 type OpportunityStats = {
-  signals_total: number | null;
-  signals_30d: number | null;
-  clusters_total: number | null;
-  clusters_gate_passed: number | null;
-  briefs_total: number | null;
+  signals_count?: number | null;
+  clusters_count?: number | null;
+  gate_passed_count?: number | null;
+  briefs_count?: number | null;
+  signals_total?: number | null;
+  signals_30d?: number | null;
+  clusters_total?: number | null;
+  clusters_gate_passed?: number | null;
+  briefs_total?: number | null;
 };
 
 type BlockerKey =
@@ -73,7 +77,7 @@ export default function OpportunityPipelineCard({
     setLoading(true);
     setHasError(false);
     supabase
-      .rpc('strategy_opportunity_stats', { p_strategy_id: normalizedId })
+      .rpc('strategy_opportunity_stats', { strategy_id: normalizedId })
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -81,10 +85,18 @@ export default function OpportunityPipelineCard({
           setHasError(true);
           setUpdatedAt(null);
           setBlocker(null);
-        } else {
-          setStats((data as OpportunityStats | null) ?? null);
-          setUpdatedAt(new Date());
+          return;
         }
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!row) {
+          setStats(null);
+          setHasError(true);
+          setUpdatedAt(null);
+          setBlocker(null);
+          return;
+        }
+        setStats(row as OpportunityStats);
+        setUpdatedAt(new Date());
       })
       .catch(() => {
         if (!active) return;
@@ -104,18 +116,18 @@ export default function OpportunityPipelineCard({
   }, [normalizedId, isValid, supabase]);
 
   const safeStats = {
-    signals_total: stats?.signals_total ?? 0,
-    signals_30d: stats?.signals_30d ?? 0,
-    clusters_total: stats?.clusters_total ?? 0,
-    clusters_gate_passed: stats?.clusters_gate_passed ?? 0,
-    briefs_total: stats?.briefs_total ?? 0,
+    signals_count: stats?.signals_count ?? stats?.signals_total ?? 0,
+    signals_30d: stats?.signals_30d ?? null,
+    clusters_count: stats?.clusters_count ?? stats?.clusters_total ?? 0,
+    gate_passed_count: stats?.gate_passed_count ?? stats?.clusters_gate_passed ?? 0,
+    briefs_count: stats?.briefs_count ?? stats?.briefs_total ?? 0,
   };
 
   const statusLine = (() => {
-    if (safeStats.signals_total === 0) return 'No signals ingested yet';
-    if (safeStats.clusters_total === 0) return 'Not clustered yet';
-    if (safeStats.clusters_gate_passed === 0) return 'All clusters failed gating';
-    if (safeStats.briefs_total === 0) return 'Brief generation not run';
+    if (safeStats.signals_count === 0) return 'No signals ingested yet';
+    if (safeStats.clusters_count === 0) return 'Not clustered yet';
+    if (safeStats.gate_passed_count === 0) return 'All clusters failed gating';
+    if (safeStats.briefs_count === 0) return 'Brief generation not run';
     return 'Pipeline looks healthy';
   })();
 
@@ -135,7 +147,7 @@ export default function OpportunityPipelineCard({
         active = false;
       };
     }
-    if (safeStats.clusters_total === 0 || safeStats.clusters_gate_passed > 0) {
+    if (safeStats.clusters_count === 0 || safeStats.gate_passed_count > 0) {
       setBlocker(null);
       setBlockerLoading(false);
       return () => {
@@ -251,7 +263,16 @@ export default function OpportunityPipelineCard({
     return () => {
       active = false;
     };
-  }, [normalizedId, isValid, stats, hasError, loading, safeStats.clusters_total, safeStats.clusters_gate_passed, supabase]);
+  }, [
+    normalizedId,
+    isValid,
+    stats,
+    hasError,
+    loading,
+    safeStats.clusters_count,
+    safeStats.gate_passed_count,
+    supabase,
+  ]);
 
   const updatedLabel = updatedAt
     ? (() => {
@@ -300,22 +321,24 @@ export default function OpportunityPipelineCard({
                 </div>
               ))}
             </div>
-            <div className="text-xs text-muted-foreground">Stats unavailable.</div>
+            <div className="text-xs text-muted-foreground">Stats unavailable</div>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <div className="rounded-xl border border-border/40 bg-background/40 p-3">
                 <div className="text-2xl font-semibold text-foreground">
-                  {safeStats.signals_total}
+                  {safeStats.signals_count}
                 </div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Signals (30d: {safeStats.signals_30d})
+                  {safeStats.signals_30d !== null
+                    ? `Signals (30d: ${safeStats.signals_30d})`
+                    : 'Signals'}
                 </div>
               </div>
               <div className="rounded-xl border border-border/40 bg-background/40 p-3">
                 <div className="text-2xl font-semibold text-foreground">
-                  {safeStats.clusters_total}
+                  {safeStats.clusters_count}
                 </div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Clusters
@@ -323,7 +346,7 @@ export default function OpportunityPipelineCard({
               </div>
               <div className="rounded-xl border border-border/40 bg-background/40 p-3">
                 <div className="text-2xl font-semibold text-foreground">
-                  {safeStats.clusters_gate_passed}
+                  {safeStats.gate_passed_count}
                 </div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Gate passed
@@ -331,7 +354,7 @@ export default function OpportunityPipelineCard({
               </div>
               <div className="rounded-xl border border-border/40 bg-background/40 p-3">
                 <div className="text-2xl font-semibold text-foreground">
-                  {safeStats.briefs_total}
+                  {safeStats.briefs_count}
                 </div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Briefs

@@ -8,11 +8,15 @@ type StrategyOpportunityCardProps = {
 };
 
 type OpportunityStats = {
-  signals_total: number | null;
-  signals_30d: number | null;
-  clusters_total: number | null;
-  clusters_gate_passed: number | null;
-  briefs_total: number | null;
+  signals_count?: number | null;
+  clusters_count?: number | null;
+  gate_passed_count?: number | null;
+  briefs_count?: number | null;
+  signals_total?: number | null;
+  signals_30d?: number | null;
+  clusters_total?: number | null;
+  clusters_gate_passed?: number | null;
+  briefs_total?: number | null;
 };
 
 function isUuid(value: string) {
@@ -57,16 +61,26 @@ export default async function StrategyOpportunityCard({
     );
   }
 
-  const { data, error } = await supabase
-    .rpc('strategy_opportunity_stats', { p_strategy_id: trimmedId })
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('strategy_opportunity_stats', {
+    strategy_id: trimmedId,
+  });
 
   if (error) {
     console.error('Failed to load strategy opportunity stats:', error.message);
   }
 
-  const stats = (data ?? null) as OpportunityStats | null;
+  const row = Array.isArray(data) ? data[0] : data;
+  const stats = (row ?? null) as OpportunityStats | null;
   const errorMessage = error?.message ?? null;
+  const safeStats = stats
+    ? {
+        signals_count: stats.signals_count ?? stats.signals_total ?? 0,
+        signals_30d: stats.signals_30d ?? null,
+        clusters_count: stats.clusters_count ?? stats.clusters_total ?? 0,
+        gate_passed_count: stats.gate_passed_count ?? stats.clusters_gate_passed ?? 0,
+        briefs_count: stats.briefs_count ?? stats.briefs_total ?? 0,
+      }
+    : null;
 
   return (
     <Card className="bg-card/60">
@@ -78,7 +92,7 @@ export default async function StrategyOpportunityCard({
           <div className="text-xs text-muted-foreground">
             Unable to load opportunity stats. {errorMessage}
           </div>
-        ) : !stats ? (
+        ) : !safeStats ? (
           <div className="text-xs text-muted-foreground">
             No opportunity data yet.
           </div>
@@ -86,33 +100,35 @@ export default async function StrategyOpportunityCard({
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Signals (30d)
+                {safeStats.signals_30d !== null ? 'Signals (30d)' : 'Signals'}
               </div>
-              <div className="text-foreground">{stats.signals_30d ?? 0}</div>
+              <div className="text-foreground">
+                {safeStats.signals_30d ?? safeStats.signals_count}
+              </div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 Signals (total)
               </div>
-              <div className="text-foreground">{stats.signals_total ?? 0}</div>
+              <div className="text-foreground">{safeStats.signals_count}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 Need clusters
               </div>
-              <div className="text-foreground">{stats.clusters_total ?? 0}</div>
+              <div className="text-foreground">{safeStats.clusters_count}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 Gate passed
               </div>
-              <div className="text-foreground">{stats.clusters_gate_passed ?? 0}</div>
+              <div className="text-foreground">{safeStats.gate_passed_count}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 Opportunity briefs
               </div>
-              <div className="text-foreground">{stats.briefs_total ?? 0}</div>
+              <div className="text-foreground">{safeStats.briefs_count}</div>
             </div>
           </div>
         )}
