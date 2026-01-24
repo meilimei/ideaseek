@@ -6,6 +6,14 @@ import { embedText } from '@/lib/embeddings';
 
 type ClusterRequest = {
   signalIds?: string[];
+  ownerId?: string;
+  userId?: string;
+  createdBy?: string;
+  visibility?: string;
+  payload?: Record<string, unknown> | null;
+  config?: Record<string, unknown> | null;
+  strategy?: { config?: Record<string, unknown> | null } | null;
+  strategyConfig?: Record<string, unknown> | null;
 };
 
 type SignalRow = {
@@ -185,6 +193,25 @@ const PERSONA_TERMS = [
 ];
 const moneyRegex = /(\$|usd|eur|gbp)\s?\d+/i;
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeVisibility(value: unknown): 'public' | 'private' | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'private') return 'private';
+  if (normalized === 'public') return 'public';
+  return null;
+}
+
 function cosineSimilarity(a: number[], b: number[]) {
   if (a.length !== b.length || a.length === 0) return 0;
   let dot = 0;
@@ -314,7 +341,10 @@ async function insertCluster(
   createdAt: string | null,
   author?: string | null,
   signalId?: string | null,
+  options?: { ownerId: string | null; visibility: 'public' | 'private' },
 ) {
+  const ownerId = options?.ownerId ?? null;
+  const visibility = options?.visibility ?? 'public';
   const { data, error } = await supabase
     .from('signal_clusters')
     .insert({
@@ -322,6 +352,8 @@ async function insertCluster(
       signal_count: 1,
       first_seen_at: createdAt ?? new Date().toISOString(),
       last_seen_at: createdAt ?? new Date().toISOString(),
+      owner_id: ownerId,
+      visibility,
       meta: {
         type: 'need',
         source: 'reddit',
@@ -640,6 +672,34 @@ export async function POST(request: Request) {
     body = null;
   }
 
+  const payload = toRecord(body?.payload);
+  const payloadConfig = toRecord(payload?.config);
+  const config = toRecord(body?.config);
+  const strategyConfig =
+    toRecord(body?.strategy?.config) ?? toRecord(body?.strategyConfig);
+  const ownerId =
+    toNonEmptyString(body?.ownerId) ??
+    toNonEmptyString(body?.userId) ??
+    toNonEmptyString(body?.createdBy) ??
+    toNonEmptyString(payload?.ownerId) ??
+    toNonEmptyString(payload?.userId) ??
+    toNonEmptyString(payload?.user_id) ??
+    toNonEmptyString(payload?.created_by) ??
+    (process.env.ADMIN_JOB_CREATED_BY?.trim() || null);
+  const payloadVisibility =
+    normalizeVisibility(body?.visibility) ??
+    normalizeVisibility(payload?.visibility) ??
+    normalizeVisibility(payload?.opportunity_visibility) ??
+    normalizeVisibility(payload?.opportunities_visibility);
+  const configVisibility =
+    normalizeVisibility(config?.visibility) ??
+    normalizeVisibility(strategyConfig?.visibility) ??
+    normalizeVisibility(payloadConfig?.visibility);
+  const baseVisibility = payloadVisibility ?? configVisibility ?? 'public';
+  const visibility = ownerId ? baseVisibility : 'public';
+  // signal_clusters own visibility/ownership; opportunity_briefs inherit via cluster_id.
+  console.log(`[clusters] owner_id=${ownerId ?? 'none'} visibility=${visibility}`);
+
   const rawIds = Array.isArray(body?.signalIds)
     ? body?.signalIds?.filter((id): id is string => typeof id === 'string' && id.length > 0)
     : [];
@@ -707,6 +767,7 @@ export async function POST(request: Request) {
           signal.signal_created_at ?? null,
           signal.author ?? null,
           signal.id,
+          { ownerId, visibility },
         );
         clusters.push({
           id: newId,

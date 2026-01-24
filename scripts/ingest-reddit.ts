@@ -738,9 +738,16 @@ function buildSignalContent(post: RedditPost) {
   return parts.length > 0 ? parts.join('\n\n') : null;
 }
 
-async function upsertSignalsFromPosts(posts: RedditPost[]): Promise<number> {
+async function upsertSignalsFromPosts(
+  posts: RedditPost[],
+  strategyId?: string | null,
+): Promise<number> {
   if (posts.length === 0) return 0;
   const rowsById = new Map<string, SignalInsertRow>();
+  const strategyMeta =
+    typeof strategyId === 'string' && strategyId.trim().length > 0
+      ? { strategy_id: strategyId.trim() }
+      : {};
   for (const post of posts) {
     const externalId = typeof post.id === 'string' ? post.id.trim() : '';
     if (!externalId) continue;
@@ -762,6 +769,7 @@ async function upsertSignalsFromPosts(posts: RedditPost[]): Promise<number> {
         flair: post.flair ?? null,
         author: post.author ?? null,
         created_utc: post.created_utc ?? null,
+        ...strategyMeta,
       },
     });
   }
@@ -1720,7 +1728,7 @@ async function main() {
   }
 
   try {
-    const upsertedSignals = await upsertSignalsFromPosts(posts);
+    const upsertedSignals = await upsertSignalsFromPosts(posts, strategyId || null);
     console.log(`[signals] upserted ${upsertedSignals}`);
   } catch (err) {
     console.error(

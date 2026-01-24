@@ -2,6 +2,14 @@ import { supabaseServiceClient as supabase } from '../lib/supabaseServiceClient'
 
 const EXPECTED_DIM = Math.max(1, Number(process.env.OUTPUT_DIMENSION ?? 1024));
 
+function normalizeVisibility(value: unknown): 'public' | 'private' | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'private') return 'private';
+  if (normalized === 'public') return 'public';
+  return null;
+}
+
 type SignalRow = {
   id: string;
   embedding: number[] | null;
@@ -91,6 +99,8 @@ async function insertCluster(
   createdAt: string | null,
   author?: string | null,
   signalId?: string | null,
+  ownerId?: string | null,
+  visibility?: 'public' | 'private',
 ) {
   // meta tracks lightweight, rolling metadata such as recent signal IDs and authors.
   const { data, error } = await supabase
@@ -100,6 +110,8 @@ async function insertCluster(
       signal_count: 1,
       first_seen_at: createdAt ?? new Date().toISOString(),
       last_seen_at: createdAt ?? new Date().toISOString(),
+      owner_id: ownerId ?? null,
+      visibility: visibility ?? 'public',
       meta: {
         type: 'need',
         source: 'reddit',
@@ -204,6 +216,26 @@ async function refreshEvidence(clusterId: string) {
 }
 
 async function main() {
+  const ownerId = process.env.ADMIN_JOB_CREATED_BY?.trim() || null;
+  let visibility: 'public' | 'private' = 'public';
+  const strategyConfigRaw = process.env.INGEST_STRATEGY_CONFIG;
+  if (strategyConfigRaw) {
+    try {
+      const parsed = JSON.parse(strategyConfigRaw) as { visibility?: unknown };
+      const parsedVisibility = normalizeVisibility(parsed?.visibility);
+      if (parsedVisibility) visibility = parsedVisibility;
+    } catch (err) {
+      console.warn(
+        'Failed to parse INGEST_STRATEGY_CONFIG for visibility:',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+  if (!ownerId) {
+    visibility = 'public';
+  }
+  console.log(`[clusters] owner_id=${ownerId ?? 'none'} visibility=${visibility}`);
+
   const batchSize = Math.max(1, Number(process.env.BATCH_SIZE || 50));
   const threshold = Number(process.env.CLUSTER_SIM_THRESHOLD || 0.86);
   let processed = 0;
@@ -247,6 +279,8 @@ async function main() {
           signal.signal_created_at ?? null,
           signal.author ?? null,
           signal.id,
+          ownerId,
+          visibility,
         );
         clusters.push({
           id: newId,
