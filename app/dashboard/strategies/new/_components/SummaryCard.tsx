@@ -1,7 +1,9 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDraft } from '../_draft/context';
+import OpportunityPipelineCard from './OpportunityPipelineCard';
 
 export default function SummaryCard() {
   const { draft } = useDraft();
@@ -47,25 +49,31 @@ export default function SummaryCard() {
     rows.push({ label: 'Active', value: draft.active ? 'Yes' : 'No' });
   }
 
+  const searchParams = useSearchParams();
+  const strategyId = searchParams.get('strategyId') || '';
+
   return (
-    <Card className="bg-card/60">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">Draft summary</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm text-muted-foreground">
-        {rows.length === 0 ? (
-          <span>No selections yet.</span>
-        ) : (
-          rows.map((row) => (
-            <div key={row.label} className="flex items-start justify-between gap-4">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                {row.label}
-              </span>
-              <span className="text-right text-foreground/90">{row.value}</span>
-            </div>
-          ))
-        )}
-      </CardContent>
-    </Card>
+    <div className="space-y-3">
+      <Card className="bg-card/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Draft summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          {rows.length === 0 ? (
+            <span>No selections yet.</span>
+          ) : (
+            rows.map((row) => (
+              <div key={row.label} className="flex items-start justify-between gap-4">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                  {row.label}
+                </span>
+                <span className="text-right text-foreground/90">{row.value}</span>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+      {strategyId && <OpportunityPipelineCard strategyId={strategyId} />}
+    </div>
   );
 }
