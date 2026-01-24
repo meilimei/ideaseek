@@ -18,6 +18,18 @@ type OpportunityStats = {
   briefs_total: number | null;
 };
 
+type BlockerKey =
+  | 'repeat_score'
+  | 'paid_intent_score'
+  | 'buyer_clarity_score'
+  | 'reachability_score';
+
+type BlockerInsight = {
+  key: BlockerKey;
+  label: string;
+  hint: string;
+};
+
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -31,6 +43,8 @@ export default function OpportunityPipelineCard({
   const [loading, setLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [blocker, setBlocker] = useState<BlockerInsight | null>(null);
+  const [blockerLoading, setBlockerLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -39,6 +53,8 @@ export default function OpportunityPipelineCard({
       setLoading(false);
       setHasError(false);
       setUpdatedAt(null);
+      setBlocker(null);
+      setBlockerLoading(false);
       return () => {
         active = false;
       };
@@ -48,6 +64,8 @@ export default function OpportunityPipelineCard({
       setLoading(false);
       setHasError(true);
       setUpdatedAt(null);
+      setBlocker(null);
+      setBlockerLoading(false);
       return () => {
         active = false;
       };
@@ -62,6 +80,7 @@ export default function OpportunityPipelineCard({
           setStats(null);
           setHasError(true);
           setUpdatedAt(null);
+          setBlocker(null);
         } else {
           setStats((data as OpportunityStats | null) ?? null);
           setUpdatedAt(new Date());
@@ -72,6 +91,7 @@ export default function OpportunityPipelineCard({
         setStats(null);
         setHasError(true);
         setUpdatedAt(null);
+        setBlocker(null);
       })
       .finally(() => {
         if (!active) return;
@@ -98,6 +118,140 @@ export default function OpportunityPipelineCard({
     if (safeStats.briefs_total === 0) return 'Brief generation not run';
     return 'Pipeline looks healthy';
   })();
+
+  useEffect(() => {
+    let active = true;
+    if (!normalizedId || !isValid) {
+      setBlocker(null);
+      setBlockerLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+    if (!stats || hasError || loading) {
+      setBlocker(null);
+      setBlockerLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+    if (safeStats.clusters_total === 0 || safeStats.clusters_gate_passed > 0) {
+      setBlocker(null);
+      setBlockerLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setBlockerLoading(true);
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    supabase
+      .rpc('strategy_clusters_list', {
+        p_strategy_id: normalizedId,
+        p_limit: 200,
+        p_offset: 0,
+      })
+      .then(async ({ data, error }) => {
+        if (!active) return;
+        if (error || !Array.isArray(data)) {
+          setBlocker(null);
+          return;
+        }
+        const recentFailed = (data as Array<{
+          cluster_id: string;
+          gate_passed: boolean | null;
+          last_seen_at: string | null;
+        }>).filter((row) => {
+          if (row.gate_passed !== false) return false;
+          if (!row.last_seen_at) return false;
+          const ts = new Date(row.last_seen_at).getTime();
+          return Number.isFinite(ts) && ts >= cutoff;
+        });
+        if (recentFailed.length === 0) {
+          setBlocker(null);
+          return;
+        }
+
+        const ids = recentFailed.map((row) => row.cluster_id);
+        const { data: scoreRows, error: scoreError } = await supabase
+          .from('signal_clusters')
+          .select('id, repeat_score, paid_intent_score, buyer_clarity_score, reachability_score')
+          .in('id', ids);
+        if (!active || scoreError || !Array.isArray(scoreRows)) {
+          setBlocker(null);
+          return;
+        }
+
+        const counts: Record<BlockerKey, number> = {
+          repeat_score: 0,
+          paid_intent_score: 0,
+          buyer_clarity_score: 0,
+          reachability_score: 0,
+        };
+
+        for (const row of scoreRows as Array<Record<string, unknown>>) {
+          const repeat = typeof row.repeat_score === 'number' ? row.repeat_score : null;
+          const paid = typeof row.paid_intent_score === 'number' ? row.paid_intent_score : null;
+          const buyer =
+            typeof row.buyer_clarity_score === 'number' ? row.buyer_clarity_score : null;
+          const reach =
+            typeof row.reachability_score === 'number' ? row.reachability_score : null;
+          const candidates: Array<{ key: BlockerKey; value: number }> = [];
+          if (repeat !== null) candidates.push({ key: 'repeat_score', value: repeat });
+          if (paid !== null) candidates.push({ key: 'paid_intent_score', value: paid });
+          if (buyer !== null) candidates.push({ key: 'buyer_clarity_score', value: buyer });
+          if (reach !== null) candidates.push({ key: 'reachability_score', value: reach });
+          if (candidates.length === 0) continue;
+          candidates.sort((a, b) => a.value - b.value);
+          const weakest = candidates[0]?.key;
+          if (weakest) {
+            counts[weakest] += 1;
+          }
+        }
+
+        const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const topKey = ranked[0]?.[0] as BlockerKey | undefined;
+        if (!topKey || counts[topKey] === 0) {
+          setBlocker(null);
+          return;
+        }
+
+        const labels: Record<BlockerKey, { label: string; hint: string }> = {
+          repeat_score: {
+            label: 'Repeatability',
+            hint: 'broaden subreddits/time range or lower strict filters',
+          },
+          paid_intent_score: {
+            label: 'Paid intent',
+            hint: 'include tool/competitor keywords and B2B subreddits',
+          },
+          buyer_clarity_score: {
+            label: 'Buyer clarity',
+            hint: 'choose role-specific subreddits / add role keywords',
+          },
+          reachability_score: {
+            label: 'Reachability',
+            hint: 'ensure clear communities/tools ecosystems exist',
+          },
+        };
+
+        const selected = labels[topKey];
+        setBlocker({ key: topKey, label: selected.label, hint: selected.hint });
+      })
+      .catch(() => {
+        if (!active) return;
+        setBlocker(null);
+      })
+      .finally(() => {
+        if (!active) return;
+        setBlockerLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [normalizedId, isValid, stats, hasError, loading, safeStats.clusters_total, safeStats.clusters_gate_passed, supabase]);
 
   const updatedLabel = updatedAt
     ? (() => {
@@ -185,6 +339,15 @@ export default function OpportunityPipelineCard({
               </div>
             </div>
             <div className="text-xs text-muted-foreground">{statusLine}</div>
+            {blockerLoading ? (
+              <div className="h-3 w-4/5 rounded-full bg-secondary/15" />
+            ) : (
+              blocker && (
+                <div className="text-xs text-muted-foreground">
+                  Top blocker: {blocker.label} ({blocker.hint})
+                </div>
+              )
+            )}
             {updatedLabel && (
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
                 {updatedLabel}
