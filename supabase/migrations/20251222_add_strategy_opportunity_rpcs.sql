@@ -13,13 +13,7 @@ as $$
   with strategy_signals as (
     select s.id, s.signal_created_at
     from public.signals s
-    where (
-      case
-        when (s.meta->>'strategyId') ~* '^[0-9a-f-]{36}$' then (s.meta->>'strategyId')::uuid
-        when (s.meta->>'strategy_id') ~* '^[0-9a-f-]{36}$' then (s.meta->>'strategy_id')::uuid
-        else null
-      end
-    ) = p_strategy_id
+    where s.meta->>'strategy_id' = p_strategy_id::text
   ),
   cluster_ids as (
     select distinct m.cluster_id
@@ -59,13 +53,7 @@ as $$
   with strategy_signals as (
     select s.id
     from public.signals s
-    where (
-      case
-        when (s.meta->>'strategyId') ~* '^[0-9a-f-]{36}$' then (s.meta->>'strategyId')::uuid
-        when (s.meta->>'strategy_id') ~* '^[0-9a-f-]{36}$' then (s.meta->>'strategy_id')::uuid
-        else null
-      end
-    ) = p_strategy_id
+    where s.meta->>'strategy_id' = p_strategy_id::text
   ),
   cluster_ids as (
     select distinct m.cluster_id

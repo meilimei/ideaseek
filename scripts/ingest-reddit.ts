@@ -738,22 +738,86 @@ function buildSignalContent(post: RedditPost) {
   return parts.length > 0 ? parts.join('\n\n') : null;
 }
 
+type SignalsLinkageMeta = {
+  strategy_id?: string;
+  owner_id?: string;
+  job_id?: number;
+  fetch_provider?: string;
+  track?: string;
+  subredditsSource?: string;
+};
+
+function mergeSignalMeta(
+  base: Record<string, unknown> | null,
+  linkage: SignalsLinkageMeta | null,
+): Record<string, unknown> {
+  const meta: Record<string, unknown> =
+    base && typeof base === 'object' ? { ...base } : {};
+  if (!linkage) return meta;
+  for (const [key, value] of Object.entries(linkage)) {
+    if (value === undefined || value === null) continue;
+    meta[key] = value;
+  }
+  return meta;
+}
+
+function buildSignalsLinkageMeta(input: {
+  strategyId?: string | null;
+  ownerId?: string | null;
+  jobId?: number | null;
+  fetchProvider?: string | null;
+  track?: string | null;
+  subredditsSource?: string | null;
+}): SignalsLinkageMeta {
+  const strategyId = typeof input.strategyId === 'string' ? input.strategyId.trim() : '';
+  const ownerId = typeof input.ownerId === 'string' ? input.ownerId.trim() : '';
+  const jobId =
+    typeof input.jobId === 'number' && Number.isFinite(input.jobId) ? input.jobId : null;
+  const fetchProvider =
+    typeof input.fetchProvider === 'string' ? input.fetchProvider.trim() : '';
+  const track = typeof input.track === 'string' ? input.track.trim() : '';
+  const subredditsSource =
+    typeof input.subredditsSource === 'string' ? input.subredditsSource.trim() : '';
+
+  const strategyIdPresent = strategyId.length > 0;
+  const ownerIdPresent = ownerId.length > 0;
+  const jobIdPresent = jobId !== null;
+  console.log(
+    `[signals] meta_linkage strategy_id_present=${strategyIdPresent ? '1' : '0'} owner_id_present=${ownerIdPresent ? '1' : '0'} job_id_present=${jobIdPresent ? '1' : '0'}`,
+  );
+  if (!strategyIdPresent) console.warn('[signals] meta linkage missing strategy_id');
+  if (!ownerIdPresent) console.warn('[signals] meta linkage missing owner_id');
+  if (!jobIdPresent) console.warn('[signals] meta linkage missing job_id');
+
+  const meta: SignalsLinkageMeta = {};
+  if (strategyIdPresent) meta.strategy_id = strategyId;
+  if (ownerIdPresent) meta.owner_id = ownerId;
+  if (jobIdPresent && jobId !== null) meta.job_id = jobId;
+  if (fetchProvider) meta.fetch_provider = fetchProvider;
+  if (track) meta.track = track;
+  if (subredditsSource) meta.subredditsSource = subredditsSource;
+  return meta;
+}
+
 async function upsertSignalsFromPosts(
   posts: RedditPost[],
-  strategyId?: string | null,
+  linkageMeta?: SignalsLinkageMeta | null,
 ): Promise<number> {
   if (posts.length === 0) return 0;
   const rowsById = new Map<string, SignalInsertRow>();
-  const strategyMeta =
-    typeof strategyId === 'string' && strategyId.trim().length > 0
-      ? { strategy_id: strategyId.trim() }
-      : {};
   for (const post of posts) {
     const externalId = typeof post.id === 'string' ? post.id.trim() : '';
     if (!externalId) continue;
     const createdMs = post.created_at_ms ?? toEpochMs(post.created_utc);
     const signalCreatedAt = createdMs ? new Date(createdMs).toISOString() : null;
     const title = post.title?.trim() ?? '';
+    const baseMeta: Record<string, unknown> = {
+      score: post.score ?? null,
+      num_comments: post.num_comments ?? null,
+      flair: post.flair ?? null,
+      author: post.author ?? null,
+      created_utc: post.created_utc ?? null,
+    };
     rowsById.set(externalId, {
       source: 'reddit',
       external_id: externalId,
@@ -763,14 +827,7 @@ async function upsertSignalsFromPosts(
       content: buildSignalContent(post),
       community: post.subreddit ?? null,
       signal_created_at: signalCreatedAt,
-      meta: {
-        score: post.score ?? null,
-        num_comments: post.num_comments ?? null,
-        flair: post.flair ?? null,
-        author: post.author ?? null,
-        created_utc: post.created_utc ?? null,
-        ...strategyMeta,
-      },
+      meta: mergeSignalMeta(baseMeta, linkageMeta ?? null),
     });
   }
 
@@ -1503,6 +1560,13 @@ async function main() {
     payloadCfgCandidate && typeof payloadCfgCandidate === 'object' && !Array.isArray(payloadCfgCandidate)
       ? (payloadCfgCandidate as Record<string, unknown>)
       : ((jobPayload as any) ?? null);
+  const payloadUserId =
+    typeof (jobPayload as any)?.userId === 'string'
+      ? String((jobPayload as any)?.userId).trim()
+      : typeof (jobPayload as any)?.user_id === 'string'
+        ? String((jobPayload as any)?.user_id).trim()
+        : '';
+  const resolvedOwnerId = ownerId || payloadUserId || null;
   const payloadStrategyId =
     (typeof (jobPayload as any)?.strategyId === 'string'
       ? (jobPayload as any)?.strategyId
@@ -1642,6 +1706,14 @@ async function main() {
       ',',
     )}`,
   );
+  const signalsLinkageMeta = buildSignalsLinkageMeta({
+    strategyId,
+    ownerId: resolvedOwnerId,
+    jobId,
+    fetchProvider,
+    track: cfgTrack || null,
+    subredditsSource,
+  });
   console.log(`[ideas] visibility=${ideasVisibility} source=${ideasVisibilitySource}`);
   const rawKeywords = cfgKeywords?.length ? cfgKeywords : DEFAULT_KEYWORDS;
   const keywords = normalizePainPatterns(rawKeywords);
@@ -1728,7 +1800,7 @@ async function main() {
   }
 
   try {
-    const upsertedSignals = await upsertSignalsFromPosts(posts, strategyId || null);
+    const upsertedSignals = await upsertSignalsFromPosts(posts, signalsLinkageMeta);
     console.log(`[signals] upserted ${upsertedSignals}`);
   } catch (err) {
     console.error(

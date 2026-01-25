@@ -14,7 +14,7 @@ as $$
   with strategy_signals as (
     select s.id
     from public.signals s
-    where coalesce(s.meta->>'strategyId', s.meta->>'strategy_id') = strategy_id::text
+    where s.meta->>'strategy_id' = strategy_id::text
   ),
   cluster_ids as (
     select distinct m.cluster_id
@@ -34,3 +34,5 @@ as $$
      where ob.cluster_id in (select cluster_id from cluster_ids)
     ) as briefs_count;
 $$;
+
+grant execute on function public.strategy_opportunity_stats(uuid) to anon, authenticated;
